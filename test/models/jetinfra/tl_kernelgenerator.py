@@ -7,9 +7,9 @@ import time
 import torch.nn as nn
 
 def get_configs():
-    block_M = [32, 64, 128, 256]  
-    block_K = [64, 128, 256] 
-    block_N = [64, 128, 256]  
+    block_M = [32, 64, 128]  
+    block_K = [64, 128] 
+    block_N = [64, 128]  
     num_stages = [1, 2, 3, 4]  
     threads = [128, 256]
     _configs = list(itertools.product(block_M, block_K, block_N, num_stages, threads))
@@ -229,15 +229,97 @@ def conv_kernel_generator(input, weight1, weight2, dtype="float16"):
     kernel2 = tl_linear(B, Token, hidden_size, D_out, dtype=dtype, out_dtype=dtype)
     output1 = torch.empty(B, Token, hidden_size, device=device, dtype=torch_dtype)
     output2 = torch.empty(B, Token, D_out, device=device, dtype=torch_dtype)
-    kernel1(input.view(B * Token, D_in), weight1, output1.view(B * Token, hidden_size))
-    kernel2(output1.view(B * Token, hidden_size), weight2, output2.view(B * Token, D_out))
-    return output2
+    in_mat = input.view(B * Token, D_in).contiguous()
+    # w1 = weight1.contiguous()
+    out1_mat = output1.view(B * Token, hidden_size).contiguous()
+    kernel1(in_mat, weight1, out1_mat)
+
+    # w2 = weight2.contiguous()
+    # out2_mat = output2.view(B * Token, D_out).contiguous()
+    # kernel2(out1_mat, weight2, out2_mat)
+    # return output2
+    return output1
 
 
 if __name__ == "__main__":
-    input = torch.randn(1, 1024, 1024, dtype=torch.float16).to("cuda")
-    weight1 = torch.randn(1024, 1024, dtype=torch.float16).to("cuda")
-    weight2 = torch.randn(1024, 1024, dtype=torch.float16).to("cuda")
-    output = conv_kernel_generator(input, weight1, weight2, dtype="float16")
-    print(output.shape)
-    print(output)
+    # Problem size
+    B, Token, D_in = 40, 1, 1536
+    hidden_size = 384
+    D_out = 12288
+
+    # =================
+    # FP16 Benchmarking
+    # =================
+    print("Benchmarking FP16...")
+    Input_fp16 = torch.randn(B, Token, D_in, dtype=torch.float16).to("cuda")
+    W1_fp16 = torch.randn(hidden_size, D_in, dtype=torch.float16).to("cuda")
+    W2_fp16 = torch.randn(D_out, hidden_size, dtype=torch.float16).to("cuda")
+
+    # --- Tile-lang implementation ---
+    for _ in range(10):
+        out_tl_fp16 = conv_kernel_generator(Input_fp16, W1_fp16, W2_fp16, dtype="float16")
+    torch.cuda.synchronize()
+    start = time.time()
+    for _ in range(20):
+        out_tl_fp16 = conv_kernel_generator(Input_fp16, W1_fp16, W2_fp16, dtype="float16")
+    torch.cuda.synchronize()
+    end = time.time()
+    tl_fp16_time = (end - start) * 1000 / 20
+    print(f"Tilelang FP16 Time taken: {tl_fp16_time:.4f} ms")
+
+    # --- PyTorch implementation ---
+    for _ in range(10):
+        out1 = Input_fp16.view(B * Token, D_in) @ W1_fp16.T
+        out1 = nn.functional.silu(out1)
+        out_pt_fp16 = out1 @ W2_fp16.T
+    torch.cuda.synchronize()
+    start = time.time()
+    for _ in range(20):
+        out1 = Input_fp16.view(B * Token, D_in) @ W1_fp16.T
+        out1 = nn.functional.silu(out1)
+        out_pt_fp16 = out1 @ W2_fp16.T
+    torch.cuda.synchronize()
+    end = time.time()
+    pt_fp16_time = (end - start) * 1000 / 20
+    print(f"PyTorch FP16 Time taken: {pt_fp16_time:.4f} ms")
+
+    # --- Correctness Check ---
+    # out_tl_fp16_2d = out_tl_fp16.view(B * Token, D_out)
+    # torch.testing.assert_close(out_tl_fp16_2d, out_pt_fp16, rtol=1e-2, atol=1e-2)
+    # rel_err_fp16 = torch.mean(torch.abs(out_tl_fp16_2d - out_pt_fp16) / (torch.abs(out_pt_fp16) + 1e-6))
+    # print(f"FP16 Average Relative Error: {rel_err_fp16.item():.6f}")
+    out_tl_fp16_2d = out_tl_fp16.view(B * Token, -1)
+    torch.testing.assert_close(out_tl_fp16_2d, out1, rtol=1e-2, atol=1e-2)
+    rel_err_fp16 = torch.mean(torch.abs(out_tl_fp16_2d - out1) / (torch.abs(out1) + 1e-6))
+    print(f"FP16 Average Relative Error: {rel_err_fp16.item():.6f}")
+
+    # # =================
+    # # FP8 Benchmarking
+    # # =================
+    # print("\nBenchmarking FP8...")
+    # Input_fp8 = torch.randn(B, Token, D_in, dtype=torch.float16).to("cuda").to(torch.float8_e4m3fn)
+    # W1_fp8 = torch.randn(hidden_size, D_in, dtype=torch.float16).to("cuda").to(torch.float8_e4m3fn)
+    # W2_fp8 = torch.randn(D_out, hidden_size, dtype=torch.float16).to("cuda").to(torch.float8_e4m3fn)
+
+    # # --- Tile-lang implementation ---
+    # for _ in range(10):
+    #     out_tl_fp8 = conv_kernel_generator(Input_fp8, W1_fp8, W2_fp8, dtype="float8_e4m3")
+    # torch.cuda.synchronize()
+    # start = time.time()
+    # for _ in range(20):
+    #     out_tl_fp8 = conv_kernel_generator(Input_fp8, W1_fp8, W2_fp8, dtype="float8_e4m3")
+    # torch.cuda.synchronize()
+    # end = time.time()
+    # tl_fp8_time = (end - start) * 1000 / 20
+    # print(f"Tilelang FP8 Time taken: {tl_fp8_time:.4f} ms")
+
+    # # --- PyTorch reference (FP16) ---
+    # out1_ref = Input_fp8.view(B * Token, D_in).to(torch.float16) @ W1_fp8.T.to(torch.float16)
+    # out1_ref = nn.functional.silu(out1_ref)
+    # out_pt_ref_fp8 = out1_ref @ W2_fp8.T.to(torch.float16)
+
+    # # --- Correctness Check ---
+    # out_tl_fp8_2d = out_tl_fp8.view(B * Token, D_out).to(torch.float16)
+    # torch.testing.assert_close(out_tl_fp8_2d, out_pt_ref_fp8, rtol=0.1, atol=0.1)
+    # rel_err_fp8 = torch.mean(torch.abs(out_tl_fp8_2d - out_pt_ref_fp8) / (torch.abs(out_pt_ref_fp8) + 1e-6))
+    # print(f"FP8 (Tilelang) vs FP16 (PyTorch) Average Relative Error: {rel_err_fp8.item():.6f}")

@@ -313,7 +313,7 @@ class DynamicConvTritonFunc(Function):
 
 
 # --- User-facing function ---
-def dynamic_conv_triton_cache(x: torch.Tensor, kernels: torch.Tensor, cache: torch.Tensor = None) -> torch.Tensor:
+def  dynamic_conv_triton_cache(x: torch.Tensor, kernels: torch.Tensor, cache: torch.Tensor = None) -> torch.Tensor:
     """
     Fused dynamic convolution with autograd support using Triton kernels.
     Assumes W <= 4.

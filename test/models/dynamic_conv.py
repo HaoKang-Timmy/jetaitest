@@ -65,10 +65,10 @@ class DynamicShortConvolution(nn.Module):
         
         self.static_conv_init = static_conv_init
 
-        print("generator_input_size:", self.generator_input_size)
-        print("generator_hidden_size:", self.generator_hidden_size)
-        print("hidden_size:", self.hidden_size)
-        print("kernel_size:", self.kernel_size)
+        # print("generator_input_size:", self.generator_input_size)
+        # print("generator_hidden_size:", self.generator_hidden_size)
+        # print("hidden_size:", self.hidden_size)
+        # print("kernel_size:", self.kernel_size)
         self.kernel_generator = nn.Sequential(
             OrderedDict([
                 ("w1", nn.Linear(self.generator_input_size, self.generator_hidden_size, bias=False)),
@@ -230,6 +230,7 @@ class DynamicShortConvolution(nn.Module):
             start = i * CHUNK_SIZE
             end = min((i + 1) * CHUNK_SIZE, x.shape[1])
             kernels = self.get_kernel(generator_input[:, start:end])
+            print("kernels shape:", kernels.shape)
             # print("cache shape:", cache.shape if cache is not None else None)
             out = dynamic_conv_triton_cache(x[:, start:end], kernels, cache=cache)
             output_triton[:, i*CHUNK_SIZE:end, :] = out
