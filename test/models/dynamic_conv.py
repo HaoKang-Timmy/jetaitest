@@ -136,7 +136,7 @@ class DynamicShortConvolution(nn.Module):
         x: [B, T, D]
         return: [B, T, D]
         """
-        # print("x shape:", x.shape)
+        # print("forward dynamic conv")
         # print("mask shape:", mask.shape if mask is not None else None)
         # print("cache shape:", cache.shape if cache is not None else None)
         # print("output_final_state:", output_final_state)
@@ -149,7 +149,7 @@ class DynamicShortConvolution(nn.Module):
         N = B
 
         input_dtype = x.dtype
-        print("mask dtype:", mask.dtype, "mask shape:", mask.shape)
+        # print("mask dtype:", mask.dtype, "mask shape:", mask.shape)
         if mask is not None:
             x = x.mul_(mask.unsqueeze(-1))
 
@@ -157,7 +157,7 @@ class DynamicShortConvolution(nn.Module):
         
         if implementation == "triton" and not self.training:
             implementation = "triton_cache"
-        print("implementation:", implementation)
+        # print("implementation:", implementation)
         # during the decoding phase, we assume the batch is composed of sequences of length 1
         if cache is not None and B * T == N:
             assert T == 1
@@ -168,6 +168,7 @@ class DynamicShortConvolution(nn.Module):
                 # print("decode cache shape:", cache.shape)
                 # print("decode cu_seqlens:", cu_seqlens)
                 # print("decode generator_input shape:", generator_input.shape)
+                print("step triton")
                 x, cache = self._step_triton(x, cache, cu_seqlens, generator_input=generator_input)
             else:
                 raise ValueError(f"Unknown implementation: {implementation}")
@@ -230,11 +231,11 @@ class DynamicShortConvolution(nn.Module):
             start = i * CHUNK_SIZE
             end = min((i + 1) * CHUNK_SIZE, x.shape[1])
             kernels = self.get_kernel(generator_input[:, start:end])
-            print("kernels shape:", kernels.shape)
+            # print("kernels shape:", kernels.shape)
             # print("cache shape:", cache.shape if cache is not None else None)
             out = dynamic_conv_triton_cache(x[:, start:end], kernels, cache=cache)
             output_triton[:, i*CHUNK_SIZE:end, :] = out
-            cache = x[:, end-self.kernel_size:end, :]
+        cache = x[:, end-self.kernel_size:end, :]
         return output_triton
 
     def _step_naive(
@@ -280,7 +281,8 @@ class DynamicShortConvolution(nn.Module):
         # print("generator_input squeeze shape:", generator_input.squeeze(1).shape)
         kernels_triton = self.get_kernel(generator_input.squeeze(1)) # [B, D, W]
         # print("kernels_triton shape:", kernels_triton.shape)
-        # print("cache shape:", cache.shape)
+        print("cache shape:", cache.shape)
+        print("x shape:", x.shape)
         # 2. Call Triton kernel without activation
         x_out_triton = causal_conv_step_triton(
             x,

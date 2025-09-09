@@ -18,7 +18,7 @@ import os
 import argparse
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from models import JetNemotronForCausalLM, JetNemotronConfig
+from edge_models import JetNemotronForCausalLM, JetNemotronConfig
 
 def main():
     parser = argparse.ArgumentParser(description="Generate text using local Jet-Nemotron")
@@ -26,7 +26,7 @@ def main():
                        help="Path to the model weights")
     parser.add_argument("--input_text", type=str, default="Hello, I'm Jet-Nemotron from NVIDIA.",
                        help="Input text for generation")
-    parser.add_argument("--max_new_tokens", type=int, default=1,
+    parser.add_argument("--max_new_tokens", type=int, default=10,
                        help="Maximum number of new tokens to generate")
     parser.add_argument("--do_sample", action="store_true",
                        help="Whether to use sampling for generation")

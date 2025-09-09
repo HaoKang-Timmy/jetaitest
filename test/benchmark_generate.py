@@ -19,7 +19,7 @@ import time
 import argparse
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from models import JetNemotronForCausalLM, JetNemotronConfig
+from edge_models import JetNemotronForCausalLM, JetNemotronConfig
 
 def get_gpu_memory():
     """获取当前GPU内存使用情况（以GB为单位）"""
