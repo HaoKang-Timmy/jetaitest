@@ -29,7 +29,7 @@ from transformers.activations import ACT2FN
 from .dconv_fwdbwd import dynamic_conv_triton_autograd
 from .dconv_fwd_cache import dynamic_conv_triton_cache
 from .dconv_step import causal_conv_step_triton
-from jetinfra import tl_dynamic_conv_cache
+from .jetinfra import tl_dynamic_conv_cache
 import time
 
 
