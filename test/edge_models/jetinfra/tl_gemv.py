@@ -55,7 +55,7 @@ def ref_program(A, B):
 #     return main
 def get_configs():
  
-    BLOCK_N = [2, 4, 8, 32, 64, 128]  
+    BLOCK_N = [128]  
 
     reduce_threads = [4, 8, 32]
     _configs = list(itertools.product(BLOCK_N, reduce_threads))
@@ -70,7 +70,7 @@ def get_configs():
         tl.PassConfigKey.TL_DISABLE_FAST_MATH: False,
     }
 )
-def splitk_gemv_vectorized(
+def splitk_gemv_vectorized_silu(
     Batch: int,
     N: int,
     K: int,
@@ -107,6 +107,10 @@ def splitk_gemv_vectorized(
                 for k in T.serial(TILE_K):
                     C_accum[0] += A_local[k].astype(accum_dtype) * B_local[k].astype(accum_dtype)
             T.atomic_add(C_shared[tn], C_accum[0])
+            #### silu
+            C_shared[tn] = C_shared[tn] / (1 + T.exp(-C_shared[tn]))
+            #### k2 norm
+            
             C[batch_id, bn * BLOCK_N + tn] = C_shared[tn]
 
     return main
@@ -197,7 +201,7 @@ def main():
     parser = argparse.ArgumentParser(description="GEMV Example")
     parser.add_argument("--n", type=int, default=1536, help="Matrix dimension N")
     parser.add_argument("--k", type=int, default=1152, help="Matrix dimension K")
-    parser.add_argument("--batch", type=int, default=10, help="Batch dimension B")
+    parser.add_argument("--batch", type=int, default=1, help="Batch dimension B")
     args, _ = parser.parse_known_args()
     N, K, Batch = args.n, args.k, args.batch
     # check_correctness_and_bench(naive_gemv(N, K, 128, 128), N, K)
@@ -215,7 +219,7 @@ def main():
     # print(f"Torch Latency: {latency} ms")
     # latency = profiler.do_bench(kernel, warmup=500)
     # print(f"TileLang Latency: {latency} ms\n")
-    kernel = splitk_gemv_vectorized(Batch, N, K)
+    kernel = splitk_gemv_vectorized_silu(Batch, N, K)
     input_a = torch.randn(Batch, K).half().to("cuda")
     input_b = torch.randn(N, K).half().to("cuda")
     input_c = torch.randn(Batch, N).half().to("cuda")
