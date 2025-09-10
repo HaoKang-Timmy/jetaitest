@@ -70,12 +70,12 @@ def _dconv_fwd_kernel(
             T.copy(Output_reduced, Output_shared)
             T.copy(Output_shared, Output[bx, by * block_D])
     return main_fp16_prefill
-def tl_dynamic_conv_cache(x, kernels):
+def tl_dynamic_conv_cache_w_silu(x, kernels):
     B, Token, D = x.shape
     W = kernels.shape[-1]
     out = torch.empty_like(x)
     #### TODO hard code to float16
-    kernel = _dconv_fwd_kernel(B, Token, D, W, dtype = "float16")
+    kernel = _dconv_fwd_kernel(B, Token, D, W, dtype = "bfloat16")
     x = x.view(B * Token, D)
     kernels = kernels.view(B * Token, D, W)
     out = out.view(B * Token, D)
@@ -133,5 +133,5 @@ if __name__ == "__main__":
     kernel_input = kernel_input * 5
     # kernel = _dconv_fwd_kernel(batch, token, indim, kernel_size, block_d, threads, dtype)
     # kernel(input1, kernel_input, output_triton)
-    output_triton = tl_dynamic_conv_cache(input1, kernel_input)
+    output_triton = tl_dynamic_conv_cache_w_silu(input1, kernel_input)
    

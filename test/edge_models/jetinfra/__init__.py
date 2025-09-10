@@ -1,2 +1,2 @@
 from .tl_fusedlinear import linear_w_silu
-from .tl_dconv import tl_dynamic_conv_cache
+from .tl_dconv import tl_dynamic_conv_cache_w_silu

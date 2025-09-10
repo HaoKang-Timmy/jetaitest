@@ -186,8 +186,7 @@ class JetBlock(nn.Module):
         conv_mask = attention_mask[:, -hidden_states.shape[1]:] if attention_mask is not None else None
         # print("conv_mask.shape:", conv_mask.shape if conv_mask is not None else None)
         # print("hidden_states.shape:", hidden_states.shape)
-        q = F.silu(self.q_proj(hidden_states))
-        k = F.silu(self.k_proj(hidden_states))
+        
         # print("q.shape:", q.shape)
         # print("k.shape:", k.shape)
         conv_state_v = None
@@ -219,6 +218,16 @@ class JetBlock(nn.Module):
 
         recurrent_state = last_state['recurrent_state'] if last_state is not None else None
         if mode == 'chunk':
+            ### TODO optimize prefilling as well
+            q = F.silu(self.q_proj(hidden_states))
+            k = F.silu(self.k_proj(hidden_states))
+            if attention_mask is not None and q_len > 1:
+                q = index_first_axis(rearrange(q, "b s ... -> (b s) ..."), indices).unsqueeze(0)
+                k = index_first_axis(rearrange(k, "b s ... -> (b s) ..."), indices).unsqueeze(0)
+                v = index_first_axis(rearrange(v, "b s ... -> (b s) ..."), indices).unsqueeze(0)
+                hidden_states = index_first_axis(rearrange(hidden_states, "b s ... -> (b s) ..."), indices).unsqueeze(0)
+            
+            q, k = map(lambda x: rearrange(x, '... (h d) -> ... h d', d=self.head_k_dim), (q, k))
             o, recurrent_state = chunk_gated_delta_rule(
                 q=q,
                 k=k,

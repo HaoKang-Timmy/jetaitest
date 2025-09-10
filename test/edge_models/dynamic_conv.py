@@ -29,7 +29,7 @@ from transformers.activations import ACT2FN
 from .dconv_fwdbwd import dynamic_conv_triton_autograd
 from .dconv_fwd_cache import dynamic_conv_triton_cache
 from .dconv_step import causal_conv_step_triton
-from .jetinfra import tl_dynamic_conv_cache
+from .jetinfra import tl_dynamic_conv_cache_w_silu
 import time
 
 
@@ -190,9 +190,10 @@ class DynamicShortConvolution(nn.Module):
         # else:
         #     raise ValueError(f"Unknown implementation: {implementation}")
         ### NOTICE: replace with tl kernel
-        x = self._forward_triton_cache(x, generator_input=generator_input, cache=cache)
-        if self.activation is not None:
-            x = ACT2FN[self.activation](x)
+        # x = self._forward_triton_cache(x, generator_input=generator_input, cache=cache)
+        # if self.activation is not None:
+        #     x = ACT2FN[self.activation](x)
+        x = self._forward_tilelang_cache(x, generator_input=generator_input, cache=cache)
         
         x = x.to(input_dtype)
         if output_final_state:
@@ -257,7 +258,8 @@ class DynamicShortConvolution(nn.Module):
             kernels = self.get_kernel(generator_input[:, start:end])
             # print("kernels shape:", kernels.shape)
             # print("cache shape:", cache.shape if cache is not None else None)
-            out = dynamic_conv_triton_cache(x[:, start:end], kernels, cache=cache)
+            # out = dynamic_conv_triton_cache(x[:, start:end], kernels, cache=cache)
+            out = tl_dynamic_conv_cache_w_silu(x[:, start:end], kernels)
             output_triton[:, i*CHUNK_SIZE:end, :] = out
         cache = x[:, end-self.kernel_size:end, :]
         return output_triton
