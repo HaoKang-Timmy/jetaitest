@@ -1,0 +1,2 @@
+2025-09-09 21:30:55,457 INFO:Auto-tuning with 0.9 CPU utilizations, 20 CPUs available, 18 CPUs will be used
+2025-09-09 21:30:55,720 DEBUG:Compilation failed for config {'block_D': 256, 'threads': 128} at index 1 with error: Check failed: (res->errors.empty()) is false: Layout Layout([256, 4, 1] -> [(_j // 4 + 255) // 128 * 4 + _j % 4 + 1, 128], transform: [_i, _j, _k] -> [(_j // 4 + _i) // 128 * 4 + _j % 4, (_j // 4 + _i) % 128]) has errors: ["Index mapping does not form a bijective transform."]

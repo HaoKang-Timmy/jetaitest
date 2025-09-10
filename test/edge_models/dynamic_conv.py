@@ -239,6 +239,28 @@ class DynamicShortConvolution(nn.Module):
             output_triton[:, i*CHUNK_SIZE:end, :] = out
         cache = x[:, end-self.kernel_size:end, :]
         return output_triton
+    
+    @torch.no_grad
+    def _forward_tilelang_cache(self, x: torch.Tensor, generator_input: Optional[torch.Tensor] = None, cache: Optional[torch.Tensor] = None) -> torch.Tensor:
+        generator_input = x if generator_input is None else generator_input
+        assert not self.training, "Triton implementation is only available in eval mode."
+        # cache: [B, D, T(W)]
+        CHUNK_SIZE = 2048
+        n_chunk = (x.shape[1] + CHUNK_SIZE - 1) // CHUNK_SIZE
+        output_triton = torch.zeros_like(x)
+        if cache is not None:
+            cache = rearrange(cache, "b d t -> b t d")  # [B, T(W), D]
+
+        for i in range(n_chunk):
+            start = i * CHUNK_SIZE
+            end = min((i + 1) * CHUNK_SIZE, x.shape[1])
+            kernels = self.get_kernel(generator_input[:, start:end])
+            # print("kernels shape:", kernels.shape)
+            # print("cache shape:", cache.shape if cache is not None else None)
+            out = dynamic_conv_triton_cache(x[:, start:end], kernels, cache=cache)
+            output_triton[:, i*CHUNK_SIZE:end, :] = out
+        cache = x[:, end-self.kernel_size:end, :]
+        return output_triton
 
     def _step_naive(
         self,

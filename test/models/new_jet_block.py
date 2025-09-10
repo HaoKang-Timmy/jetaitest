@@ -188,10 +188,10 @@ class JetBlock(nn.Module):
         conv_mask = attention_mask[:, -hidden_states.shape[1]:] if attention_mask is not None else None
         # print("hidden_states.shape:", hidden_states.shape)
         ## TODO FP8 kernel replacing
-        # q = F.silu(self.q_proj(hidden_states))
-        # k = F.silu(self.k_proj(hidden_states))
-        q = linear_w_silu_prefill(hidden_states, self.q_proj.weight)
-        k = linear_w_silu_prefill(hidden_states, self.k_proj.weight)
+        q = F.silu(self.q_proj(hidden_states))
+        k = F.silu(self.k_proj(hidden_states))
+        # q = linear_w_silu_prefill(hidden_states, self.q_proj.weight)
+        # k = linear_w_silu_prefill(hidden_states, self.k_proj.weight)
         conv_state_v = None
         if last_state is not None:
             conv_state_v = last_state['conv_state'][-1]

@@ -5,14 +5,14 @@ import tilelang.language as T
 import itertools
 import time
 import torch.nn as nn
-import matplotlib.pyplot as plt
-import seaborn as sns
+# import matplotlib.pyplot as plt
+# import seaborn as sns
 import numpy as np
 
 
 def get_configs():
-    block_D = [128, 256, 512]
-    threads = [128, 256]
+    block_D = [128, 256, 512, 768]
+    threads = [128]
     _configs = list(itertools.product(block_D, threads))
     configs = [{
         'block_D': c[0],
@@ -70,56 +70,35 @@ def _dconv_fwd_kernel(
             T.copy(Output_shared, Output[bx, by * block_D])
     return main_fp16_prefill
 
-# def dynamic_conv_pytorch_cache(x, kernels, cache=None):
-#     B, T, D = x.shape
-#     W = kernels.shape[-1]
-#     T_CACHE = cache.shape[1] if cache is not None else 0
-    
-#     output = torch.zeros_like(x)
-    
-#     for b in range(B):
-#         for t in range(T):
-#             for d in range(D):
-#                 accumulator = 0.0
-                
-#                 for w in range(W):
-#                     input_time_rel_x = t + w - W + 1
-#                     eff_time_idx = input_time_rel_x + T_CACHE
-                    
-#                     if eff_time_idx >= 0 and eff_time_idx < (T_CACHE + T):
-#                         if eff_time_idx < T_CACHE:
-#                             cache_idx = eff_time_idx
-#                             input_val = cache[b, cache_idx, d].item()
-#                         else:
-#                             x_idx = eff_time_idx - T_CACHE
-#                             input_val = x[b, x_idx, d].item()
-#                     else:
-#                         input_val = 0.0
-                    
-#                     kernel_val = kernels[b, t, d, w].item()
-#                     accumulator += input_val * kernel_val
-                
-#                 output[b, t, d] = accumulator
-    
-#     return output
-
+def dynamic_conv_pytorch_cache(x, kernels, cache=None):
 if __name__ == "__main__":
-    batch = 4
-    token = 10
-    indim = 512
+    batch = 1
+    token = 1
+    indim = 3072
     kernel_size = 4
-    block_d = 32
+    block_d = 512
     num_stages = 1
-    threads = 128
+    threads = 256
     dtype = "float16"
-    _dconv_fwd_kernel(batch, token, indim, kernel_size, dtype = dtype)
+    # _dconv_fwd_kernel(batch, token, indim, kernel_size, dtype = dtype)
     input1 = torch.randn(batch * token, indim).to(torch.float16).cuda()
+    # print("input1",input1)
     kernel_input = torch.randn(batch * token, indim, kernel_size).to(torch.float16).cuda()
     output_triton = torch.randn(batch * token, indim).to(torch.float16).cuda()
     input1 = input1 * 5
     kernel_input = kernel_input * 5
-    kernel = _dconv_fwd_kernel(batch, token, indim, kernel_size, block_d, threads, dtype)
-    kernel(input1, kernel_input, output_triton)
+    # kernel = _dconv_fwd_kernel(batch, token, indim, kernel_size, block_d, threads, dtype)
+    kernel = _dconv_fwd_kernel(batch, token, indim, kernel_size, dtype = dtype)
+    for _ in range(10):
+        kernel(input1, kernel_input, output_triton)
+    torch.cuda.synchronize()
+    start = time.time()
+    for _ in range(10):
+        kernel(input1, kernel_input, output_triton)
+    torch.cuda.synchronize()
+    end = time.time()
+    print("time",end - start)
+    # print("output_triton",output_triton)
     # print("output_triton",output_triton)
     # Reshape inputs for PyTorch version
     # x = input1.view(batch, token, indim)
