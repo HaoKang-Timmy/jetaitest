@@ -243,8 +243,12 @@ class JetBlock(nn.Module):
                 autotune_interval=self.autotune_interval
             )
         elif mode == 'fused_recurrent':
+
             q = F.silu(self.q_proj(hidden_states))
             k = F.silu(self.k_proj(hidden_states))
+            print("hidden_state_size:", hidden_states.shape)
+            print("q_shape:", q.shape)
+            print("k_shape:", k.shape)
             if attention_mask is not None and q_len > 1:
                 q = index_first_axis(rearrange(q, "b s ... -> (b s) ..."), indices).unsqueeze(0)
                 k = index_first_axis(rearrange(k, "b s ... -> (b s) ..."), indices).unsqueeze(0)
