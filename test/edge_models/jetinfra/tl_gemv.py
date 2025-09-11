@@ -55,7 +55,7 @@ def ref_program(A, B):
 #     return main
 def get_configs():
  
-    BLOCK_N = [128]  
+    BLOCK_N = [128]   # Notice: Hard code to 128 cause need to fuse qknorm with gemv
 
     reduce_threads = [4, 8, 32]
     _configs = list(itertools.product(BLOCK_N, reduce_threads))
@@ -74,6 +74,7 @@ def splitk_gemv_vectorized_silu(
     Batch: int,
     N: int,
     K: int,
+    norm_dim: int,
     BLOCK_N: int,
     reduce_threads: int,
     dtype: str = "float16",
@@ -82,6 +83,25 @@ def splitk_gemv_vectorized_silu(
     MAX_TRANSACTION_SIZE_IN_BITS = 128
     TILE_K = MAX_TRANSACTION_SIZE_IN_BITS // DataType(dtype).bits
     BLOCK_K = reduce_threads * TILE_K
+    @T.macro
+    def L2Norm_QK(
+        QK: T.SharedBuffer([norm_dim],dtype),
+    ):
+        shared_reg = T.alloc_fragment([norm_dim], dtype)
+        squared_reg = T.alloc_fragment([norm_dim], dtype)
+        sum_reg = T.alloc_fragment([1], dtype)
+        T.copy(QK, shared_reg)
+        
+        # 计算元素的平方用于求norm
+        for i in T.Parallel(norm_dim):
+            [i] = shared_reg[i] * shared_reg[i]
+        T.reduce_sum(squared_reg, sum_reg, dim=0)
+        sum_reg[0] = T.sqrt(sum_reg[0]) + 1e-6
+        
+        # 用原始元素除以norm
+        for i in T.Parallel(norm_dim):
+            shared_reg[i] = shared_reg[i] / sum_reg[0]
+        T.copy(shared_reg, QK)
 
     @T.prim_func
     def main(
@@ -110,7 +130,8 @@ def splitk_gemv_vectorized_silu(
             #### silu
             C_shared[tn] = C_shared[tn] / (1 + T.exp(-C_shared[tn]))
             #### k2 norm
-            
+            # if tn % norm_dim == 0:
+            # L2Norm_QK(C_shared)
             C[batch_id, bn * BLOCK_N + tn] = C_shared[tn]
 
     return main
@@ -196,7 +217,25 @@ def check_correctness_and_bench(kernel, N, K, bench_ref=True):
     latency = profiler.do_bench(kernel, warmup=50)
     print(f"TileLang Latency: {latency} ms\n")
 
+def compare_pytorch(a, b, norm_dim=128):
+    # Step 1: GEMV + SiLU
+    output = (a @ b.T) / (1 + torch.exp(-(a @ b.T)))
 
+    # # Step 2: Reshape for normalization
+    # reshaped_output = output.view(a.shape[0], -1, norm_dim)
+
+    # # Step 3: L2 Norm calculation
+    # # Keepdim=True to allow broadcasting for division
+    # norms = torch.norm(reshaped_output, p=2, dim=2, keepdim=True)
+
+    # # Step 4: Normalize
+    # # Add epsilon for numerical stability, same as in the kernel
+    # normalized_output = reshaped_output / (norms + 1e-6)
+
+    # # Step 5: Reshape back to original
+    # final_output = normalized_output.view(a.shape[0], -1)
+    final_output = output
+    return final_output
 def main():
     parser = argparse.ArgumentParser(description="GEMV Example")
     parser.add_argument("--n", type=int, default=1536, help="Matrix dimension N")
@@ -204,36 +243,47 @@ def main():
     parser.add_argument("--batch", type=int, default=1, help="Batch dimension B")
     args, _ = parser.parse_known_args()
     N, K, Batch = args.n, args.k, args.batch
-    # check_correctness_and_bench(naive_gemv(N, K, 128, 128), N, K)
-    # check_correctness_and_bench(naive_splitk_gemv(N, K, 32, 32), N, K)
-    # check_correctness_and_bench(splitk_gemv(N, K, 32, 32, 32), N, K)
-    # check_correctness_and_bench(splitk_gemv_vectorized(N, K), N, K)
-    # check_correctness_and_bench(splitk_gemv_vectorized_tvm(N, K, 2, 32), N, K)
-    # print("Test passed!")
 
-    # best_result = get_best_config(N, K)
-    # best_config = best_result.config
-    # kernel = splitk_gemv_vectorized_tvm(N, K, **best_config)
-    # profiler = kernel.get_profiler()
-    # latency = profiler.do_bench(lambda x, y: x @ y.T, warmup=500)
-    # print(f"Torch Latency: {latency} ms")
-    # latency = profiler.do_bench(kernel, warmup=500)
-    # print(f"TileLang Latency: {latency} ms\n")
-    kernel = splitk_gemv_vectorized_silu(Batch, N, K)
+    kernel = splitk_gemv_vectorized_silu(Batch, N, K, norm_dim=128)
+
+    # Manual Correctness Check
+    print("--- Running Correctness Check ---")
     input_a = torch.randn(Batch, K).half().to("cuda")
     input_b = torch.randn(N, K).half().to("cuda")
-    input_c = torch.randn(Batch, N).half().to("cuda")
+    output_c_tl = torch.empty(Batch, N).half().to("cuda")
+
+    # Run TileLang Kernel
+    kernel(input_a, input_b, output_c_tl)
+
+    # Run PyTorch reference
+    output_c_torch = compare_pytorch(input_a, input_b, norm_dim=128)
+
+    # Compare results
+    are_close = torch.allclose(output_c_tl, output_c_torch, atol=1e-2, rtol=1e-2)
+    print(f"Correctness check passed: {are_close}")
+    if not are_close:
+        print("Max difference:", (output_c_tl - output_c_torch).abs().max().item())
+
+    # Performance Benchmarking
+    print("\n--- Running Benchmarking ---")
+    # Use new tensors for benchmark to avoid caching effects
+    bench_a = torch.randn(Batch, K).half().to("cuda")
+    bench_b = torch.randn(N, K).half().to("cuda")
+    bench_c = torch.empty(Batch, N).half().to("cuda")
+    
+    # Warmup
     for _ in range(10):
-        kernel(input_a, input_b, input_c)
+        kernel(bench_a, bench_b, bench_c)
     torch.cuda.synchronize()
+    
+    # Timed run
     start_time = time.time()
     for _ in range(20):
-        kernel(input_a, input_b, input_c)
+        kernel(bench_a, bench_b, bench_c)
     torch.cuda.synchronize()
     end_time = time.time()
-    print(f"Time: {end_time - start_time} s")
-    print("Test passed!")
-
+    
+    print(f"Average TileLang Latency: {(end_time - start_time) / 20 * 1000:.4f} ms")
 
 
 if __name__ == "__main__":
