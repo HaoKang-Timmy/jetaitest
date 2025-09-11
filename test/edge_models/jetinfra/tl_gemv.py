@@ -70,7 +70,7 @@ def get_configs():
         tl.PassConfigKey.TL_DISABLE_FAST_MATH: False,
     }
 )
-def splitk_gemv_vectorized_silu(
+def splitk_gemv_vectorized_silu_l2norm(
     Batch: int,
     N: int,
     K: int,
@@ -85,18 +85,20 @@ def splitk_gemv_vectorized_silu(
     BLOCK_K = reduce_threads * TILE_K
     @T.macro
     def L2Norm_QK(
-        QK: T.SharedBuffer([norm_dim],dtype),
+        QK: T.SharedBuffer([norm_dim],accum_dtype),
     ):
-        shared_reg = T.alloc_fragment([norm_dim], dtype)
-        squared_reg = T.alloc_fragment([norm_dim], dtype)
-        sum_reg = T.alloc_fragment([1], dtype)
+        shared_reg = T.alloc_fragment([norm_dim], accum_dtype)
+        squared_reg = T.alloc_fragment([norm_dim], accum_dtype)
+        sum_reg = T.alloc_fragment([1], accum_dtype)
         T.copy(QK, shared_reg)
         
         # 计算元素的平方用于求norm
         for i in T.Parallel(norm_dim):
-            [i] = shared_reg[i] * shared_reg[i]
+            squared_reg[i] = shared_reg[i] * shared_reg[i]
+        
         T.reduce_sum(squared_reg, sum_reg, dim=0)
-        sum_reg[0] = T.sqrt(sum_reg[0]) + 1e-6
+        for i in T.Parallel(1):
+            sum_reg[0] = T.sqrt(sum_reg[0]) + 1e-6
         
         # 用原始元素除以norm
         for i in T.Parallel(norm_dim):
@@ -131,9 +133,12 @@ def splitk_gemv_vectorized_silu(
             C_shared[tn] = C_shared[tn] / (1 + T.exp(-C_shared[tn]))
             #### k2 norm
             # if tn % norm_dim == 0:
-            # L2Norm_QK(C_shared)
+            L2Norm_QK(C_shared)
             C[batch_id, bn * BLOCK_N + tn] = C_shared[tn]
-
+    # @T.prim_func
+    # def l2norm_func(
+    #     input:
+    # )
     return main
 
 
@@ -221,20 +226,20 @@ def compare_pytorch(a, b, norm_dim=128):
     # Step 1: GEMV + SiLU
     output = (a @ b.T) / (1 + torch.exp(-(a @ b.T)))
 
-    # # Step 2: Reshape for normalization
-    # reshaped_output = output.view(a.shape[0], -1, norm_dim)
+    # Step 2: Reshape for normalization
+    reshaped_output = output.view(a.shape[0], -1, norm_dim)
 
-    # # Step 3: L2 Norm calculation
-    # # Keepdim=True to allow broadcasting for division
-    # norms = torch.norm(reshaped_output, p=2, dim=2, keepdim=True)
+    # Step 3: L2 Norm calculation
+    # Keepdim=True to allow broadcasting for division
+    norms = torch.norm(reshaped_output, p=2, dim=2, keepdim=True)
 
-    # # Step 4: Normalize
-    # # Add epsilon for numerical stability, same as in the kernel
-    # normalized_output = reshaped_output / (norms + 1e-6)
+    # Step 4: Normalize
+    # Add epsilon for numerical stability, same as in the kernel
+    normalized_output = reshaped_output / (norms + 1e-6)
 
-    # # Step 5: Reshape back to original
-    # final_output = normalized_output.view(a.shape[0], -1)
-    final_output = output
+    # Step 5: Reshape back to original
+    final_output = normalized_output.view(a.shape[0], -1)
+    # final_output = output
     return final_output
 def main():
     parser = argparse.ArgumentParser(description="GEMV Example")
@@ -244,7 +249,7 @@ def main():
     args, _ = parser.parse_known_args()
     N, K, Batch = args.n, args.k, args.batch
 
-    kernel = splitk_gemv_vectorized_silu(Batch, N, K, norm_dim=128)
+    kernel = splitk_gemv_vectorized_silu_l2norm(Batch, N, K, norm_dim=128)
 
     # Manual Correctness Check
     print("--- Running Correctness Check ---")
