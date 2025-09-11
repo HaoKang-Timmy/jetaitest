@@ -254,183 +254,183 @@ def fused_recurrent_gated_delta_rule_tl(
 
 if __name__ == '__main__':
     # 注释掉原始测试代码
-    # B, Token, H, HV, K, V = 100, 1, 12, 12, 96, 256
-    # scale = K ** -0.5
-    # dtype = torch.float16
-    # 
-    # # B = 30
-    # q = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
-    # k = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
-    # v = torch.randn(B, Token, HV, V, device='cuda', dtype=dtype)
-    # g = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
-    # beta = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
-    # h0 = torch.zeros(B, HV, K, V, device='cuda', dtype=dtype)
-    # 
-    # o, final_state = fused_recurrent_gated_delta_rule_tl(
-    #     q=q,
-    #     k=k,
-    #     v=v,
-    #     g=g,
-    #     beta=beta,
-    #     scale=scale,
-    #     initial_state=h0,
-    #     output_final_state=True,
-    #     use_qk_l2norm_in_kernel=False
-    # )
-    # 
-    # # benchmark
-    # torch.cuda.synchronize()
-    # # warm up
-    # for _ in range(10):
-    #     o, final_state = fused_recurrent_gated_delta_rule_tl(
-    #         q=q,
-    #         k=k,
-    #         v=v,
-    #         g=g,
-    #         beta=beta,
-    #         scale=scale,
-    #         initial_state=h0,
-    #         output_final_state=True,
-    #         use_qk_l2norm_in_kernel=False
-    #     )
-    # torch.cuda.synchronize()
-    # start = time.time()
-    # for _ in range(20):
-    #     o, final_state = fused_recurrent_gated_delta_rule_tl(
-    #         q=q,
-    #         k=k,
-    #         v=v,
-    #         g=g,
-    #         beta=beta,
-    #         scale=scale,
-    #         initial_state=h0,
-    #         output_final_state=True,
-    #         use_qk_l2norm_in_kernel=False
-    #     )
-    # torch.cuda.synchronize()
-    # end = time.time()
-    # print(f"Batch size: {B}, time: {(end - start) / 100 * 1000} ms")
-
-    # 新的性能测试代码
-    import pandas as pd
-    
-    # 固定参数
-    B = 40
-    Token = 1
+    B, Token, H, HV, K, V = 1, 10, 12, 12, 96, 256
+    scale = K ** -0.5
     dtype = torch.float16
     
-    # 参数范围
-    head_values = list(range(4, 33, 4))  # [4, 8, 12, 16, 20, 24, 28, 32]
-    k_values = list(range(32, 256, 32))  # [32, 64, 96, ..., 512]
-    v_values = list(range(32, 256, 32))  # [32, 64, 96, ..., 512]
+    # B = 30
+    q = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
+    k = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
+    v = torch.randn(B, Token, HV, V, device='cuda', dtype=dtype)
+    g = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
+    beta = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
+    h0 = torch.zeros(B, HV, K, V, device='cuda', dtype=dtype)
     
-    results = []
-    total_configs = len(head_values) * len(k_values) * len(v_values)
-    current_config = 0
+    o, final_state = fused_recurrent_gated_delta_rule_tl(
+        q=q,
+        k=k,
+        v=v,
+        g=g,
+        beta=beta,
+        scale=scale,
+        initial_state=h0,
+        output_final_state=True,
+        use_qk_l2norm_in_kernel=False
+    )
     
-    print(f"开始性能测试，总共 {total_configs} 个配置...")
-    print("参数设置: B={}, Token={}".format(B, Token))
-    print("H/HV范围: {} 到 {}，步长 4".format(min(head_values), max(head_values)))
-    print("K/V范围: {} 到 {}，步长 32".format(min(k_values), max(k_values)))
-    print("-" * 80)
+    # benchmark
+    torch.cuda.synchronize()
+    # warm up
+    for _ in range(10):
+        o, final_state = fused_recurrent_gated_delta_rule_tl(
+            q=q,
+            k=k,
+            v=v,
+            g=g,
+            beta=beta,
+            scale=scale,
+            initial_state=h0,
+            output_final_state=True,
+            use_qk_l2norm_in_kernel=False
+        )
+    torch.cuda.synchronize()
+    start = time.time()
+    for _ in range(20):
+        o, final_state = fused_recurrent_gated_delta_rule_tl(
+            q=q,
+            k=k,
+            v=v,
+            g=g,
+            beta=beta,
+            scale=scale,
+            initial_state=h0,
+            output_final_state=True,
+            use_qk_l2norm_in_kernel=False
+        )
+    torch.cuda.synchronize()
+    end = time.time()
+    print(f"Batch size: {B}, time: {(end - start) / 100 * 1000} ms")
+
+    # # 新的性能测试代码
+    # import pandas as pd
     
-    for H in head_values:
-        HV = H  # H和HV相等
-        for K in k_values:
-            for V in v_values:
-                current_config += 1
-                print(f"测试配置 {current_config}/{total_configs}: H={H}, HV={HV}, K={K}, V={V}")
+    # # 固定参数
+    # B = 40
+    # Token = 1
+    # dtype = torch.float16
+    
+    # # 参数范围
+    # head_values = list(range(4, 33, 4))  # [4, 8, 12, 16, 20, 24, 28, 32]
+    # k_values = list(range(32, 256, 32))  # [32, 64, 96, ..., 512]
+    # v_values = list(range(32, 256, 32))  # [32, 64, 96, ..., 512]
+    
+    # results = []
+    # total_configs = len(head_values) * len(k_values) * len(v_values)
+    # current_config = 0
+    
+    # print(f"开始性能测试，总共 {total_configs} 个配置...")
+    # print("参数设置: B={}, Token={}".format(B, Token))
+    # print("H/HV范围: {} 到 {}，步长 4".format(min(head_values), max(head_values)))
+    # print("K/V范围: {} 到 {}，步长 32".format(min(k_values), max(k_values)))
+    # print("-" * 80)
+    
+    # for H in head_values:
+    #     HV = H  # H和HV相等
+    #     for K in k_values:
+    #         for V in v_values:
+    #             current_config += 1
+    #             print(f"测试配置 {current_config}/{total_configs}: H={H}, HV={HV}, K={K}, V={V}")
                 
-                try:
-                    scale = K ** -0.5
+    #             try:
+    #                 scale = K ** -0.5
                     
-                    # 创建测试数据
-                    q = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
-                    k = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
-                    v = torch.randn(B, Token, HV, V, device='cuda', dtype=dtype)
-                    g = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
-                    beta = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
-                    h0 = torch.zeros(B, HV, K, V, device='cuda', dtype=dtype)
+    #                 # 创建测试数据
+    #                 q = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
+    #                 k = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
+    #                 v = torch.randn(B, Token, HV, V, device='cuda', dtype=dtype)
+    #                 g = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
+    #                 beta = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
+    #                 h0 = torch.zeros(B, HV, K, V, device='cuda', dtype=dtype)
                     
-                    # 预热
-                    torch.cuda.synchronize()
-                    for _ in range(5):
-                        try:
-                            o, final_state = fused_recurrent_gated_delta_rule_tl(
-                                q=q, k=k, v=v, g=g, beta=beta, scale=scale,
-                                initial_state=h0, output_final_state=True,
-                                use_qk_l2norm_in_kernel=False
-                            )
-                        except Exception as e:
-                            print(f"预热失败: {e}")
-                            break
+    #                 # 预热
+    #                 torch.cuda.synchronize()
+    #                 for _ in range(5):
+    #                     try:
+    #                         o, final_state = fused_recurrent_gated_delta_rule_tl(
+    #                             q=q, k=k, v=v, g=g, beta=beta, scale=scale,
+    #                             initial_state=h0, output_final_state=True,
+    #                             use_qk_l2norm_in_kernel=False
+    #                         )
+    #                     except Exception as e:
+    #                         print(f"预热失败: {e}")
+    #                         break
                     
-                    # 正式测试
-                    torch.cuda.synchronize()
-                    start = time.time()
+    #                 # 正式测试
+    #                 torch.cuda.synchronize()
+    #                 start = time.time()
                     
-                    num_runs = 10
-                    for _ in range(num_runs):
-                        o, final_state = fused_recurrent_gated_delta_rule_tl(
-                            q=q, k=k, v=v, g=g, beta=beta, scale=scale,
-                            initial_state=h0, output_final_state=True,
-                            use_qk_l2norm_in_kernel=False
-                        )
+    #                 num_runs = 10
+    #                 for _ in range(num_runs):
+    #                     o, final_state = fused_recurrent_gated_delta_rule_tl(
+    #                         q=q, k=k, v=v, g=g, beta=beta, scale=scale,
+    #                         initial_state=h0, output_final_state=True,
+    #                         use_qk_l2norm_in_kernel=False
+    #                     )
                     
-                    torch.cuda.synchronize()
-                    end = time.time()
+    #                 torch.cuda.synchronize()
+    #                 end = time.time()
                     
-                    avg_time_ms = (end - start) / num_runs * 1000
+    #                 avg_time_ms = (end - start) / num_runs * 1000
                     
-                    results.append({
-                        'H': H,
-                        'HV': HV,
-                        'K': K,
-                        'V': V,
-                        'Time_ms': avg_time_ms
-                    })
+    #                 results.append({
+    #                     'H': H,
+    #                     'HV': HV,
+    #                     'K': K,
+    #                     'V': V,
+    #                     'Time_ms': avg_time_ms
+    #                 })
                     
-                    print(f"  完成，平均时间: {avg_time_ms:.3f} ms")
+    #                 print(f"  完成，平均时间: {avg_time_ms:.3f} ms")
                     
-                    # 清理内存
-                    del q, k, v, g, beta, h0, o, final_state
-                    torch.cuda.empty_cache()
+    #                 # 清理内存
+    #                 del q, k, v, g, beta, h0, o, final_state
+    #                 torch.cuda.empty_cache()
                     
-                except Exception as e:
-                    print(f"  配置失败: {e}")
-                    results.append({
-                        'H': H,
-                        'HV': HV,
-                        'K': K,
-                        'V': V,
-                        'Time_ms': -1  # 用-1表示失败
-                    })
+    #             except Exception as e:
+    #                 print(f"  配置失败: {e}")
+    #                 results.append({
+    #                     'H': H,
+    #                     'HV': HV,
+    #                     'K': K,
+    #                     'V': V,
+    #                     'Time_ms': -1  # 用-1表示失败
+    #                 })
     
-    # 创建DataFrame并保存结果
-    df = pd.DataFrame(results)
+    # # 创建DataFrame并保存结果
+    # df = pd.DataFrame(results)
     
-    # 保存为CSV文件
-    output_file = "fused_recurrent_performance_results.csv"
-    df.to_csv(output_file, index=False)
-    print(f"\n结果已保存到 {output_file}")
+    # # 保存为CSV文件
+    # output_file = "fused_recurrent_performance_results.csv"
+    # df.to_csv(output_file, index=False)
+    # print(f"\n结果已保存到 {output_file}")
     
-    # 显示汇总统计
-    print("\n=== 性能测试结果汇总 ===")
-    print(f"总配置数: {len(df)}")
-    print(f"成功配置数: {len(df[df['Time_ms'] > 0])}")
-    print(f"失败配置数: {len(df[df['Time_ms'] == -1])}")
+    # # 显示汇总统计
+    # print("\n=== 性能测试结果汇总 ===")
+    # print(f"总配置数: {len(df)}")
+    # print(f"成功配置数: {len(df[df['Time_ms'] > 0])}")
+    # print(f"失败配置数: {len(df[df['Time_ms'] == -1])}")
     
-    if len(df[df['Time_ms'] > 0]) > 0:
-        success_df = df[df['Time_ms'] > 0]
-        print(f"最快时间: {success_df['Time_ms'].min():.3f} ms")
-        print(f"最慢时间: {success_df['Time_ms'].max():.3f} ms")
-        print(f"平均时间: {success_df['Time_ms'].mean():.3f} ms")
+    # if len(df[df['Time_ms'] > 0]) > 0:
+    #     success_df = df[df['Time_ms'] > 0]
+    #     print(f"最快时间: {success_df['Time_ms'].min():.3f} ms")
+    #     print(f"最慢时间: {success_df['Time_ms'].max():.3f} ms")
+    #     print(f"平均时间: {success_df['Time_ms'].mean():.3f} ms")
         
-        # 显示前10个最快的配置
-        print("\n前10个最快的配置:")
-        top_10 = success_df.nsmallest(10, 'Time_ms')
-        for idx, row in top_10.iterrows():
-            print(f"  H={row['H']}, K={row['K']}, V={row['V']}: {row['Time_ms']:.3f} ms")
+    #     # 显示前10个最快的配置
+    #     print("\n前10个最快的配置:")
+    #     top_10 = success_df.nsmallest(10, 'Time_ms')
+    #     for idx, row in top_10.iterrows():
+    #         print(f"  H={row['H']}, K={row['K']}, V={row['V']}: {row['Time_ms']:.3f} ms")
     
-    print("\n完整结果表格:")
-    print(df.to_string(index=False))
+    # print("\n完整结果表格:")
+    # print(df.to_string(index=False))

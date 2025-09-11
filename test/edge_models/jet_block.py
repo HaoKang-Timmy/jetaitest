@@ -37,6 +37,8 @@ from .dynamic_conv import DynamicShortConvolution
 from .configuration_jet_nemotron import JetNemotronConfig
 from .kv_cache import JetNemotronCache
 
+from .jetinfra import gemv_silu_l2norm_kernel, fused_recurrent_gated_delta_rule_tl
+
 
 @dataclass
 class JetBlockConfig():
@@ -243,12 +245,29 @@ class JetBlock(nn.Module):
                 autotune_interval=self.autotune_interval
             )
         elif mode == 'fused_recurrent':
+            # q = F.silu(self.q_proj(hidden_states))
+            # k = F.silu(self.k_proj(hidden_states))
+            # intermediate_q = self.q_proj(hidden_states)
+            # intermediate_k = self.k_proj(hidden_states)
+            # q = F.silu(intermediate_q)
+            # k = F.silu(intermediate_k)
+            
+            
+            
+            q = gemv_silu_l2norm_kernel(hidden_states, self.q_proj.weight)
+            k = gemv_silu_l2norm_kernel(hidden_states, self.k_proj.weight)
+            
+            # q_abs_diff = (q - q_new).abs()
+            # k_abs_diff = (k - k_new).abs()
+            # print(f"DEBUG:: Layer {self.layer_idx} Q abs error max: {q_abs_diff.max().item()}")
+            # print(f"DEBUG:: Layer {self.layer_idx} K abs error max: {k_abs_diff.max().item()}")
 
-            q = F.silu(self.q_proj(hidden_states))
-            k = F.silu(self.k_proj(hidden_states))
-            print("hidden_state_size:", hidden_states.shape)
-            print("q_shape:", q.shape)
-            print("k_shape:", k.shape)
+            # q_rel_diff = q_abs_diff / (q.abs() + 1e-8)
+            # k_rel_diff = k_abs_diff / (k.abs() + 1e-8)
+            # print(f"DEBUG:: Layer {self.layer_idx} Q rel error max: {q_rel_diff.max().item()}")
+            # print(f"DEBUG:: Layer {self.layer_idx} K rel error max: {k_rel_diff.max().item()}")
+
+            # print("finished")
             if attention_mask is not None and q_len > 1:
                 q = index_first_axis(rearrange(q, "b s ... -> (b s) ..."), indices).unsqueeze(0)
                 k = index_first_axis(rearrange(k, "b s ... -> (b s) ..."), indices).unsqueeze(0)
@@ -267,6 +286,17 @@ class JetBlock(nn.Module):
                 cu_seqlens=cu_seqlens,
                 use_qk_l2norm_in_kernel=True
             )
+            # o, recurrent_state = fused_recurrent_gated_delta_rule_tl(
+            #     q=q,
+            #     k=k,
+            #     v=v,
+            #     g=g,
+            #     beta=beta,
+            #     initial_state=recurrent_state,
+            #     output_final_state=use_cache,
+            #     cu_seqlens=cu_seqlens,
+            #     use_qk_l2norm_in_kernel=False
+            # )
         else:
             raise NotImplementedError(f"Not supported mode `{mode}`.")
 

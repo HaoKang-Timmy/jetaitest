@@ -24,7 +24,7 @@ def main():
     parser = argparse.ArgumentParser(description="Generate text using local Jet-Nemotron")
     parser.add_argument("--model_path", type=str, default="jet-ai/Jet-Nemotron-2B", 
                        help="Path to the model weights")
-    parser.add_argument("--input_text", type=str, default="Hello, I'm Jet-Nemotron from NVIDIA.",
+    parser.add_argument("--input_text", type=str, default="Introduce yourself.",
                        help="Input text for generation")
     parser.add_argument("--max_new_tokens", type=int, default=10,
                        help="Maximum number of new tokens to generate")

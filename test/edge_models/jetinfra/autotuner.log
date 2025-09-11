@@ -1,29 +1,29 @@
-2025-09-11 15:49:55,895 INFO:Auto-tuning with 0.9 CPU utilizations, 20 CPUs available, 18 CPUs will be used
-2025-09-11 15:49:56,186 INFO:An error occurred while testing config {'BLOCK_N': 128, 'reduce_threads': 32}, checkout autotuner.log for more details
-2025-09-11 15:49:56,186 DEBUG:Error: Traceback (most recent call last):
-  File "/home/haokang/tilelang/tilelang/autotuner/tuner.py", line 494, in run
+2025-09-11 16:51:56,340 INFO:Auto-tuning with 0.9 CPU utilizations, 8 CPUs available, 7 CPUs will be used
+2025-09-11 16:52:05,965 INFO:An error occurred while testing config {'BLOCK_N': 128, 'reduce_threads': 32}, checkout autotuner.log for more details
+2025-09-11 16:52:05,968 DEBUG:Error: Traceback (most recent call last):
+  File "/storage/coda1/p-tkrishna3/0/hkang342/h100/lib/python3.12/site-packages/tilelang/autotuner/tuner.py", line 499, in run
     latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/haokang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+  File "/storage/coda1/p-tkrishna3/0/hkang342/h100/lib/python3.12/site-packages/tilelang/autotuner/tuner.py", line 55, in run_with_timeout
     raise e
-  File "/home/haokang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+  File "/storage/coda1/p-tkrishna3/0/hkang342/h100/lib/python3.12/site-packages/tilelang/autotuner/tuner.py", line 53, in run_with_timeout
     result = func(*args, **kwargs)
              ^^^^^^^^^^^^^^^^^^^^^
-  File "/home/haokang/tilelang/tilelang/autotuner/tuner.py", line 387, in target_fn
+  File "/storage/coda1/p-tkrishna3/0/hkang342/h100/lib/python3.12/site-packages/tilelang/autotuner/tuner.py", line 392, in target_fn
     latency = profiler.do_bench(
               ^^^^^^^^^^^^^^^^^^
-  File "/home/haokang/tilelang/tilelang/profiler/__init__.py", line 240, in do_bench
+  File "/storage/coda1/p-tkrishna3/0/hkang342/h100/lib/python3.12/site-packages/tilelang/profiler/__init__.py", line 240, in do_bench
     return do_bench(
            ^^^^^^^^^
-  File "/home/haokang/tilelang/tilelang/profiler/bench.py", line 41, in do_bench
+  File "/storage/coda1/p-tkrishna3/0/hkang342/h100/lib/python3.12/site-packages/tilelang/profiler/bench.py", line 41, in do_bench
     fn()
-  File "/home/haokang/tilelang/tilelang/jit/adapter/base.py", line 49, in __call__
+  File "/storage/coda1/p-tkrishna3/0/hkang342/h100/lib/python3.12/site-packages/tilelang/jit/adapter/base.py", line 49, in __call__
     return self.func(*args, **kwds)
            ^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/haokang/tilelang/tilelang/jit/adapter/cython/adapter.py", line 485, in lambda_forward
+  File "/storage/coda1/p-tkrishna3/0/hkang342/h100/lib/python3.12/site-packages/tilelang/jit/adapter/cython/adapter.py", line 447, in lambda_forward
     return self.cython_wrapper.forward([*args],
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "tilelang/jit/adapter/cython/cython_wrapper.pyx", line 148, in tilelang.jit.adapter.cython.cython_wrapper.CythonKernelWrapper.forward
-  File "tilelang/jit/adapter/cython/cython_wrapper.pyx", line 257, in tilelang.jit.adapter.cython.cython_wrapper.CythonKernelWrapper.forward
-RuntimeError: Kernel call failed: main_kernel: cudaErrorInvalidValue - invalid argument
+  File "tilelang/jit/adapter/cython/cython_wrapper.pyx", line 107, in tilelang.jit.adapter.cython.cython_wrapper.CythonKernelWrapper.forward
+  File "tilelang/jit/adapter/cython/cython_wrapper.pyx", line 206, in tilelang.jit.adapter.cython.cython_wrapper.CythonKernelWrapper.forward
+RuntimeError: Kernel call failed: kernel_name: cudaErrorInvalidConfiguration - invalid configuration argument
 

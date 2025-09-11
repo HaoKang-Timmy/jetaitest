@@ -1,2 +1,4 @@
 from .tl_fusedlinear import linear_w_silu
 from .tl_dconv import tl_dynamic_conv_cache_w_silu
+from .tl_gemv import gemv_silu_l2norm_kernel
+from .tl_fusedrecurrent import fused_recurrent_gated_delta_rule_tl
