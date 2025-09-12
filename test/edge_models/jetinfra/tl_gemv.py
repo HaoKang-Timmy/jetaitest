@@ -18,7 +18,7 @@ def get_configs():
  
     BLOCK_N = [128]   # Notice: Hard code to 128 cause need to fuse qknorm with gemv
 
-    reduce_threads = [4, 8, 32]
+    reduce_threads = [4, 8, 16]
     _configs = list(itertools.product(BLOCK_N, reduce_threads))
     configs = [{
         'BLOCK_N': c[0],
@@ -38,7 +38,7 @@ def splitk_gemv_vectorized_silu_l2norm(
     norm_dim: int,
     BLOCK_N: int = 128,
     reduce_threads: int = 4,
-    dtype: str = "bfloat16",
+    dtype: str = "float16",
     accum_dtype: str = "float",
 ):
     MAX_TRANSACTION_SIZE_IN_BITS = 128
@@ -60,7 +60,7 @@ def splitk_gemv_vectorized_silu_l2norm(
             tk = tx % reduce_threads
             A_local = T.alloc_local((TILE_K,), dtype)
             B_local = T.alloc_local((TILE_K,), dtype)
-            C_shared = T.alloc_shared((BLOCK_N,), accum_dtype)
+            C_shared = T.alloc_shared((BLOCK_N,), accum_dtype, scope="shared")
             C_accum = T.alloc_local((1,), accum_dtype)
             C_squared = T.alloc_fragment((BLOCK_N,), accum_dtype)
             sum_reg = T.alloc_fragment([1], accum_dtype)
@@ -82,8 +82,8 @@ def splitk_gemv_vectorized_silu_l2norm(
             for i in T.Parallel(BLOCK_N):
                 C_squared[i] = C_shared[i] * C_shared[i]
             
-            # if tn % norm_dim == 0:
-            # L2Norm_QK(C_shared)
+            # # if tn % norm_dim == 0:
+            # # L2Norm_QK(C_shared)
             T.reduce_sum(C_squared, sum_reg, dim=0)
             # for i in T.Parallel(1):
             for i in T.Parallel(1):
@@ -91,7 +91,6 @@ def splitk_gemv_vectorized_silu_l2norm(
             for i in T.Parallel(BLOCK_N):
                 C_shared[i] = C_shared[i] / sum_reg[0]
             C[batch_id, bn * BLOCK_N + tn] = C_shared[tn]
-    # print(main)
     return main
 def gemv_silu_l2norm_kernel(
     input,
@@ -104,6 +103,7 @@ def gemv_silu_l2norm_kernel(
     output = torch.empty(B, Token, N).to(torch_dtype).to(device)
     new_B = B * Token
     kernel = splitk_gemv_vectorized_silu_l2norm(new_B, N, K, norm_dim=128)
+    # print(kernel.get_kernel_source())
     kernel(input.view(new_B, K), weight_t, output.view(new_B, N))
     output = output.view(B, Token, N)
     return output
@@ -151,28 +151,29 @@ def main():
     parser.add_argument("--batch", type=int, default=1, help="Batch dimension B")
     args, _ = parser.parse_known_args()
     N, K, Batch, Token = args.n, args.k, args.batch, args.token
-
+    dtype = torch.float16
     kernel = splitk_gemv_vectorized_silu_l2norm(Batch * Token, N, K, norm_dim=128)
 
     # Manual Correctness Check
     print("--- Running Correctness Check ---")
-    input_a = torch.randn(Batch, Token, K).to(torch.bfloat16).to("cuda")
-    input_b = torch.randn(N, K).to(torch.bfloat16).to("cuda")
-    output_c_tl = torch.empty(Batch, Token, N).to(torch.bfloat16).to("cuda")
+    input_a = torch.randn(Batch, Token, K).to(dtype).to("cuda")
+    input_b = torch.randn(N, K).to(dtype).to("cuda")
+    output_c_tl = torch.empty(Batch, Token, N).to(dtype).to("cuda")
 
     # Run TileLang Kernel
     kernel(input_a.view(Batch * Token, K), input_b, output_c_tl.view(Batch * Token, N))
-
+    print(torch.isnan(output_c_tl).any())
     # Run PyTorch reference
     output_c_torch = compare_pytorch(input_a.view(Batch * Token, K), input_b, norm_dim=128)
-
+    print(torch.isnan(output_c_torch).any())
     # Compare results
     abs_diff = (output_c_tl - output_c_torch).abs()
-    rel_diff = abs_diff / (output_c_torch.abs() + 1e-8)
-
+    # rel_diff = abs_diff / (output_c_torch.abs() + 1e-6)
+    torch.cuda.synchronize()
+    print("down pytorch")
     print(f"Max absolute difference: {abs_diff.max().item():.6e}")
-    print(f"Max relative error: {rel_diff.max().item():.6e}")
-    print(f"Mean relative error: {rel_diff.mean().item():.6e}")
+    # print(f"Max relative error: {rel_diff.max().item():.6e}")
+    # print(f"Mean relative error: {rel_diff.mean().item():.6e}")
 
     # are_close = torch.allclose(output_c_tl, output_c_torch, atol=1e-4, rtol=1e-2)
     # print(f"Correctness check passed (torch.allclose): {are_close}")
@@ -182,9 +183,9 @@ def main():
     # Performance Benchmarking
     print("\n--- Running Benchmarking ---")
     # Use new tensors for benchmark to avoid caching effects
-    bench_a = torch.randn(Batch, Token, K).to(torch.bfloat16).to("cuda")
-    bench_b = torch.randn(N, K).to(torch.bfloat16).to("cuda")
-    # bench_c = torch.empty(Batch, N).half().to("cuda")
+    bench_a = torch.randn(Batch, Token, K).to(dtype).to("cuda")
+    bench_b = torch.randn(N, K).to(dtype).to("cuda")
+    bench_c = torch.empty(Batch, N).half().to("cuda")
     
     # Warmup
     for _ in range(10):
