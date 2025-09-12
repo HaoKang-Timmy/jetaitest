@@ -275,7 +275,18 @@ class JetBlock(nn.Module):
                 hidden_states = index_first_axis(rearrange(hidden_states, "b s ... -> (b s) ..."), indices).unsqueeze(0)
             
             q, k = map(lambda x: rearrange(x, '... (h d) -> ... h d', d=self.head_k_dim), (q, k))
-            o, recurrent_state = fused_recurrent_gated_delta_rule(
+            # o, recurrent_state = fused_recurrent_gated_delta_rule(
+            #     q=q,
+            #     k=k,
+            #     v=v,
+            #     g=g,
+            #     beta=beta,
+            #     initial_state=recurrent_state,
+            #     output_final_state=use_cache,
+            #     cu_seqlens=cu_seqlens,
+            #     use_qk_l2norm_in_kernel=True
+            # )
+            o, recurrent_state = fused_recurrent_gated_delta_rule_tl(
                 q=q,
                 k=k,
                 v=v,
@@ -286,17 +297,6 @@ class JetBlock(nn.Module):
                 cu_seqlens=cu_seqlens,
                 use_qk_l2norm_in_kernel=True
             )
-            # o, recurrent_state = fused_recurrent_gated_delta_rule_tl(
-            #     q=q,
-            #     k=k,
-            #     v=v,
-            #     g=g,
-            #     beta=beta,
-            #     initial_state=recurrent_state,
-            #     output_final_state=use_cache,
-            #     cu_seqlens=cu_seqlens,
-            #     use_qk_l2norm_in_kernel=False
-            # )
         else:
             raise NotImplementedError(f"Not supported mode `{mode}`.")
 

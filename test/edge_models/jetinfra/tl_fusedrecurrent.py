@@ -6,10 +6,14 @@ import itertools
 from typing import Optional, Tuple
 import time
 import tilelang as tl
+import sys
+sys.path.insert(0, '/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/flash-linear-attention')
+from fla.ops.gated_delta_rule.fused_recurrent import fused_recurrent_gated_delta_rule
+
 
 def get_configs():
-    block_K = [32,64,128,256]
-    block_V = [32,64,128,256]
+    block_K = [128]
+    block_V = [128]
     num_stages = [3, 4]
     threads = [128, 256]
     # head_split_k = [1, 2, 3, 4]
@@ -36,7 +40,8 @@ def fused_recurrent(
     V_Dim, 
     USE_QK_L2NORM_IN_KERNEL=True, 
     STORE_FINAL_STATE=True,
-    dtype = "float16",
+    dtype = "bfloat16",
+    accum_dtype = "float",
     block_K=128, 
     block_V=128, 
     num_stages=2, 
@@ -45,11 +50,11 @@ def fused_recurrent(
 ):
     @T.macro
     def L2Norm_QK(
-        QK: T.SharedBuffer([block_K],dtype),
+        QK: T.SharedBuffer([block_K],accum_dtype),
     ):
-        shared_reg = T.alloc_fragment([block_K], dtype)
-        squared_reg = T.alloc_fragment([block_K], dtype)
-        sum_reg = T.alloc_fragment([1], dtype)
+        shared_reg = T.alloc_fragment([block_K], accum_dtype)
+        squared_reg = T.alloc_fragment([block_K], accum_dtype)
+        sum_reg = T.alloc_fragment([1], accum_dtype)
         T.copy(QK, shared_reg)
         
         # 计算元素的平方用于求norm
@@ -68,7 +73,7 @@ def fused_recurrent(
         Q: T.Tensor([Batch, Token, Head, K_Dim], dtype),
         K: T.Tensor([Batch, Token, Head, K_Dim], dtype),
         V: T.Tensor([Batch, Token, Head_V, V_Dim], dtype),
-        g: T.Tensor([Batch, Token, Head_V], dtype),
+        g: T.Tensor([Batch, Token, Head_V], accum_dtype),
         Beta: T.Tensor([Batch, Token, Head_V],dtype),
         O: T.Tensor([Batch, Token, Head_V, V_Dim], dtype),
         h0: T.Tensor([Batch, Head_V, K_Dim, V_Dim], dtype),
@@ -86,12 +91,12 @@ def fused_recurrent(
             h0_shared = T.alloc_shared([block_K, block_V], dtype)
             o_shared = T.alloc_shared([block_V], dtype)
             
-            scale_reg = T.alloc_fragment([1], dtype)
-            g_reg = T.alloc_local([1], dtype)
-            beta_reg = T.alloc_local([1], dtype)
-            h0_reg = T.alloc_fragment([block_K, block_V], dtype)
-            k_reg = T.alloc_fragment([block_K], dtype)
-            v_min_reg = T.alloc_fragment([block_V], dtype)
+            scale_reg = T.alloc_fragment([1], accum_dtype)
+            g_reg = T.alloc_local([1], accum_dtype)
+            beta_reg = T.alloc_local([1], accum_dtype)
+            h0_reg = T.alloc_fragment([block_K, block_V], accum_dtype)
+            k_reg = T.alloc_fragment([block_K], accum_dtype)
+            v_min_reg = T.alloc_fragment([block_V], accum_dtype)
             
             scale_reg[0] = scale[0]
             
@@ -114,9 +119,9 @@ def fused_recurrent(
                 # elementwise copy
                 beta_reg[0] = Beta[id_b, t, id_hv]
                 g_reg[0] = g[id_b, t, id_hv]
-                # if USE_QK_L2NORM_IN_KERNEL:
-                #     L2Norm_QK(Q_shared)
-                #     L2Norm_QK(K_shared)
+                if USE_QK_L2NORM_IN_KERNEL:
+                    L2Norm_QK(Q_shared)
+                    L2Norm_QK(K_shared)
                 # b_q = b_q * scale
                 for i in T.Parallel(block_K):
                     Q_shared[i] = Q_shared[i] * scale_reg[0]
@@ -171,18 +176,18 @@ def fused_recurrent_fwd(
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     B, Token, H, K, V = *k.shape, v.shape[-1]
     HV = v.shape[2]
-    device, dtype = q.device, q.dtype
+    device = q.device
     if scale is None:
         scale = K ** -0.5
     o = torch.empty(B, Token, HV, V, device=device, dtype=v.dtype)
     # ht = torch.empty(B, HV, K, V, device=device, dtype=v.dtype)
     if initial_state is None:
-        h0 = torch.zeros(B, HV, K, V, device=device, dtype=torch.float16)
+        h0 = torch.zeros(B, HV, K, V, device=device, dtype=v.dtype)
     else:
         h0 = initial_state
     kernel = fused_recurrent(B, Token, H, HV, K, V, 
                              use_qk_l2norm_in_kernel, STORE_FINAL_STATE=True)
-    scale = torch.tensor([scale]).cuda().half()
+    scale = torch.tensor([scale]).cuda().to(v.dtype)
     kernel(q, k, v, g, beta, o, h0, scale)
     return o, h0
           # [B,T,HV]
@@ -256,15 +261,15 @@ if __name__ == '__main__':
     # 注释掉原始测试代码
     B, Token, H, HV, K, V = 1, 10, 12, 12, 96, 256
     scale = K ** -0.5
-    dtype = torch.float16
+    datatype = torch.bfloat16
     
     # B = 30
-    q = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
-    k = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
-    v = torch.randn(B, Token, HV, V, device='cuda', dtype=dtype)
-    g = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
-    beta = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
-    h0 = torch.zeros(B, HV, K, V, device='cuda', dtype=dtype)
+    q = torch.randn(B, Token, H, K, device='cuda', dtype=datatype)
+    k = torch.randn(B, Token, H, K, device='cuda', dtype=datatype)
+    v = torch.randn(B, Token, HV, V, device='cuda', dtype=datatype)
+    g = torch.randn(B, Token, HV, device='cuda', dtype=datatype).sigmoid()
+    beta = torch.randn(B, Token, HV, device='cuda', dtype=datatype).sigmoid()
+    h0 = torch.zeros(B, HV, K, V, device='cuda', dtype=datatype)
     
     o, final_state = fused_recurrent_gated_delta_rule_tl(
         q=q,
@@ -273,43 +278,75 @@ if __name__ == '__main__':
         g=g,
         beta=beta,
         scale=scale,
-        initial_state=h0,
+        initial_state=h0.clone(),
         output_final_state=True,
-        use_qk_l2norm_in_kernel=False
+        use_qk_l2norm_in_kernel=True
     )
     
-    # benchmark
-    torch.cuda.synchronize()
-    # warm up
-    for _ in range(10):
-        o, final_state = fused_recurrent_gated_delta_rule_tl(
-            q=q,
-            k=k,
-            v=v,
-            g=g,
-            beta=beta,
-            scale=scale,
-            initial_state=h0,
-            output_final_state=True,
-            use_qk_l2norm_in_kernel=False
-        )
-    torch.cuda.synchronize()
-    start = time.time()
-    for _ in range(20):
-        o, final_state = fused_recurrent_gated_delta_rule_tl(
-            q=q,
-            k=k,
-            v=v,
-            g=g,
-            beta=beta,
-            scale=scale,
-            initial_state=h0,
-            output_final_state=True,
-            use_qk_l2norm_in_kernel=False
-        )
-    torch.cuda.synchronize()
-    end = time.time()
-    print(f"Batch size: {B}, time: {(end - start) / 100 * 1000} ms")
+    o_ref, final_state_ref = fused_recurrent_gated_delta_rule(
+        q=q,
+        k=k,
+        v=v,
+        g=g,
+        beta=beta,
+        scale=scale,
+        initial_state=h0.clone(),
+        output_final_state=True,
+        use_qk_l2norm_in_kernel=True
+    )
+
+    print("Comparing implementation outputs...")
+    # Looser tolerance for float16
+    o_allclose = torch.allclose(o, o_ref, atol=1e-2, rtol=1e-2)
+    final_state_allclose = torch.allclose(final_state, final_state_ref.to(final_state.dtype), atol=1e-2, rtol=1e-2)
+
+    print(f"Output 'o' is close: {o_allclose}")
+    print(f"Output 'final_state' is close: {final_state_allclose}")
+
+    if not o_allclose:
+        print("Output 'o' mismatch!")
+        print("TileLang output o sample:", o.flatten()[:10])
+        print("Reference output o sample:", o_ref.flatten()[:10])
+        print("Difference:", (o - o_ref).abs().max())
+
+    if not final_state_allclose:
+        print("Output 'final_state' mismatch!")
+        print("TileLang final_state sample:", final_state.flatten()[:10])
+        print("Reference final_state sample:", final_state_ref.flatten()[:10])
+        print("Difference:", (final_state - final_state_ref.to(final_state.dtype)).abs().max())
+
+    # # benchmark
+    # torch.cuda.synchronize()
+    # # warm up
+    # for _ in range(10):
+    #     o, final_state = fused_recurrent_gated_delta_rule_tl(
+    #         q=q,
+    #         k=k,
+    #         v=v,
+    #         g=g,
+    #         beta=beta,
+    #         scale=scale,
+    #         initial_state=h0,
+    #         output_final_state=True,
+    #         use_qk_l2norm_in_kernel=True
+    #     )
+    # torch.cuda.synchronize()
+    # start = time.time()
+    # for _ in range(20):
+    #     o, final_state = fused_recurrent_gated_delta_rule_tl(
+    #         q=q,
+    #         k=k,
+    #         v=v,
+    #         g=g,
+    #         beta=beta,
+    #         scale=scale,
+    #         initial_state=h0,
+    #         output_final_state=True,
+    #         use_qk_l2norm_in_kernel=True
+    #     )
+    # torch.cuda.synchronize()
+    # end = time.time()
+    # print(f"Batch size: {B}, time: {(end - start) / 100 * 1000} ms")
 
     # # 新的性能测试代码
     # import pandas as pd

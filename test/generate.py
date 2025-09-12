@@ -65,7 +65,7 @@ def main():
         hf_model = AutoModelForCausalLM.from_pretrained(
             args.model_path,
             trust_remote_code=True,
-            torch_dtype=torch.bfloat16,
+            torch_dtype=torch.float16,
             device_map="cuda"
         )
         model.load_state_dict(hf_model.state_dict())
