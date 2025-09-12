@@ -50,11 +50,11 @@ def fused_recurrent(
 ):
     @T.macro
     def L2Norm_QK(
-        QK: T.SharedBuffer([block_K],accum_dtype),
+        QK: T.SharedBuffer([block_K],dtype),
     ):
-        shared_reg = T.alloc_fragment([block_K], accum_dtype)
-        squared_reg = T.alloc_fragment([block_K], accum_dtype)
-        sum_reg = T.alloc_fragment([1], accum_dtype)
+        shared_reg = T.alloc_fragment([block_K], dtype)
+        squared_reg = T.alloc_fragment([block_K], dtype)
+        sum_reg = T.alloc_fragment([1], dtype)
         T.copy(QK, shared_reg)
         
         # 计算元素的平方用于求norm
@@ -76,7 +76,7 @@ def fused_recurrent(
         g: T.Tensor([Batch, Token, Head_V], accum_dtype),
         Beta: T.Tensor([Batch, Token, Head_V],dtype),
         O: T.Tensor([Batch, Token, Head_V, V_Dim], dtype),
-        h0: T.Tensor([Batch, Head_V, K_Dim, V_Dim], dtype),
+        h0: T.Tensor([Batch, Head_V, K_Dim, V_Dim], accum_dtype),
         # ht: T.Tensor([Batch, Head_V, K_Dim, V_Dim], dtype),
         scale: T.Tensor([1], dtype),
         # O: T.Tensor(Batch, Token, Head_V, V_Dim, dtype),
@@ -88,15 +88,15 @@ def fused_recurrent(
             Q_shared = T.alloc_shared([block_K], dtype)
             K_shared = T.alloc_shared([block_K], dtype)
             V_shared = T.alloc_shared([block_V], dtype)
-            h0_shared = T.alloc_shared([block_K, block_V], dtype)
+            h0_shared = T.alloc_shared([block_K, block_V], accum_dtype)
             o_shared = T.alloc_shared([block_V], dtype)
             
-            scale_reg = T.alloc_fragment([1], accum_dtype)
-            g_reg = T.alloc_local([1], accum_dtype)
-            beta_reg = T.alloc_local([1], accum_dtype)
+            scale_reg = T.alloc_fragment([1], dtype)
+            g_reg = T.alloc_local([1], dtype)
+            beta_reg = T.alloc_local([1], dtype)
             h0_reg = T.alloc_fragment([block_K, block_V], accum_dtype)
-            k_reg = T.alloc_fragment([block_K], accum_dtype)
-            v_min_reg = T.alloc_fragment([block_V], accum_dtype)
+            k_reg = T.alloc_fragment([block_K], dtype)
+            v_min_reg = T.alloc_fragment([block_V], dtype)
             
             scale_reg[0] = scale[0]
             
@@ -119,9 +119,9 @@ def fused_recurrent(
                 # elementwise copy
                 beta_reg[0] = Beta[id_b, t, id_hv]
                 g_reg[0] = g[id_b, t, id_hv]
-                # if USE_QK_L2NORM_IN_KERNEL:
-                #     L2Norm_QK(Q_shared)
-                #     L2Norm_QK(K_shared)
+                if USE_QK_L2NORM_IN_KERNEL:
+                    L2Norm_QK(Q_shared)
+                    L2Norm_QK(K_shared)
                 # b_q = b_q * scale
                 for i in T.Parallel(block_K):
                     Q_shared[i] = Q_shared[i] * scale_reg[0]
@@ -269,7 +269,7 @@ if __name__ == '__main__':
     v = torch.randn(B, Token, HV, V, device='cuda', dtype=datatype)
     g = torch.randn(B, Token, HV, device='cuda', dtype=gdtype).sigmoid()
     beta = torch.randn(B, Token, HV, device='cuda', dtype=datatype).sigmoid()
-    h0 = torch.zeros(B, HV, K, V, device='cuda', dtype=datatype)
+    h0 = torch.zeros(B, HV, K, V, device='cuda', dtype=gdtype)
     
     o, final_state = fused_recurrent_gated_delta_rule_tl(
         q=q,

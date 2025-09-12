@@ -1,0 +1,29 @@
+2025-09-12 02:05:35,785 INFO:Auto-tuning with 0.9 CPU utilizations, 8 CPUs available, 7 CPUs will be used
+2025-09-12 02:05:46,305 INFO:An error occurred while testing config {'BLOCK_N': 128, 'reduce_threads': 32}, checkout autotuner.log for more details
+2025-09-12 02:05:46,343 DEBUG:Error: Traceback (most recent call last):
+  File "/storage/coda1/p-tkrishna3/0/hkang342/tilelang/tilelang/autotuner/tuner.py", line 494, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/coda1/p-tkrishna3/0/hkang342/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/storage/coda1/p-tkrishna3/0/hkang342/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/coda1/p-tkrishna3/0/hkang342/tilelang/tilelang/autotuner/tuner.py", line 387, in target_fn
+    latency = profiler.do_bench(
+              ^^^^^^^^^^^^^^^^^^
+  File "/storage/coda1/p-tkrishna3/0/hkang342/tilelang/tilelang/profiler/__init__.py", line 248, in do_bench
+    return do_bench(
+           ^^^^^^^^^
+  File "/storage/coda1/p-tkrishna3/0/hkang342/tilelang/tilelang/profiler/bench.py", line 41, in do_bench
+    fn()
+  File "/storage/coda1/p-tkrishna3/0/hkang342/tilelang/tilelang/jit/adapter/base.py", line 49, in __call__
+    return self.func(*args, **kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/coda1/p-tkrishna3/0/hkang342/tilelang/tilelang/jit/adapter/cython/adapter.py", line 485, in lambda_forward
+    return self.cython_wrapper.forward([*args],
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "tilelang/jit/adapter/cython/cython_wrapper.pyx", line 148, in tilelang.jit.adapter.cython.cython_wrapper.CythonKernelWrapper.forward
+  File "tilelang/jit/adapter/cython/cython_wrapper.pyx", line 257, in tilelang.jit.adapter.cython.cython_wrapper.CythonKernelWrapper.forward
+RuntimeError: Kernel call failed: main_kernel: cudaErrorInvalidConfiguration - invalid configuration argument
+

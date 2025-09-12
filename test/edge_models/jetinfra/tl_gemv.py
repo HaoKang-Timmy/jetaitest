@@ -14,45 +14,6 @@ def ref_program(A, B):
     return A @ B.T
 
 
-# @tl.jit(out_idx=[-1])
-# def splitk_gemv_vectorized(
-#     N: int,
-#     K: int,
-#     BLOCK_N: int,
-#     reduce_threads: int,
-#     dtype: str = "float16",
-#     accum_dtype: str = "float",
-# ):
-#     MAX_TRANSACTION_SIZE_IN_BITS = 128
-#     TILE_K = MAX_TRANSACTION_SIZE_IN_BITS // DataType(dtype).bits
-#     BLOCK_K = reduce_threads * TILE_K
-
-#     @T.prim_func
-#     def main(
-#             A: T.Tensor((K,), dtype),
-#             B: T.Tensor((N, K), dtype),
-#             C: T.Tensor((N,), dtype),
-#     ):
-#         with T.Kernel(T.ceildiv(N, BLOCK_N), threads=(BLOCK_N, reduce_threads)) as bn:
-#             tn = T.get_thread_binding(0)
-#             tk = T.get_thread_binding(1)
-#             A_local = T.alloc_local((TILE_K,), dtype)
-#             B_local = T.alloc_local((TILE_K,), dtype)
-#             C_shared = T.alloc_shared((BLOCK_N,), accum_dtype)
-#             C_accum = T.alloc_local((1,), accum_dtype)
-#             if tk == 0:
-#                 C_shared[tn] = 0
-#             T.clear(C_accum)
-#             for bk in T.serial(T.ceildiv(K, BLOCK_K)):
-#                 for k in T.vectorized(TILE_K):
-#                     A_local[k] = A[bk * BLOCK_K + tk * TILE_K + k]
-#                     B_local[k] = B[bn * BLOCK_N + tn, bk * BLOCK_K + tk * TILE_K + k]
-#                 for k in T.serial(TILE_K):
-#                     C_accum[0] += A_local[k].astype(accum_dtype) * B_local[k].astype(accum_dtype)
-#             T.atomic_add(C_shared[tn], C_accum[0])
-#             C[bn * BLOCK_N + tn] = C_shared[tn]
-
-#     return main
 def get_configs():
  
     BLOCK_N = [128]   # Notice: Hard code to 128 cause need to fuse qknorm with gemv
@@ -64,7 +25,7 @@ def get_configs():
         'reduce_threads': c[1],
     } for c in _configs]
     return configs
-@autotune(configs=get_configs(), warmup=10, rep=10)
+# @autotune(configs=get_configs(), warmup=10, rep=10)
 @tl.jit(
     pass_configs={
         tl.PassConfigKey.TL_DISABLE_FAST_MATH: False,
@@ -75,35 +36,14 @@ def splitk_gemv_vectorized_silu_l2norm(
     N: int,
     K: int,
     norm_dim: int,
-    BLOCK_N: int,
-    reduce_threads: int,
+    BLOCK_N: int = 128,
+    reduce_threads: int = 4,
     dtype: str = "bfloat16",
     accum_dtype: str = "float",
 ):
     MAX_TRANSACTION_SIZE_IN_BITS = 128
     TILE_K = MAX_TRANSACTION_SIZE_IN_BITS // DataType(dtype).bits
     BLOCK_K = reduce_threads * TILE_K
-    @T.macro
-    def L2Norm_QK(
-        QK: T.SharedBuffer([norm_dim],accum_dtype),
-    ):
-        shared_reg = T.alloc_fragment([norm_dim], accum_dtype)
-        squared_reg = T.alloc_fragment([norm_dim], accum_dtype)
-        sum_reg = T.alloc_fragment([1], accum_dtype)
-        T.copy(QK, shared_reg)
-        
-        # 计算元素的平方用于求norm
-        for i in T.Parallel(norm_dim):
-            squared_reg[i] = shared_reg[i] * shared_reg[i]
-        
-        T.reduce_sum(squared_reg, sum_reg, dim=0)
-        for i in T.Parallel(1):
-            sum_reg[0] = T.sqrt(sum_reg[0]) + 1e-6
-        
-        # 用原始元素除以norm
-        for i in T.Parallel(norm_dim):
-            shared_reg[i] = shared_reg[i] / sum_reg[0]
-        T.copy(shared_reg, QK)
 
     @T.prim_func
     def main(
@@ -111,9 +51,13 @@ def splitk_gemv_vectorized_silu_l2norm(
             B: T.Tensor((N, K), dtype),
             C: T.Tensor((Batch, N), dtype),
     ):
-        with T.Kernel(Batch, T.ceildiv(N, BLOCK_N), threads=(BLOCK_N, reduce_threads)) as (batch_id, bn):
-            tn = T.get_thread_binding(0)
-            tk = T.get_thread_binding(1)
+        with T.Kernel(Batch, T.ceildiv(N, BLOCK_N), threads=(BLOCK_N * reduce_threads)) as (batch_id, bn):
+            
+            # tn = T.get_thread_binding(0)
+            # tk = T.get_thread_binding(1)
+            tx = T.get_thread_binding(0)
+            tn = tx // reduce_threads
+            tk = tx % reduce_threads
             A_local = T.alloc_local((TILE_K,), dtype)
             B_local = T.alloc_local((TILE_K,), dtype)
             C_shared = T.alloc_shared((BLOCK_N,), accum_dtype)
@@ -135,18 +79,19 @@ def splitk_gemv_vectorized_silu_l2norm(
             for i in T.Parallel(BLOCK_N):
                 C_shared[i] = C_shared[i] / (1 + T.exp(-C_shared[i]))
             #### k2 norm
-            # for i in T.Parallel(BLOCK_N):
-            #     C_squared[i] = C_shared[i] * C_shared[i]
+            for i in T.Parallel(BLOCK_N):
+                C_squared[i] = C_shared[i] * C_shared[i]
             
-            # # if tn % norm_dim == 0:
-            # # L2Norm_QK(C_shared)
-            # T.reduce_sum(C_squared, sum_reg, dim=0)
-            # # for i in T.Parallel(1):
-            # sum_reg[0] = T.sqrt(sum_reg[0]) + 1e-6
-            # for i in T.Parallel(BLOCK_N):
-            #     C_shared[i] = C_shared[i] / sum_reg[0]
+            # if tn % norm_dim == 0:
+            # L2Norm_QK(C_shared)
+            T.reduce_sum(C_squared, sum_reg, dim=0)
+            # for i in T.Parallel(1):
+            for i in T.Parallel(1):
+                sum_reg[i] = T.sqrt(sum_reg[i]) + 1e-6
+            for i in T.Parallel(BLOCK_N):
+                C_shared[i] = C_shared[i] / sum_reg[0]
             C[batch_id, bn * BLOCK_N + tn] = C_shared[tn]
-
+    # print(main)
     return main
 def gemv_silu_l2norm_kernel(
     input,
@@ -181,27 +126,28 @@ def compare_pytorch(a, b, norm_dim=128):
     # output = (a @ b.T)
 
     # Step 2: Reshape for normalization
-    # reshaped_output = output.view(a.shape[0], -1, norm_dim)
+    reshaped_output = output.view(a.shape[0], -1, norm_dim)
 
-    # # Step 3: L2 Norm calculation
-    # # Keepdim=True to allow broadcasting for division
-    # norms = reshaped_output * reshaped_output
-    # norms = torch.sum(norms, dim=1)
-    # norms = torch.sqrt(norms) + 1e-6
+    # Step 3: L2 Norm calculation
+    # Keepdim=True to allow broadcasting for division
+    norms = reshaped_output * reshaped_output
+    norms = torch.sum(norms, dim=-1)
+    norms = torch.sqrt(norms) + 1e-6
     
-    # # Step 4: Normalize
-    # # Add epsilon for numerical stability, same as in the kernel
-    # normalized_output = reshaped_output / (norms)
+    # Step 4: Normalize
+    # Add epsilon for numerical stability, same as in the kernel
+    normalized_output = reshaped_output / (norms.unsqueeze(-1))
 
-    # # Step 5: Reshape back to original
-    # final_output = normalized_output.view(a.shape[0], -1)
-    final_output = output
+    # Step 5: Reshape back to original
+    final_output = normalized_output.view(a.shape[0], -1)
+    # final_output = output
     return final_output
+
 def main():
     parser = argparse.ArgumentParser(description="GEMV Example")
-    parser.add_argument("--n", type=int, default=1152, help="Matrix dimension N")
+    parser.add_argument("--n", type=int, default=128, help="Matrix dimension N")
     parser.add_argument("--k", type=int, default=1536, help="Matrix dimension K")
-    parser.add_argument("--token", type=int, default=10, help="Token dimension T")
+    parser.add_argument("--token", type=int, default=1, help="Token dimension T")
     parser.add_argument("--batch", type=int, default=1, help="Batch dimension B")
     args, _ = parser.parse_known_args()
     N, K, Batch, Token = args.n, args.k, args.batch, args.token
