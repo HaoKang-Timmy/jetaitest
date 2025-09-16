@@ -36,8 +36,7 @@ from fla.ops.gated_delta_rule import (chunk_gated_delta_rule,
 from .dynamic_conv import DynamicShortConvolution
 from .configuration_jet_nemotron import JetNemotronConfig
 from .kv_cache import JetNemotronCache
-from .jetinfra import linear_w_silu
-
+from .jetinfra import fused_linear_silu
 
 @dataclass
 class JetBlockConfig():
@@ -156,9 +155,8 @@ class JetBlock(nn.Module):
         use_cache: Optional[bool] = False,
         **kwargs
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[JetNemotronCache]]:
-        
         if attention_mask is not None:
-            
+            # print("attn mask shape:", attention_mask.shape)
             if len(attention_mask.shape) > 2:
                 attention_mask = attention_mask.squeeze(1)
                 attention_mask = torch.where(attention_mask[:, -1] > -1, 1, 0)
@@ -184,19 +182,22 @@ class JetBlock(nn.Module):
             indices, cu_seqlens, _ = get_unpad_data(attention_mask[:, -q_len:])
 
         conv_state = None
-
+        
         conv_mask = attention_mask[:, -hidden_states.shape[1]:] if attention_mask is not None else None
+        # print("conv_mask.shape:", conv_mask.shape if conv_mask is not None else None)
         # print("hidden_states.shape:", hidden_states.shape)
-        ## TODO FP8 kernel replacing
-        q = F.silu(self.q_proj(hidden_states))
-        k = F.silu(self.k_proj(hidden_states))
-        # q = linear_w_silu_prefill(hidden_states, self.q_proj.weight)
-        # k = linear_w_silu_prefill(hidden_states, self.k_proj.weight)
+        # q = F.silu(self.q_proj(hidden_states))
+        # k = F.silu(self.k_proj(hidden_states))
+        q = fused_linear_silu(hidden_states, self.q_proj.weight)
+        k = fused_linear_silu(hidden_states, self.k_proj.weight)
+        # print("q.shape:", q.shape)
+        # print("k.shape:", k.shape)
         conv_state_v = None
         if last_state is not None:
             conv_state_v = last_state['conv_state'][-1]
+        v = self.v_proj(hidden_states)
         v, conv_state_v = self.dynamic_conv1d(
-            x=self.v_proj(hidden_states),
+            x=v,
             generator_input=hidden_states,
             mask=conv_mask,
             cache=conv_state_v,

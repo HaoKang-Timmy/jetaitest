@@ -18,7 +18,7 @@ import os
 import argparse
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from edge_models import JetNemotronForCausalLM, JetNemotronConfig
+from server_models import JetNemotronForCausalLM, JetNemotronConfig
 
 def main():
     parser = argparse.ArgumentParser(description="Generate text using local Jet-Nemotron")

@@ -168,7 +168,7 @@ class DynamicShortConvolution(nn.Module):
                 # print("decode cache shape:", cache.shape)
                 # print("decode cu_seqlens:", cu_seqlens)
                 # print("decode generator_input shape:", generator_input.shape)
-                print("step triton")
+                # print("step triton")
                 x, cache = self._step_triton(x, cache, cu_seqlens, generator_input=generator_input)
             else:
                 raise ValueError(f"Unknown implementation: {implementation}")
@@ -281,8 +281,8 @@ class DynamicShortConvolution(nn.Module):
         # print("generator_input squeeze shape:", generator_input.squeeze(1).shape)
         kernels_triton = self.get_kernel(generator_input.squeeze(1)) # [B, D, W]
         # print("kernels_triton shape:", kernels_triton.shape)
-        print("cache shape:", cache.shape)
-        print("x shape:", x.shape)
+        # print("cache shape:", cache.shape)
+        # print("x shape:", x.shape)
         # 2. Call Triton kernel without activation
         x_out_triton = causal_conv_step_triton(
             x,

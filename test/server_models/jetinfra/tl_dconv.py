@@ -70,7 +70,7 @@ def _dconv_fwd_kernel(
             T.copy(Output_shared, Output[bx, by * block_D])
     return main_fp16_prefill
 
-def dynamic_conv_pytorch_cache(x, kernels, cache=None):
+
 if __name__ == "__main__":
     batch = 1
     token = 1
