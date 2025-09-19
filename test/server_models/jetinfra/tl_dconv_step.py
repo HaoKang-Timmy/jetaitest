@@ -55,6 +55,7 @@ def _dconv_step_kernel(
         with T.Kernel(Batch * Token, T.ceildiv(Indim, block_D), threads=threads) as (bx, by):
             Kernel_shared = T.alloc_shared([block_D, Kernel_size], dtype)
             Input_shared = T.alloc_shared([block_D, Kernel_size], dtype)
+
             Output_shared = T.alloc_shared([block_D], dtype)
 
             Input_reg = T.alloc_fragment([block_D, Kernel_size], reduce_type)
@@ -65,11 +66,18 @@ def _dconv_step_kernel(
             token_id = bx % Token
             # for i, j in T.Parallel(block_D, Kernel_size):
             #     Kernel_shared[i, j] = Kernel_input[bx, token_id, i + by * block_D, j]
-            T.copy(Kernel_input[bx, token_id, by * block_D, 0], Kernel_shared)
-            # T.copy(Input[batch_id, token_id, by * block_D],Input_shared[])
+            T.copy(Kernel_input[bx, token_id, by * block_D:by * block_D + block_D, 0:Kernel_size], Kernel_shared)
+
             for i, j in T.Parallel(block_D, Kernel_size):
                 Input_shared[i, j] = T.if_then_else(token_id + 1 + j - Kernel_size >= 0, 
                     Input[bx, token_id, i + by * block_D], Cache[bx, i + by * block_D, j+1])
+            # for i, j in T.Parallel(block_D, Kernel_size - 1):
+            #     Input_shared[i, j] = Cache[bx, i + by * block_D, j+1]
+            ### Last dim
+            for i in T.Parallel(block_D):
+                Input_shared[i, Kernel_size - 1] = Input[bx, token_id, i + by * block_D]
+            
+            
 
             T.copy(Input_shared, Input_reg)
             T.copy(Kernel_shared, Kernel_reg)
