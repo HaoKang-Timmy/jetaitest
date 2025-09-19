@@ -1,6 +1,0 @@
-2025-09-17 18:29:04,997 INFO:Auto-tuning with 0.9 CPU utilizations, 8 CPUs available, 7 CPUs will be used
-2025-09-17 18:29:05,024 DEBUG:Compilation failed for config {'block_D': 64, 'threads': 128} at index 0 with error: _dconv_step_kernel() missing 1 required positional argument: 'dtype'
-2025-09-17 18:29:05,024 DEBUG:Compilation failed for config {'block_D': 256, 'threads': 128} at index 2 with error: _dconv_step_kernel() missing 1 required positional argument: 'dtype'
-2025-09-17 18:29:05,024 DEBUG:Compilation failed for config {'block_D': 512, 'threads': 128} at index 3 with error: _dconv_step_kernel() missing 1 required positional argument: 'dtype'
-2025-09-17 18:29:05,024 DEBUG:Compilation failed for config {'block_D': 128, 'threads': 128} at index 1 with error: _dconv_step_kernel() missing 1 required positional argument: 'dtype'
-2025-09-17 18:29:05,025 ERROR:Auto-tuning failed: No configuration successfully compiled and passed benchmarking/validation.

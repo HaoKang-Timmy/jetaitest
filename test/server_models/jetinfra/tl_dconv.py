@@ -59,8 +59,9 @@ def _dconv_fwd_kernel(
             batch_id = bx // Token
             token_id = bx % Token
             # T.copy(Kernel_input[bx, by * block_D,0], Kernel_shared)
-            for i, j in T.Parallel(block_D, Kernel_size):
-                Kernel_shared[i, j] = Kernel_input[bx, i + by * block_D, j]
+            T.copy(Kernel_input[bx, by * block_D, 0], Kernel_shared)
+            # for i, j in T.Parallel(block_D, Kernel_size):
+            #     Kernel_shared[i, j] = Kernel_input[bx, i + by * block_D, j]
             ## copy input
             for i, j in T.Parallel(block_D, Kernel_size):
                 Input_shared[i, j] = T.if_then_else(token_id + 1 + j - Kernel_size >= 0, 
