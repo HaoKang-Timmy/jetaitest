@@ -101,6 +101,10 @@ class DynamicShortConvolution(nn.Module):
             kernels = rearrange(flat_kernels, 'b (d w) -> b d w', w=self.kernel_size)
         else:
             raise ValueError(f"Invalid kernel shape: {flat_kernels.shape}")
+        
+
+        kernels = kernels.transpose(-2, -1)
+        
         return kernels
 
     def forward(
