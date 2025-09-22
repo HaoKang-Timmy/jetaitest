@@ -1,0 +1,352 @@
+2025-09-22 16:15:40,659 INFO:Auto-tuning with 0.9 CPU utilizations, 8 CPUs available, 7 CPUs will be used
+2025-09-22 16:17:11,863 DEBUG:Compilation failed for config {'block_M': 128, 'block_K': 128, 'block_N': 128, 'num_stages': 4, 'threads': 256} at index 47 with error: Initialization failed: Failed to set the allowed dynamic shared memory size to 262144 with error: invalid argument
+#include <tl_templates/cuda/gemm.h>
+#include <tl_templates/cuda/copy.h>
+#include <tl_templates/cuda/reduce.h>
+#include <tl_templates/cuda/ldsm.h>
+#include <tl_templates/cuda/threadblock_swizzle.h>
+#include <tl_templates/cuda/debug.h>
+#ifdef ENABLE_BF16
+#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>
+#endif
+
+extern "C" __global__ void main_kernel(__grid_constant__ const CUtensorMap Input_desc, __grid_constant__ const CUtensorMap Output_desc, __grid_constant__ const CUtensorMap W_T_desc);
+extern "C" __global__ void __launch_bounds__(384, 1) main_kernel(__grid_constant__ const CUtensorMap Input_desc, __grid_constant__ const CUtensorMap Output_desc, __grid_constant__ const CUtensorMap W_T_desc) {
+  extern __shared__ __align__(1024) uchar buf_dyn_shmem[];
+  float output_reg[64];
+  __shared__ uint64_t mbarrier_mem[8];
+  auto mbarrier = reinterpret_cast<Barrier*>(mbarrier_mem);
+  if (tl::tl_shuffle_elect<0>()) {
+    tl::prefetch_tma_descriptor(Input_desc);
+    tl::prefetch_tma_descriptor(W_T_desc);
+    tl::prefetch_tma_descriptor(Output_desc);
+    mbarrier[0].init(128);
+    mbarrier[1].init(128);
+    mbarrier[2].init(128);
+    mbarrier[3].init(128);
+    mbarrier[4].init(256);
+    mbarrier[5].init(256);
+    mbarrier[6].init(256);
+    mbarrier[7].init(256);
+  }
+  __syncthreads();
+  if (256 <= ((int)threadIdx.x)) {
+    tl::warpgroup_reg_dealloc<24>();
+    for (int k = 0; k < 12; ++k) {
+      mbarrier[((k & 3) + 4)].wait((((k & 7) >> 2) ^ 1));
+      if (tl::tl_shuffle_elect<128>()) {
+        mbarrier[(k & 3)].expect_transaction(32768);
+        tl::tma_load(Input_desc, mbarrier[(k & 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((k & 3) * 16384) + 65536)])), (k * 128), 0);
+        tl::tma_load(Input_desc, mbarrier[(k & 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((k & 3) * 16384) + 73728)])), ((k * 128) + 64), 0);
+        mbarrier[(k & 3)].expect_transaction(32768);
+        tl::tma_load(W_T_desc, mbarrier[(k & 3)], (&(((bfloat16_t*)buf_dyn_shmem)[((k & 3) * 16384)])), (k * 128), (((int)blockIdx.x) * 128));
+        tl::tma_load(W_T_desc, mbarrier[(k & 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((k & 3) * 16384) + 8192)])), ((k * 128) + 64), (((int)blockIdx.x) * 128));
+      }
+      mbarrier[(k & 3)].arrive();
+    }
+  } else {
+    tl::warpgroup_reg_alloc<240>();
+    #pragma unroll
+    for (int i = 0; i < 32; ++i) {
+      *(float2*)(output_reg + (i * 2)) = make_float2(0x0p+0f/*0.000000e+00*/, 0x0p+0f/*0.000000e+00*/);
+    }
+    tl::fence_proxy_async();
+    for (int k_1 = 0; k_1 < 12; ++k_1) {
+      mbarrier[(k_1 & 3)].wait(((k_1 & 7) >> 2));
+      tl::gemm_ss<128, 128, 128, 4, 2, 0, 1, 0, 128, 128, 0, 0, true>((&(((bfloat16_t*)buf_dyn_shmem)[(((k_1 & 3) * 16384) + 65536)])), (&(((bfloat16_t*)buf_dyn_shmem)[((k_1 & 3) * 16384)])), (&(output_reg[0])));
+      mbarrier[((k_1 & 3) + 4)].arrive();
+    }
+    #pragma unroll
+    for (int i_1 = 0; i_1 < 64; ++i_1) {
+      output_reg[i_1] = (output_reg[i_1] / (0x1p+0f/*1.000000e+00*/ + __expf((output_reg[i_1] * -0x1p+0f/*-1.000000e+00*/))));
+    }
+    tl::__sync_thread_partial<3, 256>();
+    #pragma unroll
+    for (int i_2 = 0; i_2 < 8; ++i_2) {
+      tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((int)threadIdx.x) >> 7) * 8192) + ((i_2 >> 2) * 4096)) + (((((int)threadIdx.x) & 127) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_2 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_2 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 65536)])), __pack_half2(((bfloat16_t)output_reg[(i_2 * 8)]), ((bfloat16_t)output_reg[((i_2 * 8) + 1)])), __pack_half2(((bfloat16_t)output_reg[((i_2 * 8) + 2)]), ((bfloat16_t)output_reg[((i_2 * 8) + 3)])), __pack_half2(((bfloat16_t)output_reg[((i_2 * 8) + 4)]), ((bfloat16_t)output_reg[((i_2 * 8) + 5)])), __pack_half2(((bfloat16_t)output_reg[((i_2 * 8) + 6)]), ((bfloat16_t)output_reg[((i_2 * 8) + 7)])));
+    }
+    tl::fence_proxy_async();
+    tl::__sync_thread_partial<3, 256>();
+    if (tl::tl_shuffle_elect<256>()) {
+      tl::tma_store(Output_desc, (&(((bfloat16_t*)buf_dyn_shmem)[65536])), (((int)blockIdx.x) * 128), 0);
+      tl::tma_store_arrive();
+      tl::tma_store_wait<0>();
+      tl::tma_store(Output_desc, (&(((bfloat16_t*)buf_dyn_shmem)[73728])), ((((int)blockIdx.x) * 128) + 64), 0);
+      tl::tma_store_arrive();
+      tl::tma_store_wait<0>();
+    }
+  }
+}
+
+
+#define ERROR_BUF_SIZE 1024
+static char error_buf[ERROR_BUF_SIZE];
+
+extern "C" const char* get_last_error() {
+    return error_buf;
+}
+
+extern "C" int init() {
+    error_buf[0] = '\0';
+    
+    cudaError_t result_main_kernel = cudaFuncSetAttribute(main_kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 262144);
+    if (result_main_kernel != CUDA_SUCCESS) {
+        snprintf(error_buf, ERROR_BUF_SIZE, "Failed to set the allowed dynamic shared memory size to %d with error: %s", 262144, cudaGetErrorString(result_main_kernel));
+        return -1;
+    }
+
+    return 0;
+}
+
+extern "C" int call(bfloat16_t* __restrict__ Input, bfloat16_t* __restrict__ W_T, bfloat16_t* __restrict__ Output, cudaStream_t stream=cudaStreamDefault) {
+
+	CUtensorMap Input_desc;
+	CUtensorMapDataType Input_desc_type= (CUtensorMapDataType)9;
+	cuuint32_t Input_desc_tensorRank= 2;
+	void *Input_desc_globalAddress= Input;
+	cuuint64_t Input_desc_globalDim[2]= {1536,5};
+	cuuint64_t Input_desc_globalStride[2]= {2,3072};
+	cuuint32_t Input_desc_boxDim[2]= {64,128};
+	cuuint32_t Input_desc_elementStrides[2]= {1,1};
+	CUtensorMapInterleave Input_desc_interleave= (CUtensorMapInterleave)0;
+	CUtensorMapSwizzle Input_desc_swizzle= (CUtensorMapSwizzle)3;
+	CUtensorMapL2promotion Input_desc_l2Promotion= (CUtensorMapL2promotion)2;
+	CUtensorMapFloatOOBfill Input_desc_oobFill= (CUtensorMapFloatOOBfill)0;
+
+	CUresult Input_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
+    &Input_desc, Input_desc_type, Input_desc_tensorRank, Input_desc_globalAddress, Input_desc_globalDim, Input_desc_globalStride + 1, Input_desc_boxDim, Input_desc_elementStrides, Input_desc_interleave, Input_desc_swizzle, Input_desc_l2Promotion, Input_desc_oobFill);
+
+	if (Input_desc_result != CUDA_SUCCESS) {
+		std::stringstream ss;
+		ss << "Error: Failed to initialize the TMA descriptor Input_desc";
+		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
+		return -1;
+	}
+
+	CUtensorMap Output_desc;
+	CUtensorMapDataType Output_desc_type= (CUtensorMapDataType)9;
+	cuuint32_t Output_desc_tensorRank= 2;
+	void *Output_desc_globalAddress= Output;
+	cuuint64_t Output_desc_globalDim[2]= {1152,5};
+	cuuint64_t Output_desc_globalStride[2]= {2,2304};
+	cuuint32_t Output_desc_boxDim[2]= {64,128};
+	cuuint32_t Output_desc_elementStrides[2]= {1,1};
+	CUtensorMapInterleave Output_desc_interleave= (CUtensorMapInterleave)0;
+	CUtensorMapSwizzle Output_desc_swizzle= (CUtensorMapSwizzle)3;
+	CUtensorMapL2promotion Output_desc_l2Promotion= (CUtensorMapL2promotion)2;
+	CUtensorMapFloatOOBfill Output_desc_oobFill= (CUtensorMapFloatOOBfill)0;
+
+	CUresult Output_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
+    &Output_desc, Output_desc_type, Output_desc_tensorRank, Output_desc_globalAddress, Output_desc_globalDim, Output_desc_globalStride + 1, Output_desc_boxDim, Output_desc_elementStrides, Output_desc_interleave, Output_desc_swizzle, Output_desc_l2Promotion, Output_desc_oobFill);
+
+	if (Output_desc_result != CUDA_SUCCESS) {
+		std::stringstream ss;
+		ss << "Error: Failed to initialize the TMA descriptor Output_desc";
+		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
+		return -1;
+	}
+
+	CUtensorMap W_T_desc;
+	CUtensorMapDataType W_T_desc_type= (CUtensorMapDataType)9;
+	cuuint32_t W_T_desc_tensorRank= 2;
+	void *W_T_desc_globalAddress= W_T;
+	cuuint64_t W_T_desc_globalDim[2]= {1536,1152};
+	cuuint64_t W_T_desc_globalStride[2]= {2,3072};
+	cuuint32_t W_T_desc_boxDim[2]= {64,128};
+	cuuint32_t W_T_desc_elementStrides[2]= {1,1};
+	CUtensorMapInterleave W_T_desc_interleave= (CUtensorMapInterleave)0;
+	CUtensorMapSwizzle W_T_desc_swizzle= (CUtensorMapSwizzle)3;
+	CUtensorMapL2promotion W_T_desc_l2Promotion= (CUtensorMapL2promotion)2;
+	CUtensorMapFloatOOBfill W_T_desc_oobFill= (CUtensorMapFloatOOBfill)0;
+
+	CUresult W_T_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
+    &W_T_desc, W_T_desc_type, W_T_desc_tensorRank, W_T_desc_globalAddress, W_T_desc_globalDim, W_T_desc_globalStride + 1, W_T_desc_boxDim, W_T_desc_elementStrides, W_T_desc_interleave, W_T_desc_swizzle, W_T_desc_l2Promotion, W_T_desc_oobFill);
+
+	if (W_T_desc_result != CUDA_SUCCESS) {
+		std::stringstream ss;
+		ss << "Error: Failed to initialize the TMA descriptor W_T_desc";
+		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
+		return -1;
+	}
+	main_kernel<<<dim3(132, 1, 1), dim3(384, 1, 1), 262144, stream>>>(Input_desc, Output_desc, W_T_desc);
+	TILELANG_CHECK_LAST_ERROR("main_kernel");
+
+	return 0;
+}
+
+2025-09-22 16:17:12,042 DEBUG:Compilation failed for config {'block_M': 128, 'block_K': 128, 'block_N': 128, 'num_stages': 4, 'threads': 128} at index 46 with error: Initialization failed: Failed to set the allowed dynamic shared memory size to 262144 with error: invalid argument
+#include <tl_templates/cuda/gemm.h>
+#include <tl_templates/cuda/copy.h>
+#include <tl_templates/cuda/reduce.h>
+#include <tl_templates/cuda/ldsm.h>
+#include <tl_templates/cuda/threadblock_swizzle.h>
+#include <tl_templates/cuda/debug.h>
+#ifdef ENABLE_BF16
+#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>
+#endif
+
+extern "C" __global__ void main_kernel(__grid_constant__ const CUtensorMap Input_desc, __grid_constant__ const CUtensorMap Output_desc, __grid_constant__ const CUtensorMap W_T_desc);
+extern "C" __global__ void __launch_bounds__(256, 1) main_kernel(__grid_constant__ const CUtensorMap Input_desc, __grid_constant__ const CUtensorMap Output_desc, __grid_constant__ const CUtensorMap W_T_desc) {
+  extern __shared__ __align__(1024) uchar buf_dyn_shmem[];
+  float output_reg[128];
+  __shared__ uint64_t mbarrier_mem[8];
+  auto mbarrier = reinterpret_cast<Barrier*>(mbarrier_mem);
+  if (tl::tl_shuffle_elect<0>()) {
+    tl::prefetch_tma_descriptor(Input_desc);
+    tl::prefetch_tma_descriptor(W_T_desc);
+    tl::prefetch_tma_descriptor(Output_desc);
+    mbarrier[0].init(128);
+    mbarrier[1].init(128);
+    mbarrier[2].init(128);
+    mbarrier[3].init(128);
+    mbarrier[4].init(128);
+    mbarrier[5].init(128);
+    mbarrier[6].init(128);
+    mbarrier[7].init(128);
+  }
+  __syncthreads();
+  if (128 <= ((int)threadIdx.x)) {
+    tl::warpgroup_reg_dealloc<24>();
+    for (int k = 0; k < 12; ++k) {
+      mbarrier[((k & 3) + 4)].wait((((k & 7) >> 2) ^ 1));
+      if (tl::tl_shuffle_elect<128>()) {
+        mbarrier[(k & 3)].expect_transaction(32768);
+        tl::tma_load(Input_desc, mbarrier[(k & 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((k & 3) * 16384) + 65536)])), (k * 128), 0);
+        tl::tma_load(Input_desc, mbarrier[(k & 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((k & 3) * 16384) + 73728)])), ((k * 128) + 64), 0);
+        mbarrier[(k & 3)].expect_transaction(32768);
+        tl::tma_load(W_T_desc, mbarrier[(k & 3)], (&(((bfloat16_t*)buf_dyn_shmem)[((k & 3) * 16384)])), (k * 128), (((int)blockIdx.x) * 128));
+        tl::tma_load(W_T_desc, mbarrier[(k & 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((k & 3) * 16384) + 8192)])), ((k * 128) + 64), (((int)blockIdx.x) * 128));
+      }
+      mbarrier[(k & 3)].arrive();
+    }
+  } else {
+    tl::warpgroup_reg_alloc<240>();
+    #pragma unroll
+    for (int i = 0; i < 64; ++i) {
+      *(float2*)(output_reg + (i * 2)) = make_float2(0x0p+0f/*0.000000e+00*/, 0x0p+0f/*0.000000e+00*/);
+    }
+    tl::fence_proxy_async();
+    for (int k_1 = 0; k_1 < 12; ++k_1) {
+      mbarrier[(k_1 & 3)].wait(((k_1 & 7) >> 2));
+      tl::gemm_ss<128, 128, 128, 4, 1, 0, 1, 0, 128, 128, 0, 0, true>((&(((bfloat16_t*)buf_dyn_shmem)[(((k_1 & 3) * 16384) + 65536)])), (&(((bfloat16_t*)buf_dyn_shmem)[((k_1 & 3) * 16384)])), (&(output_reg[0])));
+      mbarrier[((k_1 & 3) + 4)].arrive();
+    }
+    #pragma unroll
+    for (int i_1 = 0; i_1 < 128; ++i_1) {
+      output_reg[i_1] = (output_reg[i_1] / (0x1p+0f/*1.000000e+00*/ + __expf((output_reg[i_1] * -0x1p+0f/*-1.000000e+00*/))));
+    }
+    tl::__sync_thread_partial<3, 128>();
+    #pragma unroll
+    for (int i_2 = 0; i_2 < 16; ++i_2) {
+      tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((((i_2 & 7) >> 2) * 8192) + ((i_2 >> 3) * 4096)) + ((((int)threadIdx.x) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_2 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_2 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 65536)])), __pack_half2(((bfloat16_t)output_reg[(i_2 * 8)]), ((bfloat16_t)output_reg[((i_2 * 8) + 1)])), __pack_half2(((bfloat16_t)output_reg[((i_2 * 8) + 2)]), ((bfloat16_t)output_reg[((i_2 * 8) + 3)])), __pack_half2(((bfloat16_t)output_reg[((i_2 * 8) + 4)]), ((bfloat16_t)output_reg[((i_2 * 8) + 5)])), __pack_half2(((bfloat16_t)output_reg[((i_2 * 8) + 6)]), ((bfloat16_t)output_reg[((i_2 * 8) + 7)])));
+    }
+    tl::fence_proxy_async();
+    tl::__sync_thread_partial<3, 128>();
+    if (tl::tl_shuffle_elect<128>()) {
+      tl::tma_store(Output_desc, (&(((bfloat16_t*)buf_dyn_shmem)[65536])), (((int)blockIdx.x) * 128), 0);
+      tl::tma_store_arrive();
+      tl::tma_store_wait<0>();
+      tl::tma_store(Output_desc, (&(((bfloat16_t*)buf_dyn_shmem)[73728])), ((((int)blockIdx.x) * 128) + 64), 0);
+      tl::tma_store_arrive();
+      tl::tma_store_wait<0>();
+    }
+  }
+}
+
+
+#define ERROR_BUF_SIZE 1024
+static char error_buf[ERROR_BUF_SIZE];
+
+extern "C" const char* get_last_error() {
+    return error_buf;
+}
+
+extern "C" int init() {
+    error_buf[0] = '\0';
+    
+    cudaError_t result_main_kernel = cudaFuncSetAttribute(main_kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 262144);
+    if (result_main_kernel != CUDA_SUCCESS) {
+        snprintf(error_buf, ERROR_BUF_SIZE, "Failed to set the allowed dynamic shared memory size to %d with error: %s", 262144, cudaGetErrorString(result_main_kernel));
+        return -1;
+    }
+
+    return 0;
+}
+
+extern "C" int call(bfloat16_t* __restrict__ Input, bfloat16_t* __restrict__ W_T, bfloat16_t* __restrict__ Output, cudaStream_t stream=cudaStreamDefault) {
+
+	CUtensorMap Input_desc;
+	CUtensorMapDataType Input_desc_type= (CUtensorMapDataType)9;
+	cuuint32_t Input_desc_tensorRank= 2;
+	void *Input_desc_globalAddress= Input;
+	cuuint64_t Input_desc_globalDim[2]= {1536,5};
+	cuuint64_t Input_desc_globalStride[2]= {2,3072};
+	cuuint32_t Input_desc_boxDim[2]= {64,128};
+	cuuint32_t Input_desc_elementStrides[2]= {1,1};
+	CUtensorMapInterleave Input_desc_interleave= (CUtensorMapInterleave)0;
+	CUtensorMapSwizzle Input_desc_swizzle= (CUtensorMapSwizzle)3;
+	CUtensorMapL2promotion Input_desc_l2Promotion= (CUtensorMapL2promotion)2;
+	CUtensorMapFloatOOBfill Input_desc_oobFill= (CUtensorMapFloatOOBfill)0;
+
+	CUresult Input_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
+    &Input_desc, Input_desc_type, Input_desc_tensorRank, Input_desc_globalAddress, Input_desc_globalDim, Input_desc_globalStride + 1, Input_desc_boxDim, Input_desc_elementStrides, Input_desc_interleave, Input_desc_swizzle, Input_desc_l2Promotion, Input_desc_oobFill);
+
+	if (Input_desc_result != CUDA_SUCCESS) {
+		std::stringstream ss;
+		ss << "Error: Failed to initialize the TMA descriptor Input_desc";
+		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
+		return -1;
+	}
+
+	CUtensorMap Output_desc;
+	CUtensorMapDataType Output_desc_type= (CUtensorMapDataType)9;
+	cuuint32_t Output_desc_tensorRank= 2;
+	void *Output_desc_globalAddress= Output;
+	cuuint64_t Output_desc_globalDim[2]= {1152,5};
+	cuuint64_t Output_desc_globalStride[2]= {2,2304};
+	cuuint32_t Output_desc_boxDim[2]= {64,128};
+	cuuint32_t Output_desc_elementStrides[2]= {1,1};
+	CUtensorMapInterleave Output_desc_interleave= (CUtensorMapInterleave)0;
+	CUtensorMapSwizzle Output_desc_swizzle= (CUtensorMapSwizzle)3;
+	CUtensorMapL2promotion Output_desc_l2Promotion= (CUtensorMapL2promotion)2;
+	CUtensorMapFloatOOBfill Output_desc_oobFill= (CUtensorMapFloatOOBfill)0;
+
+	CUresult Output_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
+    &Output_desc, Output_desc_type, Output_desc_tensorRank, Output_desc_globalAddress, Output_desc_globalDim, Output_desc_globalStride + 1, Output_desc_boxDim, Output_desc_elementStrides, Output_desc_interleave, Output_desc_swizzle, Output_desc_l2Promotion, Output_desc_oobFill);
+
+	if (Output_desc_result != CUDA_SUCCESS) {
+		std::stringstream ss;
+		ss << "Error: Failed to initialize the TMA descriptor Output_desc";
+		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
+		return -1;
+	}
+
+	CUtensorMap W_T_desc;
+	CUtensorMapDataType W_T_desc_type= (CUtensorMapDataType)9;
+	cuuint32_t W_T_desc_tensorRank= 2;
+	void *W_T_desc_globalAddress= W_T;
+	cuuint64_t W_T_desc_globalDim[2]= {1536,1152};
+	cuuint64_t W_T_desc_globalStride[2]= {2,3072};
+	cuuint32_t W_T_desc_boxDim[2]= {64,128};
+	cuuint32_t W_T_desc_elementStrides[2]= {1,1};
+	CUtensorMapInterleave W_T_desc_interleave= (CUtensorMapInterleave)0;
+	CUtensorMapSwizzle W_T_desc_swizzle= (CUtensorMapSwizzle)3;
+	CUtensorMapL2promotion W_T_desc_l2Promotion= (CUtensorMapL2promotion)2;
+	CUtensorMapFloatOOBfill W_T_desc_oobFill= (CUtensorMapFloatOOBfill)0;
+
+	CUresult W_T_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
+    &W_T_desc, W_T_desc_type, W_T_desc_tensorRank, W_T_desc_globalAddress, W_T_desc_globalDim, W_T_desc_globalStride + 1, W_T_desc_boxDim, W_T_desc_elementStrides, W_T_desc_interleave, W_T_desc_swizzle, W_T_desc_l2Promotion, W_T_desc_oobFill);
+
+	if (W_T_desc_result != CUDA_SUCCESS) {
+		std::stringstream ss;
+		ss << "Error: Failed to initialize the TMA descriptor W_T_desc";
+		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
+		return -1;
+	}
+	main_kernel<<<dim3(132, 1, 1), dim3(256, 1, 1), 262144, stream>>>(Input_desc, Output_desc, W_T_desc);
+	TILELANG_CHECK_LAST_ERROR("main_kernel");
+
+	return 0;
+}
+
+2025-09-22 16:17:13,291 INFO:Auto-tuning with 0.9 CPU utilizations, 8 CPUs available, 7 CPUs will be used

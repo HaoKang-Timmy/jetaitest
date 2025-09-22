@@ -8,8 +8,8 @@ import time
 import tilelang as tl
 
 def get_configs():
-    block_K = [32,64,128,256]
-    block_V = [32,64,128,256]
+    block_K = [128]
+    block_V = [128]
     num_stages = [3, 4]
     threads = [128, 256]
     # head_split_k = [1, 2, 3, 4]
@@ -37,31 +37,30 @@ def fused_recurrent(
     USE_QK_L2NORM_IN_KERNEL=True, 
     STORE_FINAL_STATE=True,
     dtype = "float16",
+    accum_dtype = "float",
     block_K=128, 
     block_V=128, 
-    num_stages=2, 
+    num_stages=3, 
 
-    threads=128
+    threads=256
 ):
     @T.macro
     def L2Norm_QK(
-        QK: T.SharedBuffer([block_K],dtype),
+        QK: T.FragmentBuffer([block_K],dtype),
     ):
-        shared_reg = T.alloc_fragment([block_K], dtype)
         squared_reg = T.alloc_fragment([block_K], dtype)
         sum_reg = T.alloc_fragment([1], dtype)
-        T.copy(QK, shared_reg)
         
         # 计算元素的平方用于求norm
         for i in T.Parallel(block_K):
-            squared_reg[i] = shared_reg[i] * shared_reg[i]
+            squared_reg[i] = QK[i] * QK[i]
         T.reduce_sum(squared_reg, sum_reg, dim=0)
         sum_reg[0] = T.sqrt(sum_reg[0]) + 1e-6
         
         # 用原始元素除以norm
         for i in T.Parallel(block_K):
-            shared_reg[i] = shared_reg[i] / sum_reg[0]
-        T.copy(shared_reg, QK)
+            QK[i] = QK[i] / sum_reg[0]
+
 
     @T.prim_func
     def main(
@@ -81,72 +80,61 @@ def fused_recurrent(
             id_hv = bz % Head_V
             id_h = id_hv // (Head_V // Head)
             Q_shared = T.alloc_shared([block_K], dtype)
+            Q_fragment = T.alloc_fragment([block_K], dtype)
             K_shared = T.alloc_shared([block_K], dtype)
             V_shared = T.alloc_shared([block_V], dtype)
+            V_fragment = T.alloc_fragment([block_V], dtype)
             h0_shared = T.alloc_shared([block_K, block_V], dtype)
             o_shared = T.alloc_shared([block_V], dtype)
             
-            scale_reg = T.alloc_fragment([1], dtype)
-            g_reg = T.alloc_local([1], dtype)
-            beta_reg = T.alloc_local([1], dtype)
-            h0_reg = T.alloc_fragment([block_K, block_V], dtype)
-            k_reg = T.alloc_fragment([block_K], dtype)
-            v_min_reg = T.alloc_fragment([block_V], dtype)
+            h0_fragment = T.alloc_fragment([block_K, block_V], accum_dtype)
+            K_fragment = T.alloc_fragment([block_K], accum_dtype)
+            v_min_reg = T.alloc_fragment([block_V], accum_dtype)
             
-            scale_reg[0] = scale[0]
+            
             
             T.copy(h0[id_b, id_hv, bx * block_K, by * block_V], h0_shared)
-            # T.annotate_layout(
-            #     {
-            #         Q_shared: tl.layout.make_swizzled_layout(Q_shared),
-            #         K_shared: tl.layout.make_swizzled_layout(K_shared),
-            #         V_shared: tl.layout.make_swizzled_layout(V_shared),
-            #         h0_shared: tl.layout.make_swizzled_layout(h0_shared),
-            #         o_shared: tl.layout.make_swizzled_layout(o_shared),
-            #     }
-            # )
-            # T.use_swizzle(8)
             for t in T.Pipelined(Token, num_stages=num_stages):
                 T.copy(Q[id_b, t, id_h, bx * block_K], Q_shared)
                 T.copy(K[id_b, t, id_h, bx * block_K], K_shared)
                 T.copy(V[id_b, t, id_hv, by * block_V], V_shared)
-                T.copy(O[id_b, t, id_hv, by * block_V], o_shared)
-                # elementwise copy
-                beta_reg[0] = Beta[id_b, t, id_hv]
-                g_reg[0] = g[id_b, t, id_hv]
-                # if USE_QK_L2NORM_IN_KERNEL:
-                #     L2Norm_QK(Q_shared)
-                #     L2Norm_QK(K_shared)
+ 
+                # b_q = b_q * scale
+                T.copy(Q_shared, Q_fragment)
+                T.copy(K_shared, K_fragment)
+                T.copy(V_shared, V_fragment)
+                T.copy(h0_shared, h0_fragment)
+                if USE_QK_L2NORM_IN_KERNEL:
+                    L2Norm_QK(Q_fragment)
+                    L2Norm_QK(K_fragment)
                 # b_q = b_q * scale
                 for i in T.Parallel(block_K):
-                    Q_shared[i] = Q_shared[i] * scale_reg[0]
+                    Q_shared[i] = Q_shared[i] * scale[0]
                 #b_h *= exp(b_g)
                 
-                T.copy(h0_shared, h0_reg)
                 for i, j in T.Parallel(block_K, block_V):
-                    h0_reg[i, j] = h0_reg[i, j] * T.exp(g_reg[0])
-                T.copy(h0_reg, h0_shared)
+                    h0_fragment[i, j] = h0_fragment[i, j] * T.exp(g[id_b, t, id_hv])
+                T.copy(h0_fragment, h0_shared)
                 ### b_v -= tl.sum(b_h * b_k[:, None], 0)
-                
-                T.copy(K_shared, k_reg)
+
                 for i, j in T.Parallel(block_K, block_V):
-                    h0_reg[i, j] = h0_reg[i, j] * k_reg[i]
-                T.reduce_sum(h0_reg, v_min_reg, dim=0)
+                    h0_fragment[i, j] = h0_fragment[i, j] * K_fragment[i]
+                T.reduce_sum(h0_fragment, v_min_reg, dim=0)
                 for i in T.Parallel(block_V):
-                    V_shared[i] = V_shared[i] - v_min_reg[i]
+                    V_fragment[i] = V_fragment[i] - v_min_reg[i]
                 ### finished
                 ### b_v *= b_beta
                 for i in T.Parallel(block_V):
-                    V_shared[i] = V_shared[i] * beta_reg[0]
+                    V_fragment[i] = V_fragment[i] * Beta[id_b, t, id_hv]
                 ### b_h += b_k[:, None] * b_v[None, :]
                 for i, j in T.Parallel(block_K, block_V):
-                    h0_shared[i, j] = h0_shared[i, j] + K_shared[i] * V_shared[j]
+                    h0_fragment[i, j] = h0_fragment[i, j] + K_fragment[i] * V_fragment[j]
                 ### b_o = tl.sum(b_h * b_q[:, None], 0)
-                T.copy(h0_shared, h0_reg)
+                T.copy(h0_shared, h0_fragment)
                 for i, j in T.Parallel(block_K, block_V):
-                    h0_reg[i, j] = h0_reg[i, j] * Q_shared[i]
+                    h0_fragment[i, j] = h0_fragment[i, j] * Q_shared[i]
                 ### reuse v_min_reg
-                T.reduce_sum(h0_reg, v_min_reg, dim=0)
+                T.reduce_sum(h0_fragment, v_min_reg, dim=0)
                 T.copy(v_min_reg, o_shared)
                 
                 T.copy(o_shared, O[id_b, t, id_hv, by * block_V])
@@ -254,31 +242,31 @@ def fused_recurrent_gated_delta_rule_tl(
 
 if __name__ == '__main__':
     # 注释掉原始测试代码
-    # B, Token, H, HV, K, V = 100, 1, 12, 12, 96, 256
-    # scale = K ** -0.5
-    # dtype = torch.float16
-    # 
-    # # B = 30
-    # q = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
-    # k = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
-    # v = torch.randn(B, Token, HV, V, device='cuda', dtype=dtype)
-    # g = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
-    # beta = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
-    # h0 = torch.zeros(B, HV, K, V, device='cuda', dtype=dtype)
-    # 
-    # o, final_state = fused_recurrent_gated_delta_rule_tl(
-    #     q=q,
-    #     k=k,
-    #     v=v,
-    #     g=g,
-    #     beta=beta,
-    #     scale=scale,
-    #     initial_state=h0,
-    #     output_final_state=True,
-    #     use_qk_l2norm_in_kernel=False
-    # )
-    # 
-    # # benchmark
+    B, Token, H, HV, K, V = 100, 1, 12, 12, 96, 256
+    scale = K ** -0.5
+    dtype = torch.float16
+    
+    # B = 30
+    q = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
+    k = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
+    v = torch.randn(B, Token, HV, V, device='cuda', dtype=dtype)
+    g = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
+    beta = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
+    h0 = torch.zeros(B, HV, K, V, device='cuda', dtype=dtype)
+    
+    o, final_state = fused_recurrent_gated_delta_rule_tl(
+        q=q,
+        k=k,
+        v=v,
+        g=g,
+        beta=beta,
+        scale=scale,
+        initial_state=h0,
+        output_final_state=True,
+        use_qk_l2norm_in_kernel=False
+    )
+    print(o.shape, final_state.shape)
+    # benchmark
     # torch.cuda.synchronize()
     # # warm up
     # for _ in range(10):
@@ -312,125 +300,125 @@ if __name__ == '__main__':
     # print(f"Batch size: {B}, time: {(end - start) / 100 * 1000} ms")
 
     # 新的性能测试代码
-    import pandas as pd
+    # import pandas as pd
     
-    # 固定参数
-    B = 40
-    Token = 1
-    dtype = torch.float16
+    # # 固定参数
+    # B = 40
+    # Token = 1
+    # dtype = torch.float16
     
-    # 参数范围
-    head_values = list(range(4, 33, 4))  # [4, 8, 12, 16, 20, 24, 28, 32]
-    k_values = list(range(32, 256, 32))  # [32, 64, 96, ..., 512]
-    v_values = list(range(32, 256, 32))  # [32, 64, 96, ..., 512]
+    # # 参数范围
+    # head_values = list(range(4, 33, 4))  # [4, 8, 12, 16, 20, 24, 28, 32]
+    # k_values = list(range(32, 256, 32))  # [32, 64, 96, ..., 512]
+    # v_values = list(range(32, 256, 32))  # [32, 64, 96, ..., 512]
     
-    results = []
-    total_configs = len(head_values) * len(k_values) * len(v_values)
-    current_config = 0
+    # results = []
+    # total_configs = len(head_values) * len(k_values) * len(v_values)
+    # current_config = 0
     
-    print(f"开始性能测试，总共 {total_configs} 个配置...")
-    print("参数设置: B={}, Token={}".format(B, Token))
-    print("H/HV范围: {} 到 {}，步长 4".format(min(head_values), max(head_values)))
-    print("K/V范围: {} 到 {}，步长 32".format(min(k_values), max(k_values)))
-    print("-" * 80)
+    # print(f"开始性能测试，总共 {total_configs} 个配置...")
+    # print("参数设置: B={}, Token={}".format(B, Token))
+    # print("H/HV范围: {} 到 {}，步长 4".format(min(head_values), max(head_values)))
+    # print("K/V范围: {} 到 {}，步长 32".format(min(k_values), max(k_values)))
+    # print("-" * 80)
     
-    for H in head_values:
-        HV = H  # H和HV相等
-        for K in k_values:
-            for V in v_values:
-                current_config += 1
-                print(f"测试配置 {current_config}/{total_configs}: H={H}, HV={HV}, K={K}, V={V}")
+    # for H in head_values:
+    #     HV = H  # H和HV相等
+    #     for K in k_values:
+    #         for V in v_values:
+    #             current_config += 1
+    #             print(f"测试配置 {current_config}/{total_configs}: H={H}, HV={HV}, K={K}, V={V}")
                 
-                try:
-                    scale = K ** -0.5
+    #             try:
+    #                 scale = K ** -0.5
                     
-                    # 创建测试数据
-                    q = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
-                    k = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
-                    v = torch.randn(B, Token, HV, V, device='cuda', dtype=dtype)
-                    g = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
-                    beta = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
-                    h0 = torch.zeros(B, HV, K, V, device='cuda', dtype=dtype)
+    #                 # 创建测试数据
+    #                 q = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
+    #                 k = torch.randn(B, Token, H, K, device='cuda', dtype=dtype)
+    #                 v = torch.randn(B, Token, HV, V, device='cuda', dtype=dtype)
+    #                 g = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
+    #                 beta = torch.randn(B, Token, HV, device='cuda', dtype=dtype).sigmoid()
+    #                 h0 = torch.zeros(B, HV, K, V, device='cuda', dtype=dtype)
                     
-                    # 预热
-                    torch.cuda.synchronize()
-                    for _ in range(5):
-                        try:
-                            o, final_state = fused_recurrent_gated_delta_rule_tl(
-                                q=q, k=k, v=v, g=g, beta=beta, scale=scale,
-                                initial_state=h0, output_final_state=True,
-                                use_qk_l2norm_in_kernel=False
-                            )
-                        except Exception as e:
-                            print(f"预热失败: {e}")
-                            break
+    #                 # 预热
+    #                 torch.cuda.synchronize()
+    #                 for _ in range(5):
+    #                     try:
+    #                         o, final_state = fused_recurrent_gated_delta_rule_tl(
+    #                             q=q, k=k, v=v, g=g, beta=beta, scale=scale,
+    #                             initial_state=h0, output_final_state=True,
+    #                             use_qk_l2norm_in_kernel=False
+    #                         )
+    #                     except Exception as e:
+    #                         print(f"预热失败: {e}")
+    #                         break
                     
-                    # 正式测试
-                    torch.cuda.synchronize()
-                    start = time.time()
+    #                 # 正式测试
+    #                 torch.cuda.synchronize()
+    #                 start = time.time()
                     
-                    num_runs = 10
-                    for _ in range(num_runs):
-                        o, final_state = fused_recurrent_gated_delta_rule_tl(
-                            q=q, k=k, v=v, g=g, beta=beta, scale=scale,
-                            initial_state=h0, output_final_state=True,
-                            use_qk_l2norm_in_kernel=False
-                        )
+    #                 num_runs = 10
+    #                 for _ in range(num_runs):
+    #                     o, final_state = fused_recurrent_gated_delta_rule_tl(
+    #                         q=q, k=k, v=v, g=g, beta=beta, scale=scale,
+    #                         initial_state=h0, output_final_state=True,
+    #                         use_qk_l2norm_in_kernel=False
+    #                     )
                     
-                    torch.cuda.synchronize()
-                    end = time.time()
+    #                 torch.cuda.synchronize()
+    #                 end = time.time()
                     
-                    avg_time_ms = (end - start) / num_runs * 1000
+    #                 avg_time_ms = (end - start) / num_runs * 1000
                     
-                    results.append({
-                        'H': H,
-                        'HV': HV,
-                        'K': K,
-                        'V': V,
-                        'Time_ms': avg_time_ms
-                    })
+    #                 results.append({
+    #                     'H': H,
+    #                     'HV': HV,
+    #                     'K': K,
+    #                     'V': V,
+    #                     'Time_ms': avg_time_ms
+    #                 })
                     
-                    print(f"  完成，平均时间: {avg_time_ms:.3f} ms")
+    #                 print(f"  完成，平均时间: {avg_time_ms:.3f} ms")
                     
-                    # 清理内存
-                    del q, k, v, g, beta, h0, o, final_state
-                    torch.cuda.empty_cache()
+    #                 # 清理内存
+    #                 del q, k, v, g, beta, h0, o, final_state
+    #                 torch.cuda.empty_cache()
                     
-                except Exception as e:
-                    print(f"  配置失败: {e}")
-                    results.append({
-                        'H': H,
-                        'HV': HV,
-                        'K': K,
-                        'V': V,
-                        'Time_ms': -1  # 用-1表示失败
-                    })
+    #             except Exception as e:
+    #                 print(f"  配置失败: {e}")
+    #                 results.append({
+    #                     'H': H,
+    #                     'HV': HV,
+    #                     'K': K,
+    #                     'V': V,
+    #                     'Time_ms': -1  # 用-1表示失败
+    #                 })
     
-    # 创建DataFrame并保存结果
-    df = pd.DataFrame(results)
+    # # 创建DataFrame并保存结果
+    # df = pd.DataFrame(results)
     
-    # 保存为CSV文件
-    output_file = "fused_recurrent_performance_results.csv"
-    df.to_csv(output_file, index=False)
-    print(f"\n结果已保存到 {output_file}")
+    # # 保存为CSV文件
+    # output_file = "fused_recurrent_performance_results.csv"
+    # df.to_csv(output_file, index=False)
+    # print(f"\n结果已保存到 {output_file}")
     
-    # 显示汇总统计
-    print("\n=== 性能测试结果汇总 ===")
-    print(f"总配置数: {len(df)}")
-    print(f"成功配置数: {len(df[df['Time_ms'] > 0])}")
-    print(f"失败配置数: {len(df[df['Time_ms'] == -1])}")
+    # # 显示汇总统计
+    # print("\n=== 性能测试结果汇总 ===")
+    # print(f"总配置数: {len(df)}")
+    # print(f"成功配置数: {len(df[df['Time_ms'] > 0])}")
+    # print(f"失败配置数: {len(df[df['Time_ms'] == -1])}")
     
-    if len(df[df['Time_ms'] > 0]) > 0:
-        success_df = df[df['Time_ms'] > 0]
-        print(f"最快时间: {success_df['Time_ms'].min():.3f} ms")
-        print(f"最慢时间: {success_df['Time_ms'].max():.3f} ms")
-        print(f"平均时间: {success_df['Time_ms'].mean():.3f} ms")
+    # if len(df[df['Time_ms'] > 0]) > 0:
+    #     success_df = df[df['Time_ms'] > 0]
+    #     print(f"最快时间: {success_df['Time_ms'].min():.3f} ms")
+    #     print(f"最慢时间: {success_df['Time_ms'].max():.3f} ms")
+    #     print(f"平均时间: {success_df['Time_ms'].mean():.3f} ms")
         
-        # 显示前10个最快的配置
-        print("\n前10个最快的配置:")
-        top_10 = success_df.nsmallest(10, 'Time_ms')
-        for idx, row in top_10.iterrows():
-            print(f"  H={row['H']}, K={row['K']}, V={row['V']}: {row['Time_ms']:.3f} ms")
+    #     # 显示前10个最快的配置
+    #     print("\n前10个最快的配置:")
+    #     top_10 = success_df.nsmallest(10, 'Time_ms')
+    #     for idx, row in top_10.iterrows():
+    #         print(f"  H={row['H']}, K={row['K']}, V={row['V']}: {row['Time_ms']:.3f} ms")
     
-    print("\n完整结果表格:")
-    print(df.to_string(index=False))
+    # print("\n完整结果表格:")
+    # print(df.to_string(index=False))
