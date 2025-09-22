@@ -28,7 +28,7 @@ def get_configs():
     } for c in _configs]
     return configs
 
-# @autotune(configs=get_configs(), warmup=10, rep=10)
+@autotune(configs=get_configs(), warmup=10, rep=10)
 @tilelang.jit(
     out_idx = [-1],
     pass_configs={
@@ -98,7 +98,7 @@ def tilelang_dconv_step(input, cache, kernel_input):
     B, Token, Indim = input.shape
     Kernel_size = kernel_input.shape[-2]
     dtype = dtype_dict[input.dtype]
-    kernel = _dconv_step_kernel(B, Token, Kernel_size, Indim, block_D = 128, threads = 128, dtype=dtype)
+    kernel = _dconv_step_kernel(B, Token, Kernel_size, Indim, dtype=dtype)
     output = kernel(input, cache, kernel_input)
     return output, cache
 if __name__ == "__main__":

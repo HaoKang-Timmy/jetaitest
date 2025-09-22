@@ -269,6 +269,12 @@ def causal_conv_step_tilelang(
     cache = ensure_contiguous(cache)
     kernels = ensure_contiguous(kernels)
     # print("I am here")
+    # print("kernels shape:", kernels.shape)
+    # print("cache shape:", cache.shape)
+    # print("x shape:", x.shape)
+    # print("x dtype:", x.dtype)
+    # print("cache dtype:", cache.dtype)
+    # print("kernels dtype:", kernels.dtype)
     out, cache = tilelang_dconv_step(x, cache, kernels)
 
     return out # Return the computed output [B, D] (before activation)
