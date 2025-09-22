@@ -49,7 +49,7 @@ from .jet_block import JetBlock
 from .kv_cache import JetNemotronCache
 
 try:
-    from .dynamic_conv import DynamicShortConvolution
+    from .tl_dynamic_conv import TilelangDynamicShortConvolution
     from .dconv_fwdbwd import dynamic_conv_triton_autograd
     from .dconv_fwd_cache import dynamic_conv_triton_cache
     from .dconv_step import causal_conv_step_triton

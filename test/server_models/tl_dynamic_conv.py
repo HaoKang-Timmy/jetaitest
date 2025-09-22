@@ -33,7 +33,7 @@ from .jetinfra import tl_dynamic_conv_cache_w_silu
 import time
 
 
-class DynamicShortConvolution(nn.Module):
+class TilelangDynamicShortConvolution(nn.Module):
     """
     Simple wrapper around `nn.Conv1d` that accepts dimension last.
     """
@@ -183,6 +183,7 @@ class DynamicShortConvolution(nn.Module):
             cache = None
         # print("new_cache shape:", new_cache.shape)
         x = self._forward_tilelang_cache(x, generator_input=generator_input, cache=cache)
+        # x = self._forward_triton_cache(x, generator_input=generator_input, cache=cache)
 
         x = x.to(input_dtype)
         # if output_final_state:
