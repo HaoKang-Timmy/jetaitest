@@ -34,8 +34,8 @@ def get_configs():
 def _dconv_fwd_kernel(
     Batch,
     Token,
-    Indim,
     Kernel_size,
+    Indim,
     block_D,
     threads,
     dtype,  
@@ -44,34 +44,34 @@ def _dconv_fwd_kernel(
     @T.prim_func
     def main_fp16_prefill(
         Input: T.Tensor([Batch * Token, Indim], dtype),
-        Kernel_input: T.Tensor([Batch * Token, Indim, Kernel_size], dtype),
+        Kernel_input: T.Tensor([Batch * Token, Kernel_size, Indim], dtype),
         Output: T.Tensor([Batch * Token, Indim], dtype),
         # Cache: T.Tensor([Batch * Token, T_cache], dtype),
     ):
         with T.Kernel(Batch * Token, T.ceildiv(Indim, block_D), threads=threads) as (bx, by):
-            Kernel_shared = T.alloc_shared([block_D, Kernel_size], dtype)
-            Input_shared = T.alloc_shared([block_D, Kernel_size], dtype)
+            Kernel_shared = T.alloc_shared([Kernel_size, block_D], dtype)
+            Input_shared = T.alloc_shared([Kernel_size, block_D], dtype)
             Output_shared = T.alloc_shared([block_D], dtype)
-            Input_reg = T.alloc_fragment([block_D, Kernel_size], reduce_type)
-            Output_reg = T.alloc_fragment([block_D, Kernel_size], reduce_type)
+            Input_reg = T.alloc_fragment([Kernel_size, block_D], reduce_type)
+            Output_reg = T.alloc_fragment([Kernel_size, block_D], reduce_type)
             Output_reduced = T.alloc_fragment([block_D], reduce_type)
-            Kernel_reg = T.alloc_fragment([block_D, Kernel_size], reduce_type)
+            Kernel_reg = T.alloc_fragment([Kernel_size, block_D], reduce_type)
             batch_id = bx // Token
             token_id = bx % Token
             # T.copy(Kernel_input[bx, by * block_D,0], Kernel_shared)
-            T.copy(Kernel_input[bx, by * block_D, 0], Kernel_shared)
+            T.copy(Kernel_input[bx, 0:Kernel_size, by * block_D:by * block_D + block_D], Kernel_shared)
             # for i, j in T.Parallel(block_D, Kernel_size):
             #     Kernel_shared[i, j] = Kernel_input[bx, i + by * block_D, j]
             ## copy input
-            for i, j in T.Parallel(block_D, Kernel_size):
-                Input_shared[i, j] = T.if_then_else(token_id + 1 + j - Kernel_size >= 0, 
-                                                  Input[bx - Kernel_size + 1 + j, i + by * block_D], 0.0)
+            for i, j in T.Parallel(Kernel_size, block_D):
+                Input_shared[i, j] = T.if_then_else(token_id + 1 + i - Kernel_size >= 0, 
+                                                  Input[bx - Kernel_size + 1 + i, j + by * block_D], 0.0)
             
             T.copy(Input_shared, Input_reg)
             T.copy(Kernel_shared, Kernel_reg)
-            for i, j in T.Parallel(block_D, Kernel_size):
+            for i, j in T.Parallel(Kernel_size, block_D):
                 Output_reg[i, j] = Input_reg[i, j] * Kernel_reg[i, j]  
-            T.reduce_sum(Output_reg, Output_reduced, dim=1)
+            T.reduce_sum(Output_reg, Output_reduced, dim=0)
             ### apply silu
             for i in T.Parallel(block_D):
                 Output_reduced[i] = Output_reduced[i] / (1 + T.exp(-Output_reduced[i]))
@@ -79,14 +79,15 @@ def _dconv_fwd_kernel(
             T.copy(Output_shared, Output[bx, by * block_D])
     return main_fp16_prefill
 def tl_dynamic_conv_cache_w_silu(x, kernels):
+
     B, Token, D = x.shape
-    W = kernels.shape[-1]
+    W = kernels.shape[-2]
     dtype = dtype_dict[x.dtype]
     # out = torch.empty_like(x)
     #### TODO hard code to float16
-    kernel = _dconv_fwd_kernel(B, Token, D, W, dtype = dtype)
-    x = x.view(B * Token, D)
-    kernels = kernels.view(B * Token, D, W)
+    kernel = _dconv_fwd_kernel(B, Token, W, D, dtype = dtype)
+    x = x.view(B * Token, D).contiguous()
+    kernels = kernels.view(B * Token, W, D).contiguous()
     # out = out.view(B * Token, D)
     out = kernel(x, kernels)
     x = x.view(B, Token, D)
@@ -104,7 +105,7 @@ if __name__ == "__main__":
     dtype = "float16"
     # _dconv_fwd_kernel(batch, token, indim, kernel_size, dtype = dtype)
     input1 = torch.randn(batch, token, indim).to(torch.float16).cuda()
-    kernel_input = torch.randn(batch, token, indim, kernel_size).to(torch.float16).cuda()
+    kernel_input = torch.randn(batch, token, kernel_size, indim).to(torch.float16).cuda()
     # output_triton = torch.randn(batch, token, indim).to(torch.float16).cuda()
     input1 = input1 * 5
     kernel_input = kernel_input * 5

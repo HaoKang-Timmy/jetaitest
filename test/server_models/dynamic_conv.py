@@ -28,7 +28,7 @@ from transformers.activations import ACT2FN
 
 from .dconv_fwdbwd import dynamic_conv_triton_autograd
 from .dconv_fwd_cache import dynamic_conv_triton_cache
-from .dconv_step import causal_conv_step_triton
+from .dconv_step import causal_conv_step_triton, causal_conv_step_tilelang
 from .jetinfra import tl_dynamic_conv_cache_w_silu
 import time
 
@@ -166,26 +166,29 @@ class DynamicShortConvolution(nn.Module):
         # during the decoding phase, we assume the batch is composed of sequences of length 1
         if cache is not None and B * T == N:
             assert T == 1
-
-            x, cache = self._step_triton(x, cache, cu_seqlens, generator_input=generator_input)
+            # print("x shape:", x.shape)
+            # print("cache shape:", cache.shape)
+            
+            # x, cache = self._step_triton(x, cache, cu_seqlens, generator_input=generator_input)
+            x, cache = self._step_tilelang(x, cache, cu_seqlens, generator_input=generator_input)
             # else:
             #     raise ValueError(f"Unknown implementation: {implementation}")
             return x, cache
-
+        #### prefill
         if output_final_state:
-            new_cache = rearrange(x[..., -min(W, T):, :], 'n w d -> n d w')
+            # new_cache = rearrange(x[..., -min(W, T):, :], 'n w d -> n d w')
+            # new_cache = rearrange(x[..., -min(W, T):, :])
+            cache = x[..., -min(W, T):, :].clone()
         else:
-            new_cache = None
-        
+            cache = None
+        # print("new_cache shape:", new_cache.shape)
         x = self._forward_tilelang_cache(x, generator_input=generator_input, cache=cache)
-        # print("x shape:", x.shape)
-        # print("generator_input:", generator_input.shape)
-        # print("cache:", cache.shape)
+
         x = x.to(input_dtype)
-        if output_final_state:
-            if cache is None:
-                cache = x.new_zeros(N, D, W)
-            cache[:, :, -min(W, T):].copy_(new_cache)
+        # if output_final_state:
+        #     if cache is None:
+        #         cache = x.new_zeros(N, W, D)
+        #     cache[:, :, -min(W, T):].copy_(new_cache)
 
         return x, cache
 
@@ -235,8 +238,9 @@ class DynamicShortConvolution(nn.Module):
         CHUNK_SIZE = 2048
         n_chunk = (x.shape[1] + CHUNK_SIZE - 1) // CHUNK_SIZE
         output_triton = torch.zeros_like(x)
-        if cache is not None:
-            cache = rearrange(cache, "b d t -> b t d")  # [B, T(W), D]
+        # print("prefill cache shape:", cache.shape)
+        # if cache is not None:
+        #     cache = rearrange(cache, "b d t -> b t d")  # [B, T(W), D]
 
         for i in range(n_chunk):
             start = i * CHUNK_SIZE
@@ -248,7 +252,7 @@ class DynamicShortConvolution(nn.Module):
             out = tl_dynamic_conv_cache_w_silu(x[:, start:end], kernels)
             output_triton[:, i*CHUNK_SIZE:end, :] = out
 
-        cache = x[:, end-self.kernel_size:end, :]
+        # cache = x[:, end-self.kernel_size:end, :]
         return output_triton
 
     def _step_naive(
@@ -306,6 +310,41 @@ class DynamicShortConvolution(nn.Module):
         # Apply activation (if any) after kernel execution
         if self.activation is not None:
             x_out_triton = ACT2FN[self.activation](x_out_triton)
+
+        # 3. Return reshaped output and the *same cache tensor* (it was updated in-place)
+
+        return x_out_triton.view(shape), cache
+    
+    def _step_tilelang(
+        self,
+        x: torch.Tensor,
+        cache: torch.Tensor,
+        cu_seqlens: Optional[torch.LongTensor] = None,
+        generator_input: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        # --- Triton Implementation ---
+        assert x.shape[1] == 1, "x must be of shape [B, 1, D]"
+        shape = x.shape # Keep original shape [B, 1, D] for return
+        generator_input = x if generator_input is None else generator_input
+
+        # 1. Generate kernels
+        # print("generator_input shape:", generator_input.shape)
+        # print("generator_input squeeze shape:", generator_input.squeeze(1).shape)
+        kernels_triton = self.get_kernel(generator_input) # [B, D, W]
+        # print("kernels_triton shape:", kernels_triton.shape)
+        # print("cache shape:", cache.shape)
+        # print("x shape:", x.shape)
+        # 2. Call Triton kernel without activation
+
+        x_out_triton = causal_conv_step_tilelang(
+            x,
+            cache,
+            kernels_triton,
+        )
+
+        # Apply activation (if any) after kernel execution
+        # if self.activation is not None:
+        #     x_out_triton = ACT2FN[self.activation](x_out_triton)
 
         # 3. Return reshaped output and the *same cache tensor* (it was updated in-place)
 

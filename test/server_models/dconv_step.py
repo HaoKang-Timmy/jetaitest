@@ -20,6 +20,7 @@ import triton.language as tl
 from einops import rearrange
 import torch.nn.functional as F
 from typing import Tuple, Optional
+from .jetinfra import tilelang_dconv_step
 
 # Helper function to ensure tensors are contiguous for Triton
 def ensure_contiguous(t: torch.Tensor) -> torch.Tensor:
@@ -221,5 +222,53 @@ def causal_conv_step_triton(
         BLOCK_SIZE_D=BLOCK_SIZE_D,         # Pass BLOCK_SIZE_D as constexpr
         # Removed ACTIVATION=activation
     )
+
+    return out # Return the computed output [B, D] (before activation)
+
+
+def causal_conv_step_tilelang(
+    x: torch.Tensor,           # Input tensor [B, 1, D]
+    cache: torch.Tensor,       # Cache tensor [B, D, W], modified in-place
+    kernels: torch.Tensor,     # Kernels tensor [B, D, W]
+    # Removed activation parameter
+) -> torch.Tensor:             # Returns output tensor [B, D] (before activation)
+    """
+    Performs one step of causal dynamic convolution using Triton.
+    Updates the cache in-place. Does NOT fuse activation. Assumes 1 < W <= 4.
+    Uses manually unrolled kernel for W dimension.
+
+    Args:
+        x: Current input token tensor of shape [B, 1, D].
+        cache: Cache tensor of shape [B, D, W]. Will be updated in-place.
+        kernels: Dynamically generated kernels tensor of shape [B, D, W].
+
+    Returns:
+        Output tensor of shape [B, D] for the current step (before activation).
+    """
+    # --- Input Validation and Preparation ---
+    assert x.dim() == 3 and x.shape[1] == 1, "Input x must have shape [B, 1, D]"
+    assert cache.dim() == 3, "Cache must have shape [B, D, W]"
+    assert kernels.dim() == 4, "Kernels must have shape [B, D, W]"
+    B, _, D = x.shape
+    W = cache.shape[1]
+    # Updated assertion: W must be > 1 and <= 4
+    assert 1 < W <= 4, f"Kernel W={W}, this optimized version assumes 1 < W <= 4"
+    assert cache.shape[0] == B and cache.shape[2] == D, f"Cache shape mismatch: {cache.shape}"
+    # assert kernels.shape == cache.shape, f"Kernels shape mismatch: {kernels.shape}"
+    assert x.is_cuda and cache.is_cuda and kernels.is_cuda, "Inputs must be CUDA tensors"
+    # Allow different input dtypes, but ensure they are compatible or handled
+    # assert x.dtype == cache.dtype == kernels.dtype, "Input dtypes must match"
+
+    # Squeeze the time dimension from input x
+    # x_squeezed = x.squeeze(1) # Shape [B, D]
+
+    # Ensure tensors are contiguous for correct stride calculations in Triton
+    # x_squeezed = ensure_contiguous(x_squeezed)
+    # Cache MUST be contiguous for in-place updates and loads/stores to work reliably
+    x = ensure_contiguous(x)
+    cache = ensure_contiguous(cache)
+    kernels = ensure_contiguous(kernels)
+    # print("I am here")
+    out, cache = tilelang_dconv_step(x, cache, kernels)
 
     return out # Return the computed output [B, D] (before activation)
