@@ -33,7 +33,8 @@ from fla.ops.gated_delta_rule import (chunk_gated_delta_rule,
                                       fused_recurrent_gated_delta_rule)
 
 
-from .tl_dynamic_conv import TilelangDynamicShortConvolution
+# from .tl_dynamic_conv import TilelangDynamicShortConvolution
+from .dynamic_conv import DynamicShortConvolution
 from .configuration_jet_nemotron import JetNemotronConfig
 from .kv_cache import JetNemotronCache
 from .jetinfra import fused_linear_silu
@@ -134,7 +135,7 @@ class JetBlock(nn.Module):
         # name.endswith("bias") in param_grouping.py
         self.dt_bias._no_weight_decay = True
 
-        self.dynamic_conv1d = TilelangDynamicShortConvolution(
+        self.dynamic_conv1d = DynamicShortConvolution(
             hidden_size=self.value_dim,
             kernel_size=self.conv_size,
             generator_input_size=self.hidden_size,
