@@ -150,40 +150,10 @@ class DynamicShortConvolution(nn.Module):
         # during the decoding phase, we assume the batch is composed of sequences of length 1
         if cache is not None and B * T == N:
             assert T == 1
+            # x_1, cache1 = self._step_triton(x_copy, cache_copy, cu_seqlens, generator_input=generator_input)
+            x_2, cache2 = self._step_tilelang(x, cache, cu_seqlens, generator_input=generator_input)
 
-            x_1, cache1 = self._step_triton(x, cache, cu_seqlens, generator_input=generator_input)
-            # x_2, cache2 = self._step_tilelang(x, cache, cu_seqlens, generator_input=generator_input)
-            
-            # # # 计算x_1和x_2之间的相对误差
-            # eps = 1e-8
-            # abs_diff = torch.abs(x_1 - x_2)
-            # abs_x1 = torch.abs(x_1) + eps
-            # relative_error = abs_diff / abs_x1
-            
-            # mean_relative_error = torch.mean(relative_error).item()
-            # max_relative_error = torch.max(relative_error).item()
-            # min_relative_error = torch.min(relative_error).item()
-            
-            # print(f"Triton vs TileLang 相对误差比较:")
-            # print(f"  平均相对误差: {mean_relative_error:.8f}")
-            # print(f"  最大相对误差: {max_relative_error:.8f}")
-            # print(f"  最小相对误差: {min_relative_error:.8f}")
-
-            # cache1 = rearrange(cache1, "b d t -> b t d")
-            # abs_diff = torch.abs(cache1 - cache2)
-            # abs_x1 = torch.abs(cache1) + eps
-            # relative_error = abs_diff / abs_x1
-            
-            # mean_relative_error = torch.mean(relative_error).item()
-            # max_relative_error = torch.max(relative_error).item()
-            # min_relative_error = torch.min(relative_error).item()
-            
-            # print(f"Triton vs TileLang cache 相对误差比较:")
-            # print(f"  平均相对误差: {mean_relative_error:.8f}")
-            # print(f"  最大相对误差: {max_relative_error:.8f}")
-            # print(f"  最小相对误差: {min_relative_error:.8f}")
-            
-            return x_1, cache1
+            return x_2, cache2
 
         if output_final_state:
             new_cache = rearrange(x[..., -min(W, T):, :], 'n w d -> n d w')
@@ -340,7 +310,8 @@ class DynamicShortConvolution(nn.Module):
             cache,
             kernels_triton,
         )
-        
+        # if self.activation is not None:
+        #     x_out_triton = ACT2FN[self.activation](x_out_triton)
         # Apply activation (if any) after kernel execution
         # if self.activation is not None:
         #     x_out_triton = ACT2FN[self.activation](x_out_triton)
