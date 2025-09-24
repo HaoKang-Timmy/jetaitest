@@ -96,6 +96,7 @@ class DynamicShortConvolution(nn.Module):
             kernels = rearrange(flat_kernels, 'b (d w) -> b d w', w=self.kernel_size)
         else:
             raise ValueError(f"Invalid kernel shape: {flat_kernels.shape}")
+        kernels = kernels.transpose(-2, -1).contiguous()
         return kernels
 
     def forward(
@@ -151,29 +152,20 @@ class DynamicShortConvolution(nn.Module):
         if cache is not None and B * T == N:
             assert T == 1
             # x_1, cache1 = self._step_triton(x_copy, cache_copy, cu_seqlens, generator_input=generator_input)
-            x_2, cache2 = self._step_tilelang(x, cache, cu_seqlens, generator_input=generator_input)
+            x, cache = self._step_tilelang(x, cache, cu_seqlens, generator_input=generator_input)
 
-            return x_2, cache2
+            return x, cache
 
-        if output_final_state:
-            new_cache = rearrange(x[..., -min(W, T):, :], 'n w d -> n d w')
-        else:
-            new_cache = None
         
-
+        cache = torch.empty(B, W, D)
         # x = self._forward_triton_cache(x, generator_input=generator_input, cache=cache)
         # if self.activation is not None:
         #     x = ACT2FN[self.activation](x)
-        x = self._forward_tilelang_cache(x, generator_input=generator_input, cache=cache)
+        x, cache = self._forward_tilelang_cache(x, generator_input=generator_input, cache=cache)
 
 
         
         
-        x = x.to(input_dtype)
-        if output_final_state:
-            if cache is None:
-                cache = x.new_zeros(N, D, W)
-            cache[:, :, -min(W, T):].copy_(new_cache)
 
         return x, cache
 
@@ -220,17 +212,16 @@ class DynamicShortConvolution(nn.Module):
         CHUNK_SIZE = 2048
         n_chunk = (x.shape[1] + CHUNK_SIZE - 1) // CHUNK_SIZE
         output_triton = torch.zeros_like(x)
-        if cache is not None:
-            cache = rearrange(cache, "b d t -> b t d")  # [B, T(W), D]
+        
         for i in range(n_chunk):
             start = i * CHUNK_SIZE
             end = min((i + 1) * CHUNK_SIZE, x.shape[1])
             kernels = self.get_kernel(generator_input[:, start:end])
-            kernels = kernels.transpose(-2, -1).contiguous()
+            # kernels = kernels.transpose(-2, -1).contiguous()
             out = tl_dynamic_conv_cache_w_silu(x[:, start:end], kernels)
             output_triton[:, i*CHUNK_SIZE:end, :] = out
-            cache = x[:, end-self.kernel_size:end, :]
-        return output_triton
+        cache = x[:, end-self.kernel_size:end, :]
+        return output_triton, cache
 
     def _step_naive(
         self,
@@ -302,9 +293,9 @@ class DynamicShortConvolution(nn.Module):
         kernels_triton = self.get_kernel(generator_input) # [B, D, W]
 
         # 2. Call Triton kernel without activation
-        if cache.shape[-1] == 4:
-            cache = cache.transpose(-2, -1).contiguous()
-        kernels_triton = kernels_triton.transpose(-2, -1).contiguous()
+        # if cache.shape[-1] == 4:
+        #     cache = cache.transpose(-2, -1).contiguous()
+        # kernels_triton = kernels_triton.transpose(-2, -1).contiguous()
         x_out_triton = causal_conv_step_tilelang(
             x,
             cache,

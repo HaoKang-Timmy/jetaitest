@@ -36,8 +36,8 @@ def fused_recurrent(
     V_Dim, 
     USE_QK_L2NORM_IN_KERNEL=True, 
     STORE_FINAL_STATE=True,
-    dtype = "float16",
-    accum_dtype = "float",
+    dtype = "bfloat16",
+    accum_dtype = "float32",
     block_K=128, 
     block_V=128, 
     num_stages=3, 
@@ -67,10 +67,10 @@ def fused_recurrent(
         Q: T.Tensor([Batch, Token, Head, K_Dim], dtype),
         K: T.Tensor([Batch, Token, Head, K_Dim], dtype),
         V: T.Tensor([Batch, Token, Head_V, V_Dim], dtype),
-        g: T.Tensor([Batch, Token, Head_V], dtype),
+        g: T.Tensor([Batch, Token, Head_V], accum_dtype),
         Beta: T.Tensor([Batch, Token, Head_V],dtype),
         O: T.Tensor([Batch, Token, Head_V, V_Dim], dtype),
-        h0: T.Tensor([Batch, Head_V, K_Dim, V_Dim], dtype),
+        h0: T.Tensor([Batch, Head_V, K_Dim, V_Dim], accum_dtype),
         # ht: T.Tensor([Batch, Head_V, K_Dim, V_Dim], dtype),
         scale: T.Tensor([1], dtype),
         # O: T.Tensor(Batch, Token, Head_V, V_Dim, dtype),
@@ -84,7 +84,7 @@ def fused_recurrent(
             K_shared = T.alloc_shared([block_K], dtype)
             V_shared = T.alloc_shared([block_V], dtype)
             V_fragment = T.alloc_fragment([block_V], dtype)
-            h0_shared = T.alloc_shared([block_K, block_V], dtype)
+            h0_shared = T.alloc_shared([block_K, block_V], accum_dtype)
             o_shared = T.alloc_shared([block_V], dtype)
             
             h0_fragment = T.alloc_fragment([block_K, block_V], accum_dtype)
@@ -165,12 +165,20 @@ def fused_recurrent_fwd(
     o = torch.empty(B, Token, HV, V, device=device, dtype=v.dtype)
     # ht = torch.empty(B, HV, K, V, device=device, dtype=v.dtype)
     if initial_state is None:
-        h0 = torch.zeros(B, HV, K, V, device=device, dtype=torch.float16)
+        h0 = torch.zeros(B, HV, K, V, device=device, dtype=torch.float)
     else:
         h0 = initial_state
     kernel = fused_recurrent(B, Token, H, HV, K, V, 
                              use_qk_l2norm_in_kernel, STORE_FINAL_STATE=True)
-    scale = torch.tensor([scale]).cuda().half()
+    scale = torch.tensor([scale]).cuda().to(dtype)
+    print("q dtype:", q.dtype)
+    print("k dtype:", k.dtype)
+    print("v dtype:", v.dtype)
+    print("g dtype:", g.dtype)
+    print("beta dtype:", beta.dtype)
+    print("o dtype:", o.dtype)
+    print("h0 dtype:", h0.dtype)
+    print("scale dtype:", scale.dtype)
     kernel(q, k, v, g, beta, o, h0, scale)
     return o, h0
           # [B,T,HV]

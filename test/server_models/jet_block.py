@@ -37,7 +37,7 @@ from fla.ops.gated_delta_rule import (chunk_gated_delta_rule,
 from .dynamic_conv import DynamicShortConvolution
 from .configuration_jet_nemotron import JetNemotronConfig
 from .kv_cache import JetNemotronCache
-from .jetinfra import fused_linear_silu
+from .jetinfra import fused_linear_silu, fused_recurrent_gated_delta_rule_tl
 
 @dataclass
 class JetBlockConfig():
@@ -235,7 +235,18 @@ class JetBlock(nn.Module):
                 autotune_interval=self.autotune_interval
             )
         elif mode == 'fused_recurrent':
-            o, recurrent_state = fused_recurrent_gated_delta_rule(
+            # o, recurrent_state = fused_recurrent_gated_delta_rule(
+            #     q=q,
+            #     k=k,
+            #     v=v,
+            #     g=g,
+            #     beta=beta,
+            #     initial_state=recurrent_state,
+            #     output_final_state=use_cache,
+            #     cu_seqlens=cu_seqlens,
+            #     use_qk_l2norm_in_kernel=True
+            # )
+            o, recurrent_state = fused_recurrent_gated_delta_rule_tl(
                 q=q,
                 k=k,
                 v=v,
