@@ -1,5 +1,2 @@
-2025-09-24 03:01:28,344 INFO:Auto-tuning with 0.9 CPU utilizations, 8 CPUs available, 7 CPUs will be used
-2025-09-24 03:01:29,884 DEBUG:Compilation failed for config {'block_K': 128, 'block_V': 128, 'num_stages': 3, 'threads': 256} at index 1 with error: Check failed: (res->errors.empty()) is false: Layout Layout([128, 1] -> [_i // 256 + 1, _i % 256 + 1], transform: [_i, _j] -> [_i // 256, _i % 256]) has errors: ["Index mapping does not form a bijective transform."]
-2025-09-24 03:01:29,884 DEBUG:Compilation failed for config {'block_K': 128, 'block_V': 128, 'num_stages': 4, 'threads': 128} at index 2 with error: Check failed: (res->errors.empty()) is false: Layout Layout([128, 1] -> [_i // 128 + 1, _i % 128 + 1], transform: [_i, _j] -> [_i // 128, _i % 128]) has errors: ["Index mapping does not form a bijective transform."]
-2025-09-24 03:01:29,884 DEBUG:Compilation failed for config {'block_K': 128, 'block_V': 128, 'num_stages': 4, 'threads': 256} at index 3 with error: Check failed: (res->errors.empty()) is false: Layout Layout([128, 1] -> [_i // 256 + 1, _i % 256 + 1], transform: [_i, _j] -> [_i // 256, _i % 256]) has errors: ["Index mapping does not form a bijective transform."]
-2025-09-24 03:01:41,193 INFO:Auto-tuning with 0.9 CPU utilizations, 8 CPUs available, 7 CPUs will be used
+2025-09-25 02:45:55,826 INFO:Auto-tuning with 0.9 CPU utilizations, 8 CPUs available, 7 CPUs will be used
+2025-09-25 02:46:17,197 INFO:Auto-tuning with 0.9 CPU utilizations, 8 CPUs available, 7 CPUs will be used
