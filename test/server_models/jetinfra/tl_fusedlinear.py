@@ -15,7 +15,7 @@ dtype_dict = {
 def get_configs():
     block_M = [64,128]
     block_K = [64,128]
-    block_N = [64,128]
+    block_N = [128]
     num_stages = [2, 3, 4]
     threads = [128, 256]
     # block_M = [64, 128]  
@@ -53,6 +53,23 @@ def _linear_kernel(
     threads,
     reduce_dtype = "float32",
 ):
+    @T.macro
+    def L2Norm_QK(
+        QK: T.FragmentBuffer([block_M, block_N],dtype),
+    ):
+        squared_reg = T.alloc_fragment([block_M, block_N], dtype)
+        sum_reg = T.alloc_fragment([block_M], dtype)
+        
+        # 计算元素的平方用于求norm
+        for i, j in T.Parallel(block_M, block_N):
+            squared_reg[i, j] = QK[i, j] * QK[i, j]
+        T.reduce_sum(squared_reg, sum_reg, dim=1)
+        for i in T.Parallel(block_M):
+            sum_reg[i] = T.sqrt(sum_reg[i]) + 1e-6
+        
+        # 用原始元素除以norm
+        for i, j in T.Parallel(block_M, block_N):
+            QK[i, j] = QK[i, j] / sum_reg[i]
     @ T.macro
     def silu(
         buffer: T.FragmentBuffer([block_M, block_N], reduce_dtype),
@@ -87,6 +104,7 @@ def _linear_kernel(
                     T.gemm(Input_shared, W_T_shared, output_reg, transpose_B=True)
     
                 silu(output_reg)
+                L2Norm_QK(output_reg)
                 T.copy(output_reg, output_shared)
                 T.copy(output_shared, Output[bx * block_M, by * block_N])
         

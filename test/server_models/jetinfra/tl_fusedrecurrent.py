@@ -106,9 +106,9 @@ def fused_recurrent(
                 T.copy(K_shared, K_fragment)
                 T.copy(V_shared, V_fragment)
                 T.copy(h0_shared, h0_fragment)
-                if USE_QK_L2NORM_IN_KERNEL:
-                    L2Norm_QK(Q_fragment)
-                    L2Norm_QK(K_fragment)
+                # if USE_QK_L2NORM_IN_KERNEL:
+                #     L2Norm_QK(Q_fragment)
+                #     L2Norm_QK(K_fragment)
                 # b_q = b_q * scale
                 for i in T.Parallel(block_K):
                     Q_fragment[i] = Q_fragment[i] * scale[0]
