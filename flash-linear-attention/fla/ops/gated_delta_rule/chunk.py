@@ -14,7 +14,7 @@ from fla.ops.common.chunk_scaled_dot_kkt import chunk_scaled_dot_kkt_fwd
 from fla.ops.gated_delta_rule.wy_fast import prepare_wy_repr_bwd, recompute_w_u_fwd
 from fla.ops.utils import chunk_local_cumsum, solve_tril
 from fla.utils import autocast_custom_bwd, autocast_custom_fwd, input_guard
-
+import time
 
 def chunk_gated_delta_rule_fwd(
     q: torch.Tensor,
@@ -29,6 +29,7 @@ def chunk_gated_delta_rule_fwd(
 ):
     g = chunk_local_cumsum(g, chunk_size=64, cu_seqlens=cu_seqlens)
     # obtain WY representation. u is actually the new v.
+    start_time = time.time()
     A = chunk_scaled_dot_kkt_fwd(
         k=k,
         beta=beta,
@@ -36,11 +37,19 @@ def chunk_gated_delta_rule_fwd(
         cu_seqlens=cu_seqlens,
         output_dtype=torch.float32
     )
+    torch.cuda.synchronize()
+    end_time = time.time()
+    print("chunk_scaled_dot_kkt_fwd time:", end_time - start_time)
+    start_time = time.time()
     A = solve_tril(
         A=A,
         cu_seqlens=cu_seqlens,
         output_dtype=k.dtype
     )
+    torch.cuda.synchronize()
+    end_time = time.time()
+    print("solve_tril time:", end_time - start_time)
+    start_time = time.time()
     w, u = recompute_w_u_fwd(
         k=k,
         v=v,
@@ -49,6 +58,10 @@ def chunk_gated_delta_rule_fwd(
         g_cumsum=g,
         cu_seqlens=cu_seqlens,
     )
+    torch.cuda.synchronize()
+    end_time = time.time()
+    print("recompute_w_u_fwd time:", end_time - start_time)
+    start_time = time.time()
     h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
         k=k,
         w=w,
@@ -58,6 +71,10 @@ def chunk_gated_delta_rule_fwd(
         output_final_state=output_final_state,
         cu_seqlens=cu_seqlens,
     )
+    torch.cuda.synchronize()
+    end_time = time.time()
+    print("chunk_gated_delta_rule_fwd_h time:", end_time - start_time)
+    start_time = time.time()
     o = chunk_fwd_o(
         q=q,
         k=k,
@@ -67,6 +84,9 @@ def chunk_gated_delta_rule_fwd(
         scale=scale,
         cu_seqlens=cu_seqlens,
     )
+    torch.cuda.synchronize()
+    end_time = time.time()
+    print("chunk_fwd_o time:", end_time - start_time)
     return g, o, A, final_state
 
 
@@ -177,7 +197,7 @@ class ChunkGatedDeltaRuleFunction(torch.autograd.Function):
             k = l2norm_fwd(k, autotune_interval=autotune_interval)
 
         g, o, A, final_state = chunk_gated_delta_rule_fwd(
-            q=q,
+            q=q,    
             k=k,
             v=v,
             g=g,
@@ -331,6 +351,7 @@ def chunk_gated_delta_rule(
             )
     if scale is None:
         scale = k.shape[-1] ** -0.5
+
     o, final_state = ChunkGatedDeltaRuleFunction.apply(
         q,
         k,

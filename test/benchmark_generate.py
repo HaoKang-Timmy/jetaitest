@@ -19,7 +19,7 @@ import time
 import argparse
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from edge_models import JetNemotronForCausalLM, JetNemotronConfig
+from server_models import JetNemotronForCausalLM, JetNemotronConfig
 
 def get_gpu_memory():
     """获取当前GPU内存使用情况（以GB为单位）"""
@@ -32,7 +32,7 @@ def main():
     parser = argparse.ArgumentParser(description="Benchmark Jet-Nemotron with random tokens")
     parser.add_argument("--model_path", type=str, default="jet-ai/Jet-Nemotron-2B", 
                        help="Path to the model weights")
-    parser.add_argument("--batch_size", type=int, default=100,
+    parser.add_argument("--batch_size", type=int, default=10,
                        help="Batch size for generation")
     parser.add_argument("--input_len", type=int, default=4000,
                        help="Input sequence length")

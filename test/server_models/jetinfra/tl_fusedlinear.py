@@ -110,7 +110,7 @@ def _linear_kernel(
         
     return main
 
-def fused_linear_silu(Input, W_T):
+def fused_linear_silu_l2norm(Input, W_T):
     B, Token, D_in = Input.shape
     D_out = W_T.shape[0]
     dtype = Input.dtype

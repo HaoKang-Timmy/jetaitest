@@ -37,7 +37,7 @@ from fla.ops.gated_delta_rule import (chunk_gated_delta_rule,
 from .dynamic_conv import DynamicShortConvolution
 from .configuration_jet_nemotron import JetNemotronConfig
 from .kv_cache import JetNemotronCache
-from .jetinfra import fused_linear_silu, fused_recurrent_gated_delta_rule_tl
+from .jetinfra import fused_linear_silu_l2norm, fused_recurrent_gated_delta_rule_tl
 
 @dataclass
 class JetBlockConfig():
@@ -189,8 +189,8 @@ class JetBlock(nn.Module):
         # print("hidden_states.shape:", hidden_states.shape)
         # q = F.silu(self.q_proj(hidden_states))
         # k = F.silu(self.k_proj(hidden_states))
-        q = fused_linear_silu(hidden_states, self.q_proj.weight)
-        k = fused_linear_silu(hidden_states, self.k_proj.weight)
+        q = fused_linear_silu_l2norm(hidden_states, self.q_proj.weight)
+        k = fused_linear_silu_l2norm(hidden_states, self.k_proj.weight)
         # print("q.shape:", q.shape)
         # print("k.shape:", k.shape)
         conv_state_v = None

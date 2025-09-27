@@ -246,7 +246,7 @@ class DynamicShortConvolution(nn.Module):
         generator_input = x if generator_input is None else generator_input
         assert not self.training, "Triton implementation is only available in eval mode."
         # cache: [B, D, T(W)]
-        CHUNK_SIZE = 2048
+        CHUNK_SIZE = 1024
         n_chunk = (x.shape[1] + CHUNK_SIZE - 1) // CHUNK_SIZE
         output_triton = torch.zeros_like(x)
         if cache is not None:
@@ -256,9 +256,13 @@ class DynamicShortConvolution(nn.Module):
             start = i * CHUNK_SIZE
             end = min((i + 1) * CHUNK_SIZE, x.shape[1])
             kernels = self.get_kernel(generator_input[:, start:end])
-            # print("kernels shape:", kernels.shape)
+            print("kernels shape:", kernels.shape)
+            print("x shape:", x[:, start:end].shape)
+            print("x dtype:", x[:, start:end].dtype)
+            print("kernels dtype:", kernels.dtype)
             # print("cache shape:", cache.shape if cache is not None else None)
             # out = dynamic_conv_triton_cache(x[:, start:end], kernels, cache=cache)
+
             out = tl_dynamic_conv_cache_w_silu(x[:, start:end], kernels)
             output_triton[:, i*CHUNK_SIZE:end, :] = out
         cache = x[:, end-self.kernel_size:end, :]
