@@ -174,7 +174,7 @@ def fused_recurrent_fwd(
         h0 = initial_state
     kernel = fused_recurrent(B, Token, H, HV, K, V, 
                              use_qk_l2norm_in_kernel, STORE_FINAL_STATE=True)
-    scale = torch.tensor([scale]).cuda().to(dtype)
+    scale = torch.tensor([scale]).to(device=q.device, dtype=dtype)
     # print("q dtype:", q.dtype)
     # print("k dtype:", k.dtype)
     # print("v dtype:", v.dtype)

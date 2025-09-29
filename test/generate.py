@@ -49,7 +49,7 @@ def main():
     
     # 初始化模型
     model = JetNemotronForCausalLM(config)
-    model = model.eval().cuda().bfloat16()
+    model = model.eval().to("cuda:4").bfloat16()
     
     # 加载模型权重
     if os.path.isfile(args.model_path) or os.path.isdir(args.model_path):
@@ -66,14 +66,14 @@ def main():
             args.model_path,
             trust_remote_code=True,
             torch_dtype=torch.float16,
-            device_map="cuda"
+            device_map="cuda:4"
         )
         model.load_state_dict(hf_model.state_dict())
         del hf_model  # 释放内存
 
     # 准备输入
     inputs = tokenizer(args.input_text, return_tensors="pt")
-    input_ids = inputs.input_ids.cuda()
+    input_ids = inputs.input_ids.to("cuda:4")
 
     # 生成参数
     gen_kwargs = {

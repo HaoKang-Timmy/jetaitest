@@ -30,6 +30,10 @@ def chunk_gated_delta_rule_fwd(
     g = chunk_local_cumsum(g, chunk_size=64, cu_seqlens=cu_seqlens)
     # obtain WY representation. u is actually the new v.
     start_time = time.time()
+    print("k shape:", k.shape)
+    print("beta shape:", beta.shape)
+    print("g shape:", g.shape)
+    print("cu_seqlens shape:", cu_seqlens.shape)
     A = chunk_scaled_dot_kkt_fwd(
         k=k,
         beta=beta,
