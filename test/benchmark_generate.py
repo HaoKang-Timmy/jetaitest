@@ -34,7 +34,7 @@ def main():
                        help="Path to the model weights")
     parser.add_argument("--batch_size", type=int, default=10,
                        help="Batch size for generation")
-    parser.add_argument("--input_len", type=int, default=4000,
+    parser.add_argument("--input_len", type=int, default=1000,
                        help="Input sequence length")
     parser.add_argument("--max_new_tokens", type=int, default=1,
                        help="Number of tokens to generate")
