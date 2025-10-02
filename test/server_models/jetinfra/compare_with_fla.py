@@ -1,133 +1,194 @@
+# Util functions for flash linear attention cumsum
+# Reference: fla/ops/utils/cumsum.py
+
+import tilelang
+import tilelang.language as T
+import sys  # noqa: F401
+
+# Add your fla repository path to sys.path
+# Currently we use the fla repository from the flash-linear-attention project at commit id f03cb3ae
+# sys.path.insert(0, "/home/tzj/flash-linear-attention")
+try:
+    import fla
+    print(fla.__file__)
+    from fla.ops.utils.cumsum import chunk_local_cumsum_scalar
+except ImportError:
+    print("fla not found, using tilelang implementation")
+    fla = None
+
 import torch
-import sys
 
-# 添加 flash-linear-attention 库路径
-sys.path.insert(0, "/home/haokang/jetlmrelated/jetaitest/flash-linear-attention")
+tilelang.disable_cache()
 
-from fla.ops.common.chunk_scaled_dot_kkt import chunk_scaled_dot_kkt_fwd
-from tl_chunked_deltarule import tilelang_chunk_scaled_matmul_fwd, tilelang_chunk_scaled_dot_kkt_fwd
 
-def compare_fla_vs_tilelang():
-    # 设置测试参数
-    B, S, H, DK = 1, 2000, 12, 96
-    chunk_size = 64
-    
-    # 创建相同的输入数据
-    torch.manual_seed(42)
-    k = torch.randn(B, S, H, DK, dtype=torch.bfloat16).cuda()
-    beta = torch.randn(B, S, H, dtype=torch.bfloat16).cuda()
-    g_cumsum = torch.randn(B, S, H, dtype=torch.float32).cuda()
-    
-    print("=" * 70)
-    print("对比 Flash-Linear-Attention 和 TileLang 实现")
-    print("=" * 70)
-    print(f"\n测试参数: B={B}, S={S}, H={H}, DK={DK}, chunk_size={chunk_size}")
-    print(f"\n输入形状:")
-    print(f"  K: {k.shape}, dtype: {k.dtype}")
-    print(f"  Beta: {beta.shape}, dtype: {beta.dtype}")
-    print(f"  G_cumsum: {g_cumsum.shape}, dtype: {g_cumsum.dtype}")
-    
-    # 测试 Flash-Linear-Attention 版本
-    print("\n" + "-" * 70)
-    print("运行 Flash-Linear-Attention: chunk_scaled_dot_kkt_fwd")
-    print("-" * 70)
-    output_fla = chunk_scaled_dot_kkt_fwd(
-        k=k,
-        beta=beta,
-        g_cumsum=g_cumsum,
-        cu_seqlens=None,
+@tilelang.jit(
+    out_idx=[-1],
+    pass_configs={
+        tilelang.PassConfigKey.TL_DISABLE_TMA_LOWER: True,
+        tilelang.PassConfigKey.TL_DISABLE_WARP_SPECIALIZED: True
+    })
+def tilelang_chunk_local_cumsum_scalar(
+    # task config
+    B,
+    S,
+    H,
+    chunk_size=64,
+    is_varlen=False,
+    head_first=False,
+    reverse=False,
+    input_dtype="float16",
+    output_dtype="float32",
+    # kernel config
+    block_S=64,
+    threads=256,
+    use_fragment=False,
+):
+    G_shape = (B, H, S) if head_first else (B, S, H)
+    assert chunk_size == 2**(chunk_size.bit_length() - 1), "chunk_size must be a power of 2"
+    assert chunk_size == block_S, "chunk_size must be equal to block_S"
+
+    @T.prim_func
+    def kernel(
+            G: T.Tensor(G_shape, dtype=input_dtype),
+            G_new: T.Tensor(G_shape, dtype=output_dtype),
+    ):
+        with T.Kernel(T.ceildiv(S, block_S), B * H, threads=threads) as (bs, bbh):
+            bb, bh = bbh // H, bbh % H
+            G_shared = T.alloc_shared((1, block_S), dtype=output_dtype, scope="shared")
+            if head_first:
+                T.copy(G[bb, bh, bs * block_S:(bs + 1) * block_S], G_shared)
+            else:
+                T.copy(G[bb, bs * block_S:(bs + 1) * block_S, bh], G_shared)
+            if use_fragment:
+                G_fragment = T.alloc_fragment((1, block_S), dtype=output_dtype, scope="shared")
+                T.copy(G_shared, G_fragment)
+                T.cumsum(G_fragment, dim=1, reverse=reverse)
+                if head_first:
+                    T.copy(G_fragment, G_new[bb, bh, bs * block_S:(bs + 1) * block_S])
+                else:
+                    T.copy(G_fragment, G_new[bb, bs * block_S:(bs + 1) * block_S, bh])
+            else:
+                T.cumsum(G_shared, dim=1, reverse=reverse)
+                if head_first:
+                    T.copy(G_shared, G_new[bb, bh, bs * block_S:(bs + 1) * block_S])
+                else:
+                    T.copy(G_shared, G_new[bb, bs * block_S:(bs + 1) * block_S, bh])
+
+    return kernel
+
+
+def prepare_cumsum_input(
+    B,
+    S,
+    H,
+    dtype,
+):
+    G = torch.randn(B, S, H, dtype=dtype).cuda()
+    return G
+
+
+def prepare_cumsum_output(
+    B,
+    S,
+    H,
+    dtype,
+):
+    G_new = torch.empty(B, S, H, dtype=dtype).cuda()
+    return G_new
+
+
+def run_test(
+    B,
+    S,
+    H,
+    chunk_size,
+    reverse,
+    head_first,
+    input_dtype,
+    output_dtype,
+    threads,
+    use_fragment,
+):
+    G = prepare_cumsum_input(B, S, H, getattr(torch, input_dtype))
+    G_new_ref = prepare_cumsum_output(B, S, H, getattr(torch, output_dtype))
+    G_new_tilelang = prepare_cumsum_output(B, S, H, getattr(torch, output_dtype))
+
+    # reference cumsum
+    for _ in range(10):
+        G_new_ref = chunk_local_cumsum_scalar(
+            g=G,
+            chunk_size=chunk_size,
+            reverse=reverse,
+            head_first=head_first,
+            output_dtype=getattr(torch, output_dtype))
+    import time
+    torch.cuda.synchronize()
+    start_time = time.time()
+    for _ in range(10):
+        G_new_ref = chunk_local_cumsum_scalar(
+            g=G,
+            chunk_size=chunk_size,
+            reverse=reverse,
+            head_first=head_first,
+            output_dtype=getattr(torch, output_dtype))
+    torch.cuda.synchronize()
+    end_time = time.time()
+    print(f"chunk_local_cumsum_scalar time: {end_time - start_time}")
+
+
+    # tilelang cumsum
+    block_S = chunk_size
+    kernel = tilelang_chunk_local_cumsum_scalar(
+        B=B,
+        S=S,
+        H=H,
         chunk_size=chunk_size,
-        output_dtype=torch.float32
+        reverse=reverse,
+        head_first=head_first,
+        input_dtype=input_dtype,
+        output_dtype=output_dtype,
+        block_S=block_S,
+        threads=threads,
+        use_fragment=use_fragment,
     )
-    print(f"输出形状: {output_fla.shape}, dtype: {output_fla.dtype}")
-    print(f"输出统计:")
-    print(f"  min={output_fla.min().item():.6f}")
-    print(f"  max={output_fla.max().item():.6f}")
-    print(f"  mean={output_fla.mean().item():.6f}")
-    print(f"  std={output_fla.std().item():.6f}")
-    
-    # 测试 TileLang 版本
-    print("\n" + "-" * 70)
-    print("运行 TileLang: tilelang_chunk_scaled_matmul_fwd")
-    print("-" * 70)
-    kernel_tl = tilelang_chunk_scaled_dot_kkt_fwd(
-        B, S, H, DK, 
-        chunk_size=chunk_size,
-        use_g=True,
-        output_dtype="float32"
-    )
-    output_tl = kernel_tl(k, beta, g_cumsum)
-    print(f"输出形状: {output_tl.shape}, dtype: {output_tl.dtype}")
-    print(f"输出统计:")
-    print(f"  min={output_tl.min().item():.6f}")
-    print(f"  max={output_tl.max().item():.6f}")
-    print(f"  mean={output_tl.mean().item():.6f}")
-    print(f"  std={output_tl.std().item():.6f}")
-    
-    # 比较结果
-    print("\n" + "=" * 70)
-    print("结果比较")
-    print("=" * 70)
-    
-    # 计算差异
-    diff = torch.abs(output_fla - output_tl)
-    max_diff = diff.max().item()
-    mean_diff = diff.mean().item()
-    
-    # 计算相对误差
-    max_val = max(output_fla.abs().max().item(), output_tl.abs().max().item())
-    relative_error = max_diff / (max_val + 1e-8)
-    
-    # 尝试不同的容差
-    is_close_strict = torch.allclose(output_fla, output_tl, rtol=1e-5, atol=1e-7)
-    is_close_normal = torch.allclose(output_fla, output_tl, rtol=1e-3, atol=1e-5)
-    is_close_relaxed = torch.allclose(output_fla, output_tl, rtol=1e-2, atol=1e-4)
-    
-    print(f"\n差异统计:")
-    print(f"  最大绝对差异: {max_diff:.6e}")
-    print(f"  平均绝对差异: {mean_diff:.6e}")
-    print(f"  最大相对误差: {relative_error:.6e}")
-    
-    print(f"\n是否近似相等:")
-    print(f"  严格容差 (rtol=1e-5, atol=1e-7): {is_close_strict}")
-    print(f"  正常容差 (rtol=1e-3, atol=1e-5): {is_close_normal}")
-    print(f"  宽松容差 (rtol=1e-2, atol=1e-4): {is_close_relaxed}")
-    
-    # 显示样本值对比
-    print(f"\n样本值对比 (第一个chunk，前8个元素):")
-    print(f"  batch=0, seq=0, head=0, chunk_pos=0:7")
-    print(f"  FLA 输出:      {output_fla[0, 0, 0, :8]}")
-    print(f"  TileLang 输出: {output_tl[0, 0, 0, :8]}")
-    print(f"  差异:          {diff[0, 0, 0, :8]}")
-    
-    # 检查一些不同位置的值
-    print(f"\n  batch=0, seq=64, head=0, chunk_pos=0:8")
-    print(f"  FLA 输出:      {output_fla[0, 64, 0, :8]}")
-    print(f"  TileLang 输出: {output_tl[0, 64, 0, :8]}")
-    print(f"  差异:          {diff[0, 64, 0, :8]}")
-    
-    # 结论
-    print("\n" + "=" * 70)
-    print("结论")
-    print("=" * 70)
-    
-    if is_close_normal:
-        print("✓ Flash-Linear-Attention 和 TileLang 的输出结果相同")
-        print("  （在正常数值容差范围内）")
-    elif is_close_relaxed:
-        print("⚠ Flash-Linear-Attention 和 TileLang 的输出结果基本相同")
-        print("  （在宽松容差范围内，存在小的数值误差）")
-    else:
-        print("✗ Flash-Linear-Attention 和 TileLang 的输出结果存在显著差异")
-        print(f"\n可能的原因:")
-        print(f"  1. 实现细节差异（Triton vs TileLang）")
-        print(f"  2. 浮点运算顺序不同导致的累积误差")
-        print(f"  3. 内存布局和访问模式差异")
-        print(f"  4. 编译器优化策略不同")
-    
-    print("\n" + "=" * 70)
-    
-    return output_fla, output_tl, diff
+    for _ in range(10):
+        G_new_tilelang = kernel(G)
+    import time
+    torch.cuda.synchronize()
+    start_time = time.time()
+    for _ in range(10):
+        G_new_tilelang = kernel(G)
+    torch.cuda.synchronize()
+    end_time = time.time()
+    print(f"tilelang_chunk_local_cumsum_scalar time: {end_time - start_time}")
+
+    try:
+        torch.testing.assert_close(G_new_tilelang, G_new_ref, rtol=1e-2, atol=1e-2)
+        print("tilelang cumsum passed √")
+    except Exception as e:
+        print("tilelang cumsum failed ✗")
+        print(e)
+        print("G:")
+        print(G.view(-1))
+        print("G_new_tilelang:")
+        print(G_new_tilelang.view(-1))
+        print("G_new_ref:")
+        print(G_new_ref.view(-1))
+
+
+def main():
+    run_test(
+        B=1,
+        S=32768,
+        H=12,
+        chunk_size=64,
+        reverse=True,
+        head_first=False,
+        input_dtype="float32",
+        output_dtype="float32",
+        threads=256,
+        use_fragment=False)
+
 
 if __name__ == "__main__":
-    compare_fla_vs_tilelang()
+    main()

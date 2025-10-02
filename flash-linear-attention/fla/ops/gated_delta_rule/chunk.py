@@ -27,6 +27,15 @@ def chunk_gated_delta_rule_fwd(
     output_final_state: bool,
     cu_seqlens: Optional[torch.LongTensor] = None
 ):
+    print("q shape:", q.shape)
+    print("k shape:", k.shape)
+    print("v shape:", v.shape)
+    print("g shape:", g.shape)
+    print("beta shape:", beta.shape)
+    print("initial_state:", initial_state)
+    print("scale:", scale)
+    print("output_final_state:", output_final_state)
+    print("cu_seqlens shape:", cu_seqlens)
     g = chunk_local_cumsum(g, chunk_size=64, cu_seqlens=cu_seqlens)
     # obtain WY representation. u is actually the new v.
     start_time = time.time()
@@ -42,6 +51,7 @@ def chunk_gated_delta_rule_fwd(
     end_time = time.time()
     print("chunk_scaled_dot_kkt_fwd time:", end_time - start_time)
     start_time = time.time()
+    # print("A shape:", A.shape)
     A = solve_tril(
         A=A,
         cu_seqlens=cu_seqlens,
@@ -76,6 +86,7 @@ def chunk_gated_delta_rule_fwd(
     end_time = time.time()
     print("chunk_gated_delta_rule_fwd_h time:", end_time - start_time)
     start_time = time.time()
+    print("v_new shape:", v_new.shape)
     o = chunk_fwd_o(
         q=q,
         k=k,
