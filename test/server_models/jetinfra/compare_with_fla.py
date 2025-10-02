@@ -4,6 +4,8 @@
 import tilelang
 import tilelang.language as T
 import sys  # noqa: F401
+import itertools
+from tilelang.autotuner import autotune
 
 # Add your fla repository path to sys.path
 # Currently we use the fla repository from the flash-linear-attention project at commit id f03cb3ae
@@ -20,6 +22,51 @@ import torch
 
 tilelang.disable_cache()
 
+def get_configs():
+    Block_T = [64 ,128, 256, 512]
+    threads = [128]
+    _configs = list(itertools.product(Block_T, threads))
+    configs = [{
+        'Block_T': c[0],
+        'threads': c[1]
+    } for c in _configs]
+    return configs
+
+@autotune(configs=get_configs(), warmup=10, rep=10)
+@tilelang.jit(
+    out_idx=[-1]
+)
+def tl_chunk_cumsum(
+    B,
+    Token,
+    H,
+    chunk_size = 64,
+    input_dtype = "bfloat16",
+    output_dtype = "float32",
+    Block_T = 128,
+    threads = 256,
+):
+    assert Block_T % chunk_size == 0, "Block_T must be divisible by chunk_size"
+    chunk_num = Block_T // chunk_size
+    fragment_shape = [chunk_num, chunk_size]
+    @T.prim_func
+    def kernel(
+        InputG: T.Tensor(shape=(B, Token, H), dtype=input_dtype),
+        OutputG: T.Tensor(shape=(B, Token, H), dtype=output_dtype)
+    ):
+        with T.Kernel(T.ceildiv(Token, Block_T), B * H, threads=threads) as (bt, bbh):
+            bb, bh = bbh // H, bbh % H
+            InputG_shared = T.alloc_shared((Block_T), dtype=input_dtype)
+            InputG_fragment = T.alloc_fragment((Block_T), dtype=output_dtype)
+            T.copy(InputG[bb, bt * Block_T:(bt + 1) * Block_T, bh], InputG_shared)
+
+            T.copy(InputG_shared, InputG_fragment)
+            InputG_fragment_viewed = T.view(InputG_fragment, fragment_shape)
+            T.cumsum(InputG_fragment_viewed, dim=1)
+            InputG_fragment_viewed_reverse = T.view(InputG_fragment_viewed, [Block_T])
+            T.copy(InputG_fragment_viewed_reverse, InputG_shared)
+            T.copy(InputG_shared, OutputG[bb, bt * Block_T:(bt + 1) * Block_T, bh])
+    return kernel
 
 @tilelang.jit(
     out_idx=[-1],
@@ -134,32 +181,50 @@ def run_test(
     torch.cuda.synchronize()
     end_time = time.time()
     print(f"chunk_local_cumsum_scalar time: {end_time - start_time}")
-
-
-    # tilelang cumsum
-    block_S = chunk_size
-    kernel = tilelang_chunk_local_cumsum_scalar(
-        B=B,
-        S=S,
-        H=H,
-        chunk_size=chunk_size,
-        reverse=reverse,
-        head_first=head_first,
-        input_dtype=input_dtype,
-        output_dtype=output_dtype,
-        block_S=block_S,
-        threads=threads,
-        use_fragment=use_fragment,
-    )
+    kernel = tl_chunk_cumsum(
+            B=B,
+            Token=S,
+            H=H,
+            chunk_size=chunk_size,
+            input_dtype=input_dtype,
+            output_dtype=output_dtype,
+        )
     for _ in range(10):
         G_new_tilelang = kernel(G)
-    import time
     torch.cuda.synchronize()
     start_time = time.time()
     for _ in range(10):
         G_new_tilelang = kernel(G)
     torch.cuda.synchronize()
     end_time = time.time()
+    print(f"tl_chunk_cumsum time: {end_time - start_time}")
+
+
+
+    # # tilelang cumsum
+    # block_S = chunk_size
+    # kernel = tilelang_chunk_local_cumsum_scalar(
+    #     B=B,
+    #     S=S,
+    #     H=H,
+    #     chunk_size=chunk_size,
+    #     reverse=reverse,
+    #     head_first=head_first,
+    #     input_dtype=input_dtype,
+    #     output_dtype=output_dtype,
+    #     block_S=block_S,
+    #     threads=threads,
+    #     use_fragment=use_fragment,
+    # )
+    # for _ in range(10):
+    #     G_new_tilelang = kernel(G)
+    # import time
+    # torch.cuda.synchronize()
+    # start_time = time.time()
+    # for _ in range(10):
+    #     G_new_tilelang = kernel(G)
+    # torch.cuda.synchronize()
+    # end_time = time.time()
     print(f"tilelang_chunk_local_cumsum_scalar time: {end_time - start_time}")
 
     try:
@@ -182,7 +247,7 @@ def main():
         S=32768,
         H=12,
         chunk_size=64,
-        reverse=True,
+        reverse=False,
         head_first=False,
         input_dtype="float32",
         output_dtype="float32",
