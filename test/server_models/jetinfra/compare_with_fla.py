@@ -1,9 +1,8 @@
-# Reference: fla/ops/common/chunk_scaled_dot_kkt.py
+# Reference: fla/ops/gated_delta_rule/wy_fast.py
 
 import tilelang
 import tilelang.language as T
 import sys  # noqa: F401
-import time
 import itertools
 from tilelang.autotuner import autotune
 # Add your fla repository path to sys.path
@@ -12,151 +11,149 @@ from tilelang.autotuner import autotune
 try:
     import fla
     print(fla.__file__)
-    from fla.ops.common.chunk_scaled_dot_kkt import chunk_scaled_dot_kkt_fwd
+    from fla.ops.gated_delta_rule.wy_fast import recompute_w_u_fwd
 except ImportError:
     print("fla not found, using tilelang implementation")
     fla = None
 
 import torch
 
-torch.set_printoptions(profile="full")
-torch.random.manual_seed(0)
+torch.random.manual_seed(1)
 
 tilelang.disable_cache()
 
 
-def prepare_input(
-    B,
-    S,
-    H,
-    DK,
-    input_dtype,
-    output_dtype,
-    accum_dtype,
-):
+def prepare_input(B, S, H, DK, DV, chunk_size, input_dtype, output_dtype, gate_dtype=torch.float32):
+    BS = chunk_size
     K = torch.randn(B, S, H, DK, dtype=input_dtype).cuda()
+    V = torch.randn(B, S, H, DV, dtype=input_dtype).cuda()
     Beta = torch.randn(B, S, H, dtype=input_dtype).cuda()
-    G = torch.randn(B, S, H, dtype=accum_dtype).cuda()
-    return K, Beta, G
+    G = torch.randn(B, S, H, dtype=gate_dtype).cuda()
+    A = torch.randn(B, S, H, BS, dtype=output_dtype).cuda()
+    return K, V, Beta, G, A
 
 
 def prepare_output(
     B,
     S,
     H,
-    chunk_size,
-    dtype,
+    DK,
+    DV,
+    output_dtype,
 ):
-    BS = chunk_size
-    A = torch.empty(B, S, H, BS, dtype=dtype).cuda()
-    return A
+    W = torch.empty(B, S, H, DK, dtype=output_dtype).cuda()
+    U = torch.empty(B, S, H, DV, dtype=output_dtype).cuda()
+    return W, U
 
 def get_configs():
-    block_S = [64]
-    block_DK = [64]
+    block_DK = [64, 96, 128]
+    block_DV = [64, 96, 128, 256]
     threads = [128, 256]
     num_stages = [1, 2, 3, 4]
-    _configs = list(itertools.product(block_S, block_DK, threads, num_stages))
+    _configs = list(itertools.product(block_DK, block_DV, threads, num_stages))
     configs = [{
-        'block_S': c[0],
-        'block_DK': c[1],
+        'block_DK': c[0],
+        'block_DV': c[1],
         'threads': c[2],
         'num_stages': c[3]
     } for c in _configs]
     return configs
-# tilelang.disable_cache()
 @autotune(configs=get_configs(), warmup=10, rep=10)
-@tilelang.jit(out_idx=[-1])
-def tilelang_chunk_scaled_dot_kkt_fwd(
+@tilelang.jit(out_idx=[-2, -1])
+def tilelang_recompute_w_u_fwd(
     # task config
     B,
     S,
     H,
     DK,
-    chunk_size=64,
-    input_dtype="bfloat16",
-    output_dtype="bfloat16",
-    accum_dtype="float32",
-    use_g=True,
+    DV,
+    input_dtype,
+    output_dtype,
+    gate_dtype,
+    accum_dtype,
+    chunk_size,
     # kernel config
     block_S=64,
     block_DK=64,
+    block_DV=32,
     threads=128,
-    num_stages=2,
+    num_stages=3,
 ):
     K_shape = (B, S, H, DK)
+    V_shape = (B, S, H, DV)
     Beta_shape = (B, S, H)
-    G_shape = (B, S, H)
     assert chunk_size == block_S, "chunk_size must be equal to block_S"
     BS = chunk_size
-    output_shape = (B, S, H, BS)
-    
+    G_shape = (B, S, H)
+    A_shape = (B, S, H, BS)
+
     @T.prim_func
     def kernel(
             K: T.Tensor(K_shape, dtype=input_dtype),
+            V: T.Tensor(V_shape, dtype=input_dtype),
             Beta: T.Tensor(Beta_shape, dtype=input_dtype),
-            G: T.Tensor(G_shape, dtype=accum_dtype),
-            A: T.Tensor(output_shape, dtype=output_dtype),
+            G: T.Tensor(G_shape, dtype=gate_dtype),
+            A: T.Tensor(A_shape, dtype=output_dtype),
+            W: T.Tensor(K_shape, dtype=output_dtype),
+            U: T.Tensor(V_shape, dtype=output_dtype),
     ):
         with T.Kernel(T.ceildiv(S, block_S), B * H, threads=threads) as (bs, bbh):
             bb, bh = bbh // H, bbh % H
-            # !! Pay attention to the scope of the shared memory: may cause misaligned address when shape is one dimension or the buffer is too small
             Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype, scope="shared")
             K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
+            V_shared = T.alloc_shared((block_S, block_DV), dtype=input_dtype)
+            G_shared = T.alloc_shared((block_S,), dtype=gate_dtype, scope="shared")
             A_shared = T.alloc_shared((block_S, block_S), dtype=output_dtype)
-            Beta_K_fragment = T.alloc_fragment((block_S, block_DK), dtype=input_dtype)
-            A_fragment = T.alloc_fragment((block_S, block_S), dtype=accum_dtype)
-
-            # Tensor used for gated:
-            G_shared = T.alloc_shared((block_S,), dtype=accum_dtype, scope="shared")
-            G_diff_local = T.alloc_fragment((block_S, block_S), dtype=accum_dtype)
-            # G_frag = T.alloc_fragment((block_S), dtype=accum_dtype)
+            W_fragment = T.alloc_fragment((block_S, block_DK), dtype=accum_dtype)
+            U_fragment = T.alloc_fragment((block_S, block_DV), dtype=accum_dtype)
+            W_shared = T.alloc_shared((block_S, block_DK), dtype=output_dtype)
+            U_shared = T.alloc_shared((block_S, block_DV), dtype=output_dtype)
+            W_Beta_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
+            U_Beta_shared = T.alloc_shared((block_S, block_DV), dtype=input_dtype)
 
             T.annotate_layout({
                 K_shared: tilelang.layout.make_swizzled_layout(K_shared),
+                V_shared: tilelang.layout.make_swizzled_layout(V_shared),
                 A_shared: tilelang.layout.make_swizzled_layout(A_shared),
+                W_shared: tilelang.layout.make_swizzled_layout(W_shared),
+                U_shared: tilelang.layout.make_swizzled_layout(U_shared),
+                W_Beta_shared: tilelang.layout.make_swizzled_layout(W_Beta_shared),
+                U_Beta_shared: tilelang.layout.make_swizzled_layout(U_Beta_shared),
             })
 
-            T.fill(A_fragment, 0)
             T.disable_warp_group_reg_alloc()
             for i_s in T.Parallel(block_S):
                 Beta_shared[i_s] = Beta[bb, bs * block_S + i_s, bh]
+                G_shared[i_s] = T.exp(G[bb, bs * block_S + i_s, bh])
+
+            T.copy(A[bb, bs * block_S:(bs + 1) * block_S, bh, :], A_shared)
+
+            for i_v in T.Pipelined(T.ceildiv(DV, block_DV), num_stages=num_stages):
+                T.copy(
+                    V[bb, bs * block_S:(bs + 1) * block_S, bh, i_v * block_DV:(i_v + 1) * block_DV],
+                    V_shared)
+                for i_s, i_v2 in T.Parallel(block_S, block_DV):
+                    U_Beta_shared[i_s, i_v2] = V_shared[i_s, i_v2] * Beta_shared[i_s]
+                T.gemm(A_shared, U_Beta_shared, U_fragment, clear_accum=True)
+                # First copy to smem, then copy to gmem to reduce U2RU instructions
+                T.copy(U_fragment, U_shared)
+                T.copy(
+                    U_shared, U[bb, bs * block_S:(bs + 1) * block_S, bh,
+                                i_v * block_DV:(i_v + 1) * block_DV])
 
             for i_k in T.Pipelined(T.ceildiv(DK, block_DK), num_stages=num_stages):
                 T.copy(
                     K[bb, bs * block_S:(bs + 1) * block_S, bh, i_k * block_DK:(i_k + 1) * block_DK],
                     K_shared)
                 for i_s, i_k2 in T.Parallel(block_S, block_DK):
-                    Beta_K_fragment[i_s, i_k2] = K_shared[i_s, i_k2] * Beta_shared[i_s]
-                T.gemm(Beta_K_fragment, K_shared, A_fragment, transpose_B=True)
-
-            if use_g:
-                for i_s in T.Parallel(block_S):
-                    G_shared[i_s] = G[bb, bs * block_S + i_s, bh]
-                for i_s1, i_s2 in T.Parallel(block_S, block_S):
-                    G_diff_local[i_s1, i_s2] = G_shared[i_s1] - G_shared[i_s2]
-                for i_s1, i_s2 in T.Parallel(block_S, block_S):
-                    with T.If(G_diff_local[i_s1, i_s2] <= 0 and i_s1 > i_s2):
-                        with T.Then():
-                            A_fragment[i_s1, i_s2] = A_fragment[i_s1, i_s2] * T.exp(
-                                G_diff_local[i_s1, i_s2])
-                        with T.Else():
-                            A_fragment[i_s1, i_s2] = 0
-                # for i_s1, i_s2 in T.Parallel(block_S, block_S):
-                #     with T.If(G_frag[i_s1] <= G_frag[i_s2] and i_s1 > i_s2):
-                #         with T.Then():
-                #             A_fragment[i_s1, i_s2] = A_fragment[i_s1, i_s2] * T.exp(
-                #                 G_frag[i_s1] - G_frag[i_s2])
-                #         with T.Else():
-                #             A_fragment[i_s1, i_s2] = 0
-            else:
-                for i_s1, i_s2 in T.Parallel(block_S, block_S):
-                    with T.If(i_s1 <= i_s2):  # noqa: SIM117
-                        with T.Then():
-                            A_fragment[i_s1, i_s2] = 0
-
-            T.copy(A_fragment, A_shared)
-            T.copy(A_shared, A[bb, bs * block_S:(bs + 1) * block_S, bh, :])
+                    W_Beta_shared[i_s,
+                                  i_k2] = K_shared[i_s, i_k2] * Beta_shared[i_s] * G_shared[i_s]
+                T.gemm(A_shared, W_Beta_shared, W_fragment, clear_accum=True)
+                # First copy to smem, then copy to gmem to reduce U2RU instructions
+                T.copy(W_fragment, W_shared)
+                T.copy(
+                    W_shared, W[bb, bs * block_S:(bs + 1) * block_S, bh,
+                                i_k * block_DK:(i_k + 1) * block_DK])
 
     return kernel
 
@@ -166,88 +163,98 @@ def run_test(
     S,
     H,
     DK,
+    DV,
     chunk_size,
     input_dtype,
     output_dtype,
+    gate_dtype,
     accum_dtype,
-    use_g,
     block_DK,
+    block_DV,
     threads,
     num_stages,
 ):
-    K, Beta, G = prepare_input(B, S, H, DK, getattr(torch, input_dtype),
-                               getattr(torch, output_dtype), getattr(torch, accum_dtype))
-    A_ref = prepare_output(B, S, H, chunk_size, getattr(torch, output_dtype))
-    A_tilelang = prepare_output(B, S, H, chunk_size, getattr(torch, output_dtype))
-    for _ in range(10):
+    K, V, Beta, G, A = prepare_input(
+        B,
+        S,
+        H,
+        DK,
+        DV,
+        chunk_size,
+        getattr(torch, input_dtype),
+        getattr(torch, output_dtype),
+        gate_dtype=getattr(torch, gate_dtype))
+    W_ref, U_ref = prepare_output(B, S, H, DK, DV, getattr(torch, output_dtype))
+    W_tilelang, U_tilelang = prepare_output(B, S, H, DK, DV, getattr(torch, output_dtype))
+
     # reference
-        if use_g:
-            A_ref = chunk_scaled_dot_kkt_fwd(
-                K, Beta, G, chunk_size=chunk_size, output_dtype=getattr(torch, output_dtype))
-        else:
-            A_ref = chunk_scaled_dot_kkt_fwd(
-                K, Beta, None, chunk_size=chunk_size, output_dtype=getattr(torch, output_dtype))
-
-
+    for _ in range(10):
+        W_ref, U_ref = recompute_w_u_fwd(K, V, Beta, G, A, None)
+    import time
     torch.cuda.synchronize()
     start_time = time.time()
     for _ in range(10):
-        if use_g:
-            A_ref = chunk_scaled_dot_kkt_fwd(
-                K, Beta, G, chunk_size=chunk_size, output_dtype=getattr(torch, output_dtype))
-        else:
-            A_ref = chunk_scaled_dot_kkt_fwd(
-                K, Beta, None, chunk_size=chunk_size, output_dtype=getattr(torch, output_dtype))
+        W_ref, U_ref = recompute_w_u_fwd(K, V, Beta, G, A, None)
     torch.cuda.synchronize()
     end_time = time.time()
-    print(f"triton Time taken: {end_time - start_time} seconds")
+    print(f"Reference time: {end_time - start_time} seconds")
 
     # tilelang
     block_S = chunk_size
+    kernel = tilelang_recompute_w_u_fwd(
+        B,
+        S,
+        H,
+        DK,
+        DV,
+        input_dtype,
+        output_dtype,
+        gate_dtype,
+        accum_dtype,
+        chunk_size,
+        block_S=block_S)
+    # print(kernel.get_kernel_source())
+    W_tilelang, U_tilelang = kernel(K, V, Beta, G, A)
+
     for _ in range(10):
-        # kernel = tilelang_chunk_scaled_dot_kkt_fwd(B, S, H, DK, chunk_size, input_dtype, output_dtype,
-        #                                         accum_dtype, use_g, block_S, block_DK, threads,
-        #                                         num_stages)
-        kernel = tilelang_chunk_scaled_dot_kkt_fwd(B, S, H, DK, chunk_size, input_dtype, output_dtype,
-                                            accum_dtype, use_g)
-        A_tilelang = kernel(K, Beta, G)
+        W_tilelang, U_tilelang = kernel(K, V, Beta, G, A)
     torch.cuda.synchronize()
     start_time = time.time()
     for _ in range(10):
-        # kernel = tilelang_chunk_scaled_dot_kkt_fwd(B, S, H, DK, chunk_size, input_dtype, output_dtype,
-        #                                         accum_dtype, use_g, block_S, block_DK, threads,
-        #                                         num_stages)
-        kernel = tilelang_chunk_scaled_dot_kkt_fwd(B, S, H, DK, chunk_size, input_dtype, output_dtype,
-                                            accum_dtype, use_g)
-        A_tilelang = kernel(K, Beta, G)
+        W_tilelang, U_tilelang = kernel(K, V, Beta, G, A)
     torch.cuda.synchronize()
     end_time = time.time()
-    print(f"tilelang Time taken: {end_time - start_time} seconds")
-
+    print(f"Tilelang time: {end_time - start_time} seconds")
     try:
-        torch.testing.assert_close(A_tilelang, A_ref, rtol=1e-2, atol=1e-2)
-        print("tilelang chunk scaled dot kkt fwd passed √")
+        torch.testing.assert_close(W_tilelang, W_ref, rtol=1e-2, atol=1e-2)
+        print("tilelang recompute w passed √")
     except Exception as e:
-        print("tilelang chunk scaled dot kkt fwd failed ✗")
+        print("tilelang recompute w failed ✗")
         print(e)
-        print("reference cuda kernel:")
-        print(kernel.get_kernel_source())
+    try:
+        torch.testing.assert_close(U_tilelang, U_ref, rtol=1e-2, atol=1e-2)
+        print("tilelang recompute u passed √")
+    except Exception as e:
+        print("tilelang recompute u failed ✗")
+        print(e)
 
 
 def main():
     run_test(
         B=1,
         S=32768,
-        H=32,
-        DK=128,
+        H=12,
+        DK=96,
+        DV=256,
         chunk_size=64,
         input_dtype="bfloat16",
         output_dtype="bfloat16",
+        gate_dtype="float32",
         accum_dtype="float32",
-        use_g=True,
         block_DK=64,
+        block_DV=32,
         threads=128,
-        num_stages=2)
+        num_stages=3)
 
 
 if __name__ == "__main__":

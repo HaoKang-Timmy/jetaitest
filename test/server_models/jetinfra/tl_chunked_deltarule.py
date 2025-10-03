@@ -71,6 +71,22 @@ def tl_chunk_cumsum(
             T.copy(InputG_shared, OutputG[bb, bt * Block_T:(bt + 1) * Block_T, bh])
     return kernel
 
+
+def get_configs():
+    block_S = [64]
+    block_DK = [64, 96, 128]
+    threads = [128, 256]
+    num_stages = [1, 2, 3, 4]
+    _configs = list(itertools.product(block_S, block_DK, threads, num_stages))
+    configs = [{
+        'block_S': c[0],
+        'block_DK': c[1],
+        'threads': c[2],
+        'num_stages': c[3]
+    } for c in _configs]
+    return configs
+# tilelang.disable_cache()
+@autotune(configs=get_configs(), warmup=10, rep=10)
 @tilelang.jit(out_idx=[-1])
 def tilelang_chunk_scaled_dot_kkt_fwd(
     # task config
@@ -146,7 +162,13 @@ def tilelang_chunk_scaled_dot_kkt_fwd(
                             G_diff_local[i_s1, i_s2])
                     with T.Else():
                         A_fragment[i_s1, i_s2] = 0
-
+            # for i_s1, i_s2 in T.Parallel(block_S, block_S):
+            #     with T.If(G_frag[i_s1] <= G_frag[i_s2] and i_s1 > i_s2):
+            #         with T.Then():
+            #             A_fragment[i_s1, i_s2] = A_fragment[i_s1, i_s2] * T.exp(
+            #                 G_frag[i_s1] - G_frag[i_s2])
+            #         with T.Else():
+            #             A_fragment[i_s1, i_s2] = 0
 
             T.copy(A_fragment, A_shared)
             T.copy(A_shared, A[bb, bs * block_S:(bs + 1) * block_S, bh, :])
@@ -205,6 +227,20 @@ def tilelang_chunk_scaled_dot_kkt_fwd(
                 
             
 #     return kernel
+def get_configs():
+    block_DK = [64, 96, 128]
+    block_DV = [64, 128, 256]
+    threads = [128, 256]
+    num_stages = [1, 2, 3]
+    _configs = list(itertools.product(block_DK, block_DV, threads, num_stages))
+    configs = [{
+        'block_DK': c[0],
+        'block_DV': c[1],
+        'threads': c[2],
+        'num_stages': c[3]
+    } for c in _configs]
+    return configs
+@autotune(configs=get_configs(), warmup=10, rep=10)
 @tilelang.jit(out_idx=[-2, -1])
 def tilelang_recompute_w_u_fwd(
     # task config
