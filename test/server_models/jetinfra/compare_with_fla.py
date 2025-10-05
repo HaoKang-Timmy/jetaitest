@@ -1,36 +1,68 @@
-# Reference: fla/ops/gated_delta_rule/wy_fast.py
+# Reference: fla/ops/common/chunk_delta_h.py
 
+import sys  # noqa: F401
 import tilelang
 import tilelang.language as T
-import sys  # noqa: F401
-import itertools
-from tilelang.autotuner import autotune
+
 # Add your fla repository path to sys.path
 # Currently we use the fla repository from the flash-linear-attention project at commit id f03cb3ae
 # sys.path.insert(0, "/home/tzj/flash-linear-attention")
 try:
     import fla
     print(fla.__file__)
-    from fla.ops.gated_delta_rule.wy_fast import recompute_w_u_fwd
+    from fla.ops.common.chunk_delta_h import chunk_gated_delta_rule_fwd_h
 except ImportError:
     print("fla not found, using tilelang implementation")
     fla = None
 
 import torch
+import torch.nn.functional as F
+from tilelang.engine.callback import register_cuda_postproc_callback  # noqa: F401
 
-torch.random.manual_seed(1)
+from utils import *
+
+# (zhengju) We can slightly modify the generated cuda code from tilelang lowering
+# in the debug folder to make the performance better. To enable this callback,
+# you can comment out the following function.
+# @register_cuda_postproc_callback
+# def tilelang_callback_cuda_postproc(code, _):
+#     cuda_code = open("../debug/chunk_delta_h_fuse.cu", "r").read()
+#     code = cuda_code
+#     return code
+
+torch.random.manual_seed(0)
 
 tilelang.disable_cache()
 
 
-def prepare_input(B, S, H, DK, DV, chunk_size, input_dtype, output_dtype, gate_dtype=torch.float32):
-    BS = chunk_size
+def prepare_input(
+    B,
+    S,
+    H,
+    DK,
+    DV,
+    chunk_size,
+    input_dtype,
+    output_dtype,
+    accum_dtype,
+    gate_dtype,
+):
     K = torch.randn(B, S, H, DK, dtype=input_dtype).cuda()
-    V = torch.randn(B, S, H, DV, dtype=input_dtype).cuda()
-    Beta = torch.randn(B, S, H, dtype=input_dtype).cuda()
+    K = F.normalize(K, dim=-1, p=2)
+    W = torch.randn(B, S, H, DK, dtype=input_dtype).cuda()
+    W = F.normalize(W, dim=-1, p=2)
+    U = torch.randn(B, S, H, DV, dtype=input_dtype).cuda()
+    U = F.normalize(U, dim=-1, p=2)
     G = torch.randn(B, S, H, dtype=gate_dtype).cuda()
-    A = torch.randn(B, S, H, BS, dtype=output_dtype).cuda()
-    return K, V, Beta, G, A
+    G = F.logsigmoid(G)
+    try:
+        from fla.ops.utils.cumsum import chunk_local_cumsum
+        G = chunk_local_cumsum(G, chunk_size)
+    except ImportError:
+        print("fla not found, skip cumsum")
+
+    initial_state = torch.randn(B, H, DK, DV, dtype=input_dtype).cuda()
+    return K, W, U, G, initial_state
 
 
 def prepare_output(
@@ -39,28 +71,19 @@ def prepare_output(
     H,
     DK,
     DV,
+    chunk_size,
     output_dtype,
+    state_dtype,
 ):
-    W = torch.empty(B, S, H, DK, dtype=output_dtype).cuda()
-    U = torch.empty(B, S, H, DV, dtype=output_dtype).cuda()
-    return W, U
+    BS = S // chunk_size
+    h = torch.empty(B, BS, H, DK, DV, dtype=output_dtype).cuda()
+    final_state = torch.empty(B, H, DK, DV, dtype=state_dtype).cuda()
+    V_new = torch.empty(B, S, H, DV, dtype=output_dtype).cuda()
+    return h, final_state, V_new
 
-def get_configs():
-    block_DK = [64, 96, 128]
-    block_DV = [64, 96, 128, 256]
-    threads = [128, 256]
-    num_stages = [1, 2, 3, 4]
-    _configs = list(itertools.product(block_DK, block_DV, threads, num_stages))
-    configs = [{
-        'block_DK': c[0],
-        'block_DV': c[1],
-        'threads': c[2],
-        'num_stages': c[3]
-    } for c in _configs]
-    return configs
-@autotune(configs=get_configs(), warmup=10, rep=10)
-@tilelang.jit(out_idx=[-2, -1])
-def tilelang_recompute_w_u_fwd(
+
+@tilelang.jit(out_idx=[-3, -2, -1])
+def tilelang_chunk_gated_delta_rule_fwd_h(
     # task config
     B,
     S,
@@ -69,93 +92,154 @@ def tilelang_recompute_w_u_fwd(
     DV,
     input_dtype,
     output_dtype,
-    gate_dtype,
     accum_dtype,
+    gate_dtype,
+    state_dtype,
     chunk_size,
+    use_g=True,
+    # use_initial_state=True,
+    store_final_state=True,
+    save_new_value=True,
     # kernel config
-    block_S=64,
     block_DK=64,
-    block_DV=32,
-    threads=128,
-    num_stages=3,
+    block_DV=64,
+    threads=256,
+    num_stages=0,
 ):
+    block_S = chunk_size
+    BS = S // block_S
+
     K_shape = (B, S, H, DK)
     V_shape = (B, S, H, DV)
-    Beta_shape = (B, S, H)
-    assert chunk_size == block_S, "chunk_size must be equal to block_S"
-    BS = chunk_size
+    W_shape = (B, S, H, DK)
+    U_shape = (B, S, H, DV)
     G_shape = (B, S, H)
-    A_shape = (B, S, H, BS)
+    h_shape = (B, BS, H, DK, DV)
+    initial_state_shape = (B, H, DK, DV)
+    final_state_shape = (B, H, DK, DV)
 
     @T.prim_func
     def kernel(
             K: T.Tensor(K_shape, dtype=input_dtype),
-            V: T.Tensor(V_shape, dtype=input_dtype),
-            Beta: T.Tensor(Beta_shape, dtype=input_dtype),
+            W: T.Tensor(W_shape, dtype=input_dtype),
+            U: T.Tensor(U_shape, dtype=input_dtype),
             G: T.Tensor(G_shape, dtype=gate_dtype),
-            A: T.Tensor(A_shape, dtype=output_dtype),
-            W: T.Tensor(K_shape, dtype=output_dtype),
-            U: T.Tensor(V_shape, dtype=output_dtype),
+            # initial_state: T.Tensor(initial_state_shape, dtype=input_dtype),
+            h: T.Tensor(h_shape, dtype=output_dtype),
+            final_state: T.Tensor(final_state_shape, dtype=state_dtype),
+            V_new: T.Tensor(V_shape, dtype=output_dtype),
     ):
-        with T.Kernel(T.ceildiv(S, block_S), B * H, threads=threads) as (bs, bbh):
+        with T.Kernel(T.ceildiv(DV, block_DV), B * H, threads=threads) as (bv, bbh):
             bb, bh = bbh // H, bbh % H
-            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype, scope="shared")
-            K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
-            V_shared = T.alloc_shared((block_S, block_DV), dtype=input_dtype)
-            G_shared = T.alloc_shared((block_S,), dtype=gate_dtype, scope="shared")
-            A_shared = T.alloc_shared((block_S, block_S), dtype=output_dtype)
-            W_fragment = T.alloc_fragment((block_S, block_DK), dtype=accum_dtype)
+
+            b_h_shared = T.alloc_shared((DK, block_DV), dtype=input_dtype)
+            b_h_fragment = T.alloc_fragment((DK, block_DV), dtype=accum_dtype)
+
+            U_shared = T.alloc_shared((block_S, block_DV), dtype=input_dtype)
             U_fragment = T.alloc_fragment((block_S, block_DV), dtype=accum_dtype)
-            W_shared = T.alloc_shared((block_S, block_DK), dtype=output_dtype)
-            U_shared = T.alloc_shared((block_S, block_DV), dtype=output_dtype)
-            W_Beta_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
-            U_Beta_shared = T.alloc_shared((block_S, block_DV), dtype=input_dtype)
+            W_shared = T.alloc_shared((block_S, DK), dtype=input_dtype)
+            V_new_fragment = T.alloc_fragment((block_S, block_DV), dtype=accum_dtype)
+            V_new_shared = T.alloc_shared((block_S, block_DV), dtype=output_dtype)
+            K_shared = T.alloc_shared((block_S, DK), dtype=input_dtype)
+            G_last_local = T.alloc_local((1), dtype=gate_dtype)
+            G_shared = T.alloc_shared((block_S, block_DV), dtype=gate_dtype)
+            G_fragment = T.alloc_fragment((block_S, block_DV), dtype=gate_dtype)
 
             T.annotate_layout({
-                K_shared: tilelang.layout.make_swizzled_layout(K_shared),
-                V_shared: tilelang.layout.make_swizzled_layout(V_shared),
-                A_shared: tilelang.layout.make_swizzled_layout(A_shared),
-                W_shared: tilelang.layout.make_swizzled_layout(W_shared),
+                b_h_shared: tilelang.layout.make_swizzled_layout(b_h_shared),
                 U_shared: tilelang.layout.make_swizzled_layout(U_shared),
-                W_Beta_shared: tilelang.layout.make_swizzled_layout(W_Beta_shared),
-                U_Beta_shared: tilelang.layout.make_swizzled_layout(U_Beta_shared),
+                W_shared: tilelang.layout.make_swizzled_layout(W_shared),
+                V_new_shared: tilelang.layout.make_swizzled_layout(V_new_shared),
+                K_shared: tilelang.layout.make_swizzled_layout(K_shared),
+                G_shared: tilelang.layout.make_swizzled_layout(G_shared),
             })
 
-            T.disable_warp_group_reg_alloc()
-            for i_s in T.Parallel(block_S):
-                Beta_shared[i_s] = Beta[bb, bs * block_S + i_s, bh]
-                G_shared[i_s] = T.exp(G[bb, bs * block_S + i_s, bh])
+            T.use_swizzle(10)
 
-            T.copy(A[bb, bs * block_S:(bs + 1) * block_S, bh, :], A_shared)
+            # if use_initial_state:
+            #     T.copy(initial_state[bb, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV], b_h_shared)
+            #     T.copy(b_h_shared, b_h_fragment)
+            # else:
+            T.clear(b_h_fragment)
+            T.copy(b_h_fragment, b_h_shared)
 
-            for i_v in T.Pipelined(T.ceildiv(DV, block_DV), num_stages=num_stages):
-                T.copy(
-                    V[bb, bs * block_S:(bs + 1) * block_S, bh, i_v * block_DV:(i_v + 1) * block_DV],
-                    V_shared)
-                for i_s, i_v2 in T.Parallel(block_S, block_DV):
-                    U_Beta_shared[i_s, i_v2] = V_shared[i_s, i_v2] * Beta_shared[i_s]
-                T.gemm(A_shared, U_Beta_shared, U_fragment, clear_accum=True)
-                # First copy to smem, then copy to gmem to reduce U2RU instructions
-                T.copy(U_fragment, U_shared)
-                T.copy(
-                    U_shared, U[bb, bs * block_S:(bs + 1) * block_S, bh,
-                                i_v * block_DV:(i_v + 1) * block_DV])
+            for i_s in T.Pipelined(T.ceildiv(S, block_S), num_stages=num_stages):
+                # Store previous result to the hidden tensor, like the epilogue
+                T.copy(b_h_shared, h[bb, i_s, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
 
-            for i_k in T.Pipelined(T.ceildiv(DK, block_DK), num_stages=num_stages):
+                # Recurrence
+                T.copy(W[bb, i_s * block_S:(i_s + 1) * block_S, bh, 0:DK], W_shared)
+                T.gemm(W_shared, b_h_shared, V_new_fragment, clear_accum=True)
+
+                # U - W * S
                 T.copy(
-                    K[bb, bs * block_S:(bs + 1) * block_S, bh, i_k * block_DK:(i_k + 1) * block_DK],
-                    K_shared)
-                for i_s, i_k2 in T.Parallel(block_S, block_DK):
-                    W_Beta_shared[i_s,
-                                  i_k2] = K_shared[i_s, i_k2] * Beta_shared[i_s] * G_shared[i_s]
-                T.gemm(A_shared, W_Beta_shared, W_fragment, clear_accum=True)
-                # First copy to smem, then copy to gmem to reduce U2RU instructions
-                T.copy(W_fragment, W_shared)
-                T.copy(
-                    W_shared, W[bb, bs * block_S:(bs + 1) * block_S, bh,
-                                i_k * block_DK:(i_k + 1) * block_DK])
+                    U[bb, i_s * block_S:(i_s + 1) * block_S, bh, bv * block_DV:(bv + 1) * block_DV],
+                    U_shared)
+                T.copy(U_shared, U_fragment)
+                for i_s2, i_v in T.Parallel(block_S, block_DV):
+                    V_new_fragment[i_s2, i_v] = -V_new_fragment[i_s2, i_v] + U_fragment[i_s2, i_v]
+
+                # Save V_new
+                if save_new_value:
+                    T.copy(V_new_fragment, dst=V_new_shared)
+                    T.copy(
+                        V_new_shared, V_new[bb, i_s * block_S:(i_s + 1) * block_S, bh,
+                                            bv * block_DV:(bv + 1) * block_DV])
+
+                T.copy(K[bb, i_s * block_S:(i_s + 1) * block_S, bh, 0:DK], K_shared)
+                # use_g
+                if use_g:
+                    G_last_local[0] = G[bb, (i_s + 1) * block_S - 1, bh]
+                    for i_s2, i_v in T.Parallel(block_S, block_DV):
+                        G_shared[i_s2, i_v] = G[bb, i_s * block_S + i_s2, bh]
+                    T.copy(G_shared, G_fragment)
+                    for i_s2, i_v in T.Parallel(block_S, block_DV):
+                        with T.If(G_last_local[0] - G_fragment[i_s2, i_v] <= 0):
+                            with T.Then():
+                                V_new_fragment[i_s2, i_v] = V_new_fragment[i_s2, i_v] * T.exp(
+                                    G_last_local[0] - G_fragment[i_s2, i_v])
+                            with T.Else():
+                                V_new_fragment[i_s2, i_v] = 0
+                    G_last_local[0] = T.exp(G_last_local[0])
+                    for i_k, i_v in T.Parallel(DK, block_DV):
+                        b_h_fragment[i_k, i_v] *= G_last_local[0]
+
+                # Update intermediate results
+                T.copy(V_new_fragment, V_new_shared)
+                T.gemm(K_shared, V_new_shared, b_h_fragment, transpose_A=True)
+
+                T.copy(b_h_fragment, b_h_shared)
+
+            # Save final state
+            if store_final_state:
+                T.copy(b_h_fragment, final_state[bb, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
 
     return kernel
+
+
+def do_bench(fn, *args, warmup=10, rep=10, **kwargs):
+    """
+    Do benchmark for a function.
+    """
+    start_event = [torch.cuda.Event(enable_timing=True) for i in range(rep)]
+    end_event = [torch.cuda.Event(enable_timing=True) for i in range(rep)]
+    for _ in range(warmup):
+        fn(*args, **kwargs)
+
+    torch.cuda.synchronize()
+    for i in range(rep):
+        start_event[i].record()
+        fn(*args, **kwargs)
+        end_event[i].record()
+    torch.cuda.synchronize()
+
+    # Record clocks
+    times = torch.tensor(
+        [s.elapsed_time(e) for s, e in zip(start_event, end_event)],
+        dtype=torch.float,
+    )
+
+    return times.mean().item()
 
 
 def run_test(
@@ -164,79 +248,97 @@ def run_test(
     H,
     DK,
     DV,
-    chunk_size,
     input_dtype,
     output_dtype,
-    gate_dtype,
     accum_dtype,
-    block_DK,
-    block_DV,
-    threads,
-    num_stages,
+    gate_dtype,
+    state_dtype,
+    chunk_size,
+    use_g=True,
+    use_initial_state=False,
+    store_final_state=True,
+    save_new_value=True,
+    block_DK=64,
+    block_DV=32,
+    threads=128,
+    num_stages=0,
 ):
-    K, V, Beta, G, A = prepare_input(
-        B,
-        S,
-        H,
-        DK,
-        DV,
-        chunk_size,
-        getattr(torch, input_dtype),
-        getattr(torch, output_dtype),
-        gate_dtype=getattr(torch, gate_dtype))
-    W_ref, U_ref = prepare_output(B, S, H, DK, DV, getattr(torch, output_dtype))
-    W_tilelang, U_tilelang = prepare_output(B, S, H, DK, DV, getattr(torch, output_dtype))
+    K, W, U, G, initial_state = prepare_input(B, S, H, DK, DV, chunk_size,
+                                              getattr(torch, input_dtype),
+                                              getattr(torch, output_dtype),
+                                              getattr(torch, accum_dtype),
+                                              getattr(torch, gate_dtype))
+    h_ref, final_state_ref, V_new_ref = prepare_output(B, S, H, DK, DV, chunk_size,
+                                                       getattr(torch, output_dtype),
+                                                       getattr(torch, state_dtype))
+    h_tilelang, final_state_tilelang, V_new_tilelang = prepare_output(B, S, H, DK, DV, chunk_size,
+                                                                      getattr(torch, output_dtype),
+                                                                      getattr(torch, state_dtype))
 
-    # reference
-    for _ in range(10):
-        W_ref, U_ref = recompute_w_u_fwd(K, V, Beta, G, A, None)
-    import time
-    torch.cuda.synchronize()
-    start_time = time.time()
-    for _ in range(10):
-        W_ref, U_ref = recompute_w_u_fwd(K, V, Beta, G, A, None)
-    torch.cuda.synchronize()
-    end_time = time.time()
-    print(f"Reference time: {end_time - start_time} seconds")
+    # fla ref
+    h_ref, V_new_ref, final_state_ref = chunk_gated_delta_rule_fwd_h(K, W, U, G, None,
+                                                                     store_final_state, chunk_size,
+                                                                     save_new_value)
 
     # tilelang
-    block_S = chunk_size
-    kernel = tilelang_recompute_w_u_fwd(
-        B,
-        S,
-        H,
-        DK,
-        DV,
-        input_dtype,
-        output_dtype,
-        gate_dtype,
-        accum_dtype,
-        chunk_size,
-        block_S=block_S)
-    # print(kernel.get_kernel_source())
-    W_tilelang, U_tilelang = kernel(K, V, Beta, G, A)
+    kernel = tilelang_chunk_gated_delta_rule_fwd_h(B, S, H, DK, DV, input_dtype, output_dtype,
+                                                   accum_dtype, gate_dtype, state_dtype, chunk_size,
+                                                   use_g, store_final_state,
+                                                   save_new_value, block_DK, block_DV, threads,
+                                                   num_stages)
+    h_tilelang, final_state_tilelang, V_new_tilelang = kernel(K, W, U, G)
+    # (zhengju) If you want to print the generated cuda code, you can uncomment the following line
+    # print("CUDA Code:\n", kernel.get_kernel_source())
 
-    for _ in range(10):
-        W_tilelang, U_tilelang = kernel(K, V, Beta, G, A)
-    torch.cuda.synchronize()
-    start_time = time.time()
-    for _ in range(10):
-        W_tilelang, U_tilelang = kernel(K, V, Beta, G, A)
-    torch.cuda.synchronize()
-    end_time = time.time()
-    print(f"Tilelang time: {end_time - start_time} seconds")
+    fla_time = do_bench(chunk_gated_delta_rule_fwd_h, K, W, U, G, None, store_final_state,
+                        chunk_size, save_new_value)
+    tilelang_time = do_bench(kernel, K, W, U, G)
+
+    # check correctness
     try:
-        torch.testing.assert_close(W_tilelang, W_ref, rtol=1e-2, atol=1e-2)
-        print("tilelang recompute w passed √")
+        h_ref_fp32 = h_ref.to(torch.float32)
+        h_tilelang_fp32 = h_tilelang.to(torch.float32)
+        assert_similar(
+            h_ref_fp32,
+            h_tilelang_fp32,
+            eps=1e-5,
+            name="tilelang chunk gated delta rule fwd h",
+            raise_assert=False)
+        print("tilelang chunk gated delta rule fwd h passed √")
     except Exception as e:
-        print("tilelang recompute w failed ✗")
+        print("tilelang chunk gated delta rule fwd h failed ✗")
         print(e)
+
     try:
-        torch.testing.assert_close(U_tilelang, U_ref, rtol=1e-2, atol=1e-2)
-        print("tilelang recompute u passed √")
+        final_state_ref_fp32 = final_state_ref.to(torch.float32)
+        final_state_tilelang_fp32 = final_state_tilelang.to(torch.float32)
+        assert_similar(
+            final_state_ref_fp32,
+            final_state_tilelang_fp32,
+            eps=1e-5,
+            name="tilelang chunk gated delta rule fwd final_state",
+            raise_assert=False)
+        print("tilelang chunk gated delta rule fwd final_state passed √")
     except Exception as e:
-        print("tilelang recompute u failed ✗")
+        print("tilelang chunk gated delta rule fwd final_state failed ✗")
         print(e)
+
+    try:
+        V_new_ref_fp32 = V_new_ref.to(torch.float32)
+        V_new_tilelang_fp32 = V_new_tilelang.to(torch.float32)
+        assert_similar(
+            V_new_ref_fp32,
+            V_new_tilelang_fp32,
+            eps=1e-5,
+            name="tilelang chunk gated delta rule fwd V_new",
+            raise_assert=False)
+        print("tilelang chunk gated delta rule fwd V_new passed √")
+    except Exception as e:
+        print("tilelang chunk gated delta rule fwd V_new failed ✗")
+        print(e)
+
+    print(f"tilelang time: {tilelang_time} ms")
+    print(f"fla time: {fla_time} ms")
 
 
 def main():
@@ -244,17 +346,23 @@ def main():
         B=1,
         S=32768,
         H=12,
-        DK=96,
+        DK=128,
         DV=256,
-        chunk_size=64,
         input_dtype="bfloat16",
         output_dtype="bfloat16",
-        gate_dtype="float32",
         accum_dtype="float32",
+        gate_dtype="float32",
+        state_dtype="float32",
+        chunk_size=64,
+        use_g=True,
+        use_initial_state=False,
+        store_final_state=True,
+        save_new_value=True,
         block_DK=64,
         block_DV=32,
         threads=128,
-        num_stages=3)
+        num_stages=1,
+    )
 
 
 if __name__ == "__main__":
