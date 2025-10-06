@@ -146,15 +146,19 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
         with T.Kernel(T.ceildiv(DV, block_DV), B * H, threads=threads) as (bv, bbh):
             bb, bh = bbh // H, bbh % H
 
-            b_h_shared = T.alloc_shared((DK, block_DV), dtype=input_dtype)
-            b_h_fragment = T.alloc_fragment((DK, block_DV), dtype=accum_dtype)
+            # b_h_shared = T.alloc_shared((DK, block_DV), dtype=input_dtype)
+            # b_h_fragment = T.alloc_fragment((DK, block_DV), dtype=accum_dtype)
+            b_h_shared = T.alloc_shared((block_DK, block_DV), dtype=input_dtype)
+            b_h_fragment = T.alloc_fragment((block_DK, block_DV), dtype=accum_dtype)
 
             U_shared = T.alloc_shared((block_S, block_DV), dtype=input_dtype)
             U_fragment = T.alloc_fragment((block_S, block_DV), dtype=accum_dtype)
-            W_shared = T.alloc_shared((block_S, DK), dtype=input_dtype)
+            # W_shared = T.alloc_shared((block_S, DK), dtype=input_dtype)
+            W_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
             V_new_fragment = T.alloc_fragment((block_S, block_DV), dtype=accum_dtype)
             V_new_shared = T.alloc_shared((block_S, block_DV), dtype=output_dtype)
-            K_shared = T.alloc_shared((block_S, DK), dtype=input_dtype)
+            # K_shared = T.alloc_shared((block_S, DK), dtype=input_dtype)
+            K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
             G_last_local = T.alloc_local((1), dtype=gate_dtype)
             G_shared = T.alloc_shared((block_S, block_DV), dtype=gate_dtype)
             G_fragment = T.alloc_fragment((block_S, block_DV), dtype=gate_dtype)
@@ -179,10 +183,14 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
 
             for i_s in T.Pipelined(T.ceildiv(S, block_S), num_stages=num_stages):
                 # Store previous result to the hidden tensor, like the epilogue
-                T.copy(b_h_shared, h[bb, i_s, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
+                # T.copy(b_h_shared, h[bb, i_s, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
+                for i, j in T.Parallel(DK, block_DV):
+                    h[bb, i_s, bh, i, bv * block_DV + j] = b_h_shared[i, j]
 
                 # Recurrence
-                T.copy(W[bb, i_s * block_S:(i_s + 1) * block_S, bh, 0:DK], W_shared)
+                # T.copy(W[bb, i_s * block_S:(i_s + 1) * block_S, bh, 0:DK], W_shared)
+                for i, j in T.Parallel(block_S, DK):
+                    W_shared[i, j] = W[bb, i_s * block_S + i, bh, j]
                 T.gemm(W_shared, b_h_shared, V_new_fragment, clear_accum=True)
 
                 # U - W * S
@@ -226,7 +234,9 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
 
             # Save final state
             if store_final_state:
-                T.copy(b_h_fragment, final_state[bb, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
+                # T.copy(b_h_fragment, final_state[bb, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
+                for i, j in T.Parallel(DK, block_DV):
+                    b_h_fragment[i, j] = final_state[bb, bh, i, bv * block_DV + j]
 
     return kernel
 
