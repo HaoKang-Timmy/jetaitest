@@ -95,7 +95,7 @@ def get_configs():
         'num_stages': c[3]
     } for c in _configs]
     return configs
-@autotune(configs=get_configs(), warmup=10, rep=10)
+# @autotune(configs=get_configs(), warmup=10, rep=10)
 @tilelang.jit(out_idx=[-3, -2, -1])
 def tilelang_chunk_gated_delta_rule_fwd_h(
     # task config
@@ -131,7 +131,7 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
     h_shape = (B, BS, H, DK, DV)
     initial_state_shape = (B, H, DK, DV)
     final_state_shape = (B, H, DK, DV)
-
+    assert block_DK >= DK
     @T.prim_func
     def kernel(
             K: T.Tensor(K_shape, dtype=input_dtype),
@@ -173,7 +173,7 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
             })
 
             T.use_swizzle(10)
-
+            T.disable_warp_group_reg_alloc()
             # if use_initial_state:
             #     T.copy(initial_state[bb, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV], b_h_shared)
             #     T.copy(b_h_shared, b_h_fragment)
@@ -183,9 +183,9 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
 
             for i_s in T.Pipelined(T.ceildiv(S, block_S), num_stages=num_stages):
                 # Store previous result to the hidden tensor, like the epilogue
-                # T.copy(b_h_shared, h[bb, i_s, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
-                for i, j in T.Parallel(DK, block_DV):
-                    h[bb, i_s, bh, i, bv * block_DV + j] = b_h_shared[i, j]
+                T.copy(b_h_shared[0:DK, 0:block_DV], h[bb, i_s, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
+                # for i, j in T.Parallel(DK, block_DV):
+                #     h[bb, i_s, bh, i, bv * block_DV + j] = b_h_shared[i, j]
 
                 # Recurrence
                 # T.copy(W[bb, i_s * block_S:(i_s + 1) * block_S, bh, 0:DK], W_shared)
@@ -208,7 +208,9 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
                         V_new_shared, V_new[bb, i_s * block_S:(i_s + 1) * block_S, bh,
                                             bv * block_DV:(bv + 1) * block_DV])
 
-                T.copy(K[bb, i_s * block_S:(i_s + 1) * block_S, bh, 0:DK], K_shared)
+                # T.copy(K[bb, i_s * block_S:(i_s + 1) * block_S, bh, 0:DK], K_shared[0:block_S, 0:DK])
+                for i, j in T.Parallel(block_S, DK):
+                    K_shared[i, j] = K[bb, i_s * block_S + i, bh, j]
                 # use_g
                 if use_g:
                     G_last_local[0] = G[bb, (i_s + 1) * block_S - 1, bh]
@@ -234,9 +236,9 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
 
             # Save final state
             if store_final_state:
-                # T.copy(b_h_fragment, final_state[bb, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
-                for i, j in T.Parallel(DK, block_DV):
-                    b_h_fragment[i, j] = final_state[bb, bh, i, bv * block_DV + j]
+                T.copy(b_h_fragment[0:DK, 0:block_DV], final_state[bb, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
+                # for i, j in T.Parallel(DK, block_DV):
+                #     b_h_fragment[i, j] = final_state[bb, bh, i, bv * block_DV + j]
 
     return kernel
 
@@ -309,7 +311,7 @@ def run_test(
     kernel = tilelang_chunk_gated_delta_rule_fwd_h(B, S, H, DK, DV, input_dtype, output_dtype,
                                                    accum_dtype, gate_dtype, state_dtype, chunk_size,
                                                    use_g, store_final_state,
-                                                   save_new_value)
+                                                   save_new_value, 128, 32, 128, 1)
     h_tilelang, final_state_tilelang, V_new_tilelang = kernel(K, W, U, G)
     # (zhengju) If you want to print the generated cuda code, you can uncomment the following line
     # print("CUDA Code:\n", kernel.get_kernel_source())
@@ -370,7 +372,7 @@ def main():
         B=1,
         S=32768,
         H=12,
-        DK=128,
+        DK=96,
         DV=256,
         input_dtype="bfloat16",
         output_dtype="bfloat16",
