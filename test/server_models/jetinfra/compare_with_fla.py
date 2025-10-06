@@ -85,7 +85,7 @@ def prepare_output(
 def get_configs():
     block_DK = [128]
     block_DV = [32, 64, 128]
-    threads = [128]
+    threads = [128, 256]
     num_stages = [1, 2, 3, 4]
     _configs = list(itertools.product(block_DK, block_DV, threads, num_stages))
     configs = [{
@@ -311,7 +311,7 @@ def run_test(
     kernel = tilelang_chunk_gated_delta_rule_fwd_h(B, S, H, DK, DV, input_dtype, output_dtype,
                                                    accum_dtype, gate_dtype, state_dtype, chunk_size,
                                                    use_g, store_final_state,
-                                                   save_new_value, 128, 32, 128, 1)
+                                                   save_new_value, 128, 32, 128 , 1)
     h_tilelang, final_state_tilelang, V_new_tilelang = kernel(K, W, U, G)
     # (zhengju) If you want to print the generated cuda code, you can uncomment the following line
     # print("CUDA Code:\n", kernel.get_kernel_source())
