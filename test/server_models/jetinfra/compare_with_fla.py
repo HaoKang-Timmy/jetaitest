@@ -95,7 +95,7 @@ def get_configs():
         'num_stages': c[3]
     } for c in _configs]
     return configs
-# @autotune(configs=get_configs(), warmup=10, rep=10)
+@autotune(configs=get_configs(), warmup=10, rep=10)
 @tilelang.jit(out_idx=[-3, -2, -1])
 def tilelang_chunk_gated_delta_rule_fwd_h(
     # task config
