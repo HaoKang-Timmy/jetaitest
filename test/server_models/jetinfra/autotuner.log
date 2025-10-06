@@ -1,5 +1,652 @@
-2025-10-06 02:08:26,692 INFO:Auto-tuning with 0.9 CPU utilizations, 240 CPUs available, 216 CPUs will be used
-2025-10-06 02:08:40,883 DEBUG:Compilation failed for config {'block_DK': 128, 'block_DV': 128, 'threads': 128, 'num_stages': 3} at index 8 with error: Initialization failed: Failed to set the allowed dynamic shared memory size to 294912 with error: invalid argument
+2025-10-06 00:27:46,918 INFO:Auto-tuning with 0.9 CPU utilizations, 8 CPUs available, 7 CPUs will be used
+2025-10-06 00:28:32,714 DEBUG:Compilation failed for config {'block_DK': 128, 'block_DV': 64, 'threads': 128, 'num_stages': 4} at index 7 with error: Initialization failed: Failed to set the allowed dynamic shared memory size to 253952 with error: invalid argument
+#include <tl_templates/cuda/gemm.h>
+#include <tl_templates/cuda/copy.h>
+#include <tl_templates/cuda/reduce.h>
+#include <tl_templates/cuda/ldsm.h>
+#include <tl_templates/cuda/threadblock_swizzle.h>
+#include <tl_templates/cuda/debug.h>
+#ifdef ENABLE_BF16
+#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>
+#endif
+
+extern "C" __global__ void kernel_kernel(float* __restrict__ G, __grid_constant__ const CUtensorMap K_desc, __grid_constant__ const CUtensorMap U_desc, __grid_constant__ const CUtensorMap V_new_desc, __grid_constant__ const CUtensorMap W_desc, float* __restrict__ final_state, __grid_constant__ const CUtensorMap h_desc);
+extern "C" __global__ void __launch_bounds__(256, 1) kernel_kernel(float* __restrict__ G, __grid_constant__ const CUtensorMap K_desc, __grid_constant__ const CUtensorMap U_desc, __grid_constant__ const CUtensorMap V_new_desc, __grid_constant__ const CUtensorMap W_desc, float* __restrict__ final_state, __grid_constant__ const CUtensorMap h_desc) {
+  extern __shared__ __align__(1024) uchar buf_dyn_shmem[];
+  float b_h_fragment[64];
+  float V_new_fragment[32];
+  float U_fragment[32];
+  float G_last_local[1];
+  float G_fragment[32];
+  __shared__ uint64_t mbarrier_mem[24];
+  auto mbarrier = reinterpret_cast<Barrier*>(mbarrier_mem);
+  if (tl::tl_shuffle_elect<0>()) {
+    tl::prefetch_tma_descriptor(W_desc);
+    tl::prefetch_tma_descriptor(U_desc);
+    tl::prefetch_tma_descriptor(K_desc);
+    tl::prefetch_tma_descriptor(h_desc);
+    tl::prefetch_tma_descriptor(V_new_desc);
+    mbarrier[0].init(128);
+    mbarrier[1].init(128);
+    mbarrier[2].init(128);
+    mbarrier[3].init(128);
+    mbarrier[4].init(128);
+    mbarrier[5].init(128);
+    mbarrier[6].init(128);
+    mbarrier[7].init(128);
+    mbarrier[8].init(128);
+    mbarrier[9].init(128);
+    mbarrier[10].init(128);
+    mbarrier[11].init(128);
+    mbarrier[12].init(128);
+    mbarrier[13].init(128);
+    mbarrier[14].init(128);
+    mbarrier[15].init(128);
+    mbarrier[16].init(128);
+    mbarrier[17].init(128);
+    mbarrier[18].init(128);
+    mbarrier[19].init(128);
+    mbarrier[20].init(128);
+    mbarrier[21].init(128);
+    mbarrier[22].init(128);
+    mbarrier[23].init(128);
+  }
+  __syncthreads();
+  if (128 <= ((int)threadIdx.x)) {
+    tl::warpgroup_reg_dealloc<24>();
+    const dim3 blockIdx = tl::rasterization2DRow<10>();
+    for (int i_s = 0; i_s < 512; ++i_s) {
+      mbarrier[((i_s & 3) + 12)].wait((((i_s & 7) >> 2) ^ 1));
+      if (tl::tl_shuffle_elect<128>()) {
+        mbarrier[(i_s & 3)].expect_transaction(16384);
+        tl::tma_load(W_desc, mbarrier[(i_s & 3)], (&(((bfloat16_t*)buf_dyn_shmem)[((i_s & 3) * 8192)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
+        tl::tma_load(W_desc, mbarrier[(i_s & 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 3) * 8192) + 4096)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
+      }
+      mbarrier[(i_s & 3)].arrive();
+      mbarrier[((i_s & 3) + 16)].wait((((i_s & 7) >> 2) ^ 1));
+      if (tl::tl_shuffle_elect<128>()) {
+        mbarrier[((i_s & 3) + 4)].expect_transaction(8192);
+        tl::tma_load(U_desc, mbarrier[((i_s & 3) + 4)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 3) * 4096) + 98304)])), (((int)blockIdx.x) * 64), ((int)blockIdx.y), (i_s * 64), 0);
+      }
+      mbarrier[((i_s & 3) + 4)].arrive();
+      mbarrier[((i_s & 3) + 20)].wait((((i_s & 7) >> 2) ^ 1));
+      if (tl::tl_shuffle_elect<128>()) {
+        mbarrier[((i_s & 3) + 8)].expect_transaction(16384);
+        tl::tma_load(K_desc, mbarrier[((i_s & 3) + 8)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 3) * 8192) + 65536)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
+        tl::tma_load(K_desc, mbarrier[((i_s & 3) + 8)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 3) * 8192) + 69632)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
+      }
+      #pragma unroll
+      for (int i = 0; i < 32; ++i) {
+        ((float*)buf_dyn_shmem)[((((((((((i_s & 3) * 4096) + (((((int)threadIdx.x) & 63) >> 5) * 2048)) + (i * 64)) + ((((int)threadIdx.x) >> 6) * 32)) + (((((((int)threadIdx.x) & 31) >> 4) + ((i & 3) >> 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + (i & 1)) & 1) * 8)) + ((((((int)threadIdx.x) >> 6) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 4)) + (((int)threadIdx.x) & 3)) + 16320)] = G[(((((i_s * 768) + (i * 24)) + ((((int)threadIdx.x) >> 6) * 12)) + ((int)blockIdx.y)) - 24)];
+      }
+      tl::fence_proxy_async();
+      tl::mbarrier_cp_async_arrive(mbarrier[((i_s & 3) + 8)]);
+      mbarrier[((i_s & 3) + 8)].arrive();
+    }
+  } else {
+    tl::warpgroup_reg_alloc<240>();
+    const dim3 blockIdx = tl::rasterization2DRow<10>();
+    #pragma unroll
+    for (int i_1 = 0; i_1 < 32; ++i_1) {
+      *(float2*)(b_h_fragment + (i_1 * 2)) = make_float2(0x0p+0f/*0.000000e+00*/, 0x0p+0f/*0.000000e+00*/);
+    }
+    #pragma unroll
+    for (int i_2 = 0; i_2 < 8; ++i_2) {
+      tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((i_2 >> 2) * 4096) + ((((int)threadIdx.x) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_2 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_2 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 114688)])), __pack_half2(((bfloat16_t)b_h_fragment[(i_2 * 8)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 1)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 2)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 3)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 4)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 5)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 6)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 7)])));
+    }
+    for (int i_s_1 = 0; i_s_1 < 512; ++i_s_1) {
+      tl::__sync_thread_partial<3, 128>();
+      if (tl::tl_shuffle_elect<128>()) {
+        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[114688])), (((int)blockIdx.x) * 64), 0, ((int)blockIdx.y), i_s_1, 0);
+        tl::tma_store_arrive();
+        tl::tma_store_wait<0>();
+      }
+      mbarrier[(i_s_1 & 3)].wait(((i_s_1 & 7) >> 2));
+      tl::gemm_ss<64, 64, 128, 4, 1, 0, 0, 1, 128, 64, 0, 0, true>((&(((bfloat16_t*)buf_dyn_shmem)[((i_s_1 & 3) * 8192)])), (&(((bfloat16_t*)buf_dyn_shmem)[114688])), (&(V_new_fragment[0])));
+      mbarrier[((i_s_1 & 3) + 12)].arrive();
+      mbarrier[((i_s_1 & 3) + 4)].wait(((i_s_1 & 7) >> 2));
+      #pragma unroll
+      for (int i_3 = 0; i_3 < 16; ++i_3) {
+        float2 __1;
+        uint1 v_ = *(uint1*)(((bfloat16_t*)buf_dyn_shmem) + ((((((((((i_s_1 & 3) * 4096) + ((((int)threadIdx.x) >> 5) * 1024)) + ((i_3 & 1) * 512)) + (((((int)threadIdx.x) & 31) >> 2) * 64)) + (((((((int)threadIdx.x) & 31) >> 4) + (i_3 >> 3)) & 1) * 32)) + ((((((((i_3 & 7) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 4) + ((((int)threadIdx.x) & 15) >> 3)) & 1) * 16)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_3 & 3) >> 1)) & 1) * 8)) + ((((int)threadIdx.x) & 3) * 2)) + 98304));
+#ifdef ENABLE_BF16
+        reinterpret_cast<float2 &>(__1) = fastertransformer::bf1622float2(reinterpret_cast<__nv_bfloat162 const &>(v_));
+#else
+        __1.x = (float)(((nv_bfloat162*)(&(v_.x)))->x);
+        __1.y = (float)(((nv_bfloat162*)(&(v_.x)))->y);
+#endif
+        *(float2*)(U_fragment + (i_3 * 2)) = __1;
+      }
+      tl::fence_proxy_async();
+      mbarrier[((i_s_1 & 3) + 16)].arrive();
+      #pragma unroll
+      for (int i_4 = 0; i_4 < 32; ++i_4) {
+        V_new_fragment[i_4] = ((V_new_fragment[i_4] * -0x1p+0f/*-1.000000e+00*/) + U_fragment[i_4]);
+      }
+      tl::__sync_thread_partial<3, 128>();
+      #pragma unroll
+      for (int i_5 = 0; i_5 < 4; ++i_5) {
+        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((int)threadIdx.x) >> 5) * 1024) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + (i_5 >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_5 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 122880)])), __pack_half2(((bfloat16_t)V_new_fragment[(i_5 * 8)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 1)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 2)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 3)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 4)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 5)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 6)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 7)])));
+      }
+      tl::fence_proxy_async();
+      tl::__sync_thread_partial<3, 128>();
+      if (tl::tl_shuffle_elect<128>()) {
+        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[122880])), (((int)blockIdx.x) * 64), ((int)blockIdx.y), (i_s_1 * 64), 0);
+        tl::tma_store_arrive();
+        tl::tma_store_wait<0>();
+      }
+      G_last_local[0] = G[(((i_s_1 * 768) + ((int)blockIdx.y)) + 756)];
+      tl::fence_proxy_async();
+      mbarrier[((i_s_1 & 3) + 8)].wait(((i_s_1 & 7) >> 2));
+      #pragma unroll
+      for (int i_6 = 0; i_6 < 16; ++i_6) {
+        *(float2*)(G_fragment + (i_6 * 2)) = *(float2*)(((float*)buf_dyn_shmem) + (((((((((((i_s_1 & 3) * 4096) + ((i_6 >> 3) * 2048)) + ((((int)threadIdx.x) >> 5) * 512)) + ((i_6 & 1) * 256)) + (((((int)threadIdx.x) & 31) >> 2) * 32)) + ((((((((i_6 & 7) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 4) + ((((int)threadIdx.x) & 31) >> 4)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + ((i_6 & 3) >> 1)) & 1) * 8)) + (((((((int)threadIdx.x) & 7) >> 2) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 4)) + ((((int)threadIdx.x) & 1) * 2)) + 16384));
+      }
+      #pragma unroll
+      for (int i_7 = 0; i_7 < 32; ++i_7) {
+        if ((G_last_local[0] - G_fragment[i_7]) <= 0x0p+0f/*0.000000e+00*/) {
+          V_new_fragment[i_7] = (V_new_fragment[i_7] * __expf((G_last_local[0] - G_fragment[i_7])));
+        } else {
+          V_new_fragment[i_7] = 0x0p+0f/*0.000000e+00*/;
+        }
+      }
+      G_last_local[0] = __expf(G_last_local[0]);
+      #pragma unroll
+      for (int i_8 = 0; i_8 < 64; ++i_8) {
+        b_h_fragment[i_8] = (b_h_fragment[i_8] * G_last_local[0]);
+      }
+      tl::__sync_thread_partial<3, 128>();
+      #pragma unroll
+      for (int i_9 = 0; i_9 < 4; ++i_9) {
+        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((int)threadIdx.x) >> 5) * 1024) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + (i_9 >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_9 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 122880)])), __pack_half2(((bfloat16_t)V_new_fragment[(i_9 * 8)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 1)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 2)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 3)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 4)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 5)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 6)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 7)])));
+      }
+      tl::fence_proxy_async();
+      tl::__sync_thread_partial<3, 128>();
+      tl::gemm_ss<128, 64, 64, 4, 1, 1, 0, 0, 128, 64, 0, 0, true>((&(((bfloat16_t*)buf_dyn_shmem)[(((i_s_1 & 3) * 8192) + 65536)])), (&(((bfloat16_t*)buf_dyn_shmem)[122880])), (&(b_h_fragment[0])));
+      mbarrier[((i_s_1 & 3) + 20)].arrive();
+      tl::__sync_thread_partial<3, 128>();
+      #pragma unroll
+      for (int i_10 = 0; i_10 < 8; ++i_10) {
+        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((i_10 >> 2) * 4096) + ((((int)threadIdx.x) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_10 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_10 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 114688)])), __pack_half2(((bfloat16_t)b_h_fragment[(i_10 * 8)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 1)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 2)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 3)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 4)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 5)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 6)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 7)])));
+      }
+    }
+    #pragma unroll
+    for (int i_11 = 0; i_11 < 32; ++i_11) {
+      *(float2*)(final_state + ((((((((((int)blockIdx.y) * 32768) + ((i_11 >> 4) * 16384)) + ((((int)threadIdx.x) >> 5) * 4096)) + ((i_11 & 1) * 2048)) + (((((int)threadIdx.x) & 31) >> 2) * 256)) + (((int)blockIdx.x) * 64)) + (((i_11 & 15) >> 1) * 8)) + ((((int)threadIdx.x) & 3) * 2))) = *(float2*)(b_h_fragment + (i_11 * 2));
+    }
+  }
+}
+
+
+#define ERROR_BUF_SIZE 1024
+static char error_buf[ERROR_BUF_SIZE];
+
+extern "C" const char* get_last_error() {
+    return error_buf;
+}
+
+extern "C" int init() {
+    error_buf[0] = '\0';
+    
+    cudaError_t result_kernel_kernel = cudaFuncSetAttribute(kernel_kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 253952);
+    if (result_kernel_kernel != CUDA_SUCCESS) {
+        snprintf(error_buf, ERROR_BUF_SIZE, "Failed to set the allowed dynamic shared memory size to %d with error: %s", 253952, cudaGetErrorString(result_kernel_kernel));
+        return -1;
+    }
+
+    return 0;
+}
+
+extern "C" int call(bfloat16_t* __restrict__ K, bfloat16_t* __restrict__ W, bfloat16_t* __restrict__ U, float* __restrict__ G, bfloat16_t* __restrict__ h, float* __restrict__ final_state, bfloat16_t* __restrict__ V_new, cudaStream_t stream=cudaStreamDefault) {
+
+	CUtensorMap K_desc;
+	CUtensorMapDataType K_desc_type= (CUtensorMapDataType)9;
+	cuuint32_t K_desc_tensorRank= 4;
+	void *K_desc_globalAddress= K;
+	cuuint64_t K_desc_globalDim[4]= {128,12,32768,1};
+	cuuint64_t K_desc_globalStride[4]= {2,256,3072,100663296};
+	cuuint32_t K_desc_boxDim[4]= {64,1,64,1};
+	cuuint32_t K_desc_elementStrides[4]= {1,1,1,1};
+	CUtensorMapInterleave K_desc_interleave= (CUtensorMapInterleave)0;
+	CUtensorMapSwizzle K_desc_swizzle= (CUtensorMapSwizzle)3;
+	CUtensorMapL2promotion K_desc_l2Promotion= (CUtensorMapL2promotion)2;
+	CUtensorMapFloatOOBfill K_desc_oobFill= (CUtensorMapFloatOOBfill)0;
+
+	CUresult K_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
+    &K_desc, K_desc_type, K_desc_tensorRank, K_desc_globalAddress, K_desc_globalDim, K_desc_globalStride + 1, K_desc_boxDim, K_desc_elementStrides, K_desc_interleave, K_desc_swizzle, K_desc_l2Promotion, K_desc_oobFill);
+
+	if (K_desc_result != CUDA_SUCCESS) {
+		std::stringstream ss;
+		ss << "Error: Failed to initialize the TMA descriptor K_desc";
+		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
+		return -1;
+	}
+
+	CUtensorMap U_desc;
+	CUtensorMapDataType U_desc_type= (CUtensorMapDataType)9;
+	cuuint32_t U_desc_tensorRank= 4;
+	void *U_desc_globalAddress= U;
+	cuuint64_t U_desc_globalDim[4]= {256,12,32768,1};
+	cuuint64_t U_desc_globalStride[4]= {2,512,6144,201326592};
+	cuuint32_t U_desc_boxDim[4]= {64,1,64,1};
+	cuuint32_t U_desc_elementStrides[4]= {1,1,1,1};
+	CUtensorMapInterleave U_desc_interleave= (CUtensorMapInterleave)0;
+	CUtensorMapSwizzle U_desc_swizzle= (CUtensorMapSwizzle)3;
+	CUtensorMapL2promotion U_desc_l2Promotion= (CUtensorMapL2promotion)2;
+	CUtensorMapFloatOOBfill U_desc_oobFill= (CUtensorMapFloatOOBfill)0;
+
+	CUresult U_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
+    &U_desc, U_desc_type, U_desc_tensorRank, U_desc_globalAddress, U_desc_globalDim, U_desc_globalStride + 1, U_desc_boxDim, U_desc_elementStrides, U_desc_interleave, U_desc_swizzle, U_desc_l2Promotion, U_desc_oobFill);
+
+	if (U_desc_result != CUDA_SUCCESS) {
+		std::stringstream ss;
+		ss << "Error: Failed to initialize the TMA descriptor U_desc";
+		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
+		return -1;
+	}
+
+	CUtensorMap V_new_desc;
+	CUtensorMapDataType V_new_desc_type= (CUtensorMapDataType)9;
+	cuuint32_t V_new_desc_tensorRank= 4;
+	void *V_new_desc_globalAddress= V_new;
+	cuuint64_t V_new_desc_globalDim[4]= {256,12,32768,1};
+	cuuint64_t V_new_desc_globalStride[4]= {2,512,6144,201326592};
+	cuuint32_t V_new_desc_boxDim[4]= {64,1,64,1};
+	cuuint32_t V_new_desc_elementStrides[4]= {1,1,1,1};
+	CUtensorMapInterleave V_new_desc_interleave= (CUtensorMapInterleave)0;
+	CUtensorMapSwizzle V_new_desc_swizzle= (CUtensorMapSwizzle)3;
+	CUtensorMapL2promotion V_new_desc_l2Promotion= (CUtensorMapL2promotion)2;
+	CUtensorMapFloatOOBfill V_new_desc_oobFill= (CUtensorMapFloatOOBfill)0;
+
+	CUresult V_new_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
+    &V_new_desc, V_new_desc_type, V_new_desc_tensorRank, V_new_desc_globalAddress, V_new_desc_globalDim, V_new_desc_globalStride + 1, V_new_desc_boxDim, V_new_desc_elementStrides, V_new_desc_interleave, V_new_desc_swizzle, V_new_desc_l2Promotion, V_new_desc_oobFill);
+
+	if (V_new_desc_result != CUDA_SUCCESS) {
+		std::stringstream ss;
+		ss << "Error: Failed to initialize the TMA descriptor V_new_desc";
+		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
+		return -1;
+	}
+
+	CUtensorMap W_desc;
+	CUtensorMapDataType W_desc_type= (CUtensorMapDataType)9;
+	cuuint32_t W_desc_tensorRank= 4;
+	void *W_desc_globalAddress= W;
+	cuuint64_t W_desc_globalDim[4]= {128,12,32768,1};
+	cuuint64_t W_desc_globalStride[4]= {2,256,3072,100663296};
+	cuuint32_t W_desc_boxDim[4]= {64,1,64,1};
+	cuuint32_t W_desc_elementStrides[4]= {1,1,1,1};
+	CUtensorMapInterleave W_desc_interleave= (CUtensorMapInterleave)0;
+	CUtensorMapSwizzle W_desc_swizzle= (CUtensorMapSwizzle)3;
+	CUtensorMapL2promotion W_desc_l2Promotion= (CUtensorMapL2promotion)2;
+	CUtensorMapFloatOOBfill W_desc_oobFill= (CUtensorMapFloatOOBfill)0;
+
+	CUresult W_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
+    &W_desc, W_desc_type, W_desc_tensorRank, W_desc_globalAddress, W_desc_globalDim, W_desc_globalStride + 1, W_desc_boxDim, W_desc_elementStrides, W_desc_interleave, W_desc_swizzle, W_desc_l2Promotion, W_desc_oobFill);
+
+	if (W_desc_result != CUDA_SUCCESS) {
+		std::stringstream ss;
+		ss << "Error: Failed to initialize the TMA descriptor W_desc";
+		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
+		return -1;
+	}
+
+	CUtensorMap h_desc;
+	CUtensorMapDataType h_desc_type= (CUtensorMapDataType)9;
+	cuuint32_t h_desc_tensorRank= 5;
+	void *h_desc_globalAddress= h;
+	cuuint64_t h_desc_globalDim[5]= {256,128,12,512,1};
+	cuuint64_t h_desc_globalStride[5]= {2,512,65536,786432,402653184};
+	cuuint32_t h_desc_boxDim[5]= {64,128,1,1,1};
+	cuuint32_t h_desc_elementStrides[5]= {1,1,1,1,1};
+	CUtensorMapInterleave h_desc_interleave= (CUtensorMapInterleave)0;
+	CUtensorMapSwizzle h_desc_swizzle= (CUtensorMapSwizzle)3;
+	CUtensorMapL2promotion h_desc_l2Promotion= (CUtensorMapL2promotion)2;
+	CUtensorMapFloatOOBfill h_desc_oobFill= (CUtensorMapFloatOOBfill)0;
+
+	CUresult h_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
+    &h_desc, h_desc_type, h_desc_tensorRank, h_desc_globalAddress, h_desc_globalDim, h_desc_globalStride + 1, h_desc_boxDim, h_desc_elementStrides, h_desc_interleave, h_desc_swizzle, h_desc_l2Promotion, h_desc_oobFill);
+
+	if (h_desc_result != CUDA_SUCCESS) {
+		std::stringstream ss;
+		ss << "Error: Failed to initialize the TMA descriptor h_desc";
+		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
+		return -1;
+	}
+	kernel_kernel<<<dim3(4, 12, 1), dim3(256, 1, 1), 253952, stream>>>(G, K_desc, U_desc, V_new_desc, W_desc, final_state, h_desc);
+	TILELANG_CHECK_LAST_ERROR("kernel_kernel");
+
+	return 0;
+}
+
+2025-10-06 00:28:33,646 DEBUG:Compilation failed for config {'block_DK': 128, 'block_DV': 128, 'threads': 128, 'num_stages': 4} at index 11 with error: Initialization failed: Failed to set the allowed dynamic shared memory size to 376832 with error: invalid argument
+#include <tl_templates/cuda/gemm.h>
+#include <tl_templates/cuda/copy.h>
+#include <tl_templates/cuda/reduce.h>
+#include <tl_templates/cuda/ldsm.h>
+#include <tl_templates/cuda/threadblock_swizzle.h>
+#include <tl_templates/cuda/debug.h>
+#ifdef ENABLE_BF16
+#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>
+#endif
+
+extern "C" __global__ void kernel_kernel(float* __restrict__ G, __grid_constant__ const CUtensorMap K_desc, __grid_constant__ const CUtensorMap U_desc, __grid_constant__ const CUtensorMap V_new_desc, __grid_constant__ const CUtensorMap W_desc, float* __restrict__ final_state, __grid_constant__ const CUtensorMap h_desc);
+extern "C" __global__ void __launch_bounds__(256, 1) kernel_kernel(float* __restrict__ G, __grid_constant__ const CUtensorMap K_desc, __grid_constant__ const CUtensorMap U_desc, __grid_constant__ const CUtensorMap V_new_desc, __grid_constant__ const CUtensorMap W_desc, float* __restrict__ final_state, __grid_constant__ const CUtensorMap h_desc) {
+  extern __shared__ __align__(1024) uchar buf_dyn_shmem[];
+  float b_h_fragment[128];
+  float V_new_fragment[64];
+  float U_fragment[64];
+  float G_last_local[1];
+  float G_fragment[64];
+  __shared__ uint64_t mbarrier_mem[24];
+  auto mbarrier = reinterpret_cast<Barrier*>(mbarrier_mem);
+  if (tl::tl_shuffle_elect<0>()) {
+    tl::prefetch_tma_descriptor(W_desc);
+    tl::prefetch_tma_descriptor(U_desc);
+    tl::prefetch_tma_descriptor(K_desc);
+    tl::prefetch_tma_descriptor(h_desc);
+    tl::prefetch_tma_descriptor(V_new_desc);
+    mbarrier[0].init(128);
+    mbarrier[1].init(128);
+    mbarrier[2].init(128);
+    mbarrier[3].init(128);
+    mbarrier[4].init(128);
+    mbarrier[5].init(128);
+    mbarrier[6].init(128);
+    mbarrier[7].init(128);
+    mbarrier[8].init(128);
+    mbarrier[9].init(128);
+    mbarrier[10].init(128);
+    mbarrier[11].init(128);
+    mbarrier[12].init(128);
+    mbarrier[13].init(128);
+    mbarrier[14].init(128);
+    mbarrier[15].init(128);
+    mbarrier[16].init(128);
+    mbarrier[17].init(128);
+    mbarrier[18].init(128);
+    mbarrier[19].init(128);
+    mbarrier[20].init(128);
+    mbarrier[21].init(128);
+    mbarrier[22].init(128);
+    mbarrier[23].init(128);
+  }
+  __syncthreads();
+  if (128 <= ((int)threadIdx.x)) {
+    tl::warpgroup_reg_dealloc<24>();
+    const dim3 blockIdx = tl::rasterization2DRow<10>();
+    for (int i_s = 0; i_s < 512; ++i_s) {
+      mbarrier[((i_s & 3) + 12)].wait((((i_s & 7) >> 2) ^ 1));
+      if (tl::tl_shuffle_elect<128>()) {
+        mbarrier[(i_s & 3)].expect_transaction(16384);
+        tl::tma_load(W_desc, mbarrier[(i_s & 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 3) * 8192) + 65536)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
+        tl::tma_load(W_desc, mbarrier[(i_s & 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 3) * 8192) + 69632)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
+      }
+      mbarrier[(i_s & 3)].arrive();
+      mbarrier[((i_s & 3) + 16)].wait((((i_s & 7) >> 2) ^ 1));
+      if (tl::tl_shuffle_elect<128>()) {
+        mbarrier[((i_s & 3) + 4)].expect_transaction(16384);
+        tl::tma_load(U_desc, mbarrier[((i_s & 3) + 4)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 3) * 8192) + 98304)])), (((int)blockIdx.x) * 128), ((int)blockIdx.y), (i_s * 64), 0);
+        tl::tma_load(U_desc, mbarrier[((i_s & 3) + 4)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 3) * 8192) + 102400)])), ((((int)blockIdx.x) * 128) + 64), ((int)blockIdx.y), (i_s * 64), 0);
+      }
+      mbarrier[((i_s & 3) + 4)].arrive();
+      mbarrier[((i_s & 3) + 20)].wait((((i_s & 7) >> 2) ^ 1));
+      if (tl::tl_shuffle_elect<128>()) {
+        mbarrier[((i_s & 3) + 8)].expect_transaction(16384);
+        tl::tma_load(K_desc, mbarrier[((i_s & 3) + 8)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 3) * 8192) + 131072)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
+        tl::tma_load(K_desc, mbarrier[((i_s & 3) + 8)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 3) * 8192) + 135168)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
+      }
+      #pragma unroll
+      for (int i = 0; i < 64; ++i) {
+        ((float*)buf_dyn_shmem)[(((((((((i_s & 3) * 8192) + ((((int)threadIdx.x) >> 5) * 2048)) + (i * 32)) + (((((((int)threadIdx.x) & 31) >> 4) + ((i & 7) >> 2)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + ((i & 3) >> 1)) & 1) * 8)) + (((((((int)threadIdx.x) & 7) >> 2) + (i & 1)) & 1) * 4)) + (((int)threadIdx.x) & 3)) - 8192)] = G[(((i_s * 768) + (i * 12)) + ((int)blockIdx.y))];
+      }
+      tl::fence_proxy_async();
+      tl::mbarrier_cp_async_arrive(mbarrier[((i_s & 3) + 8)]);
+      mbarrier[((i_s & 3) + 8)].arrive();
+    }
+  } else {
+    tl::warpgroup_reg_alloc<240>();
+    const dim3 blockIdx = tl::rasterization2DRow<10>();
+    #pragma unroll
+    for (int i_1 = 0; i_1 < 64; ++i_1) {
+      *(float2*)(b_h_fragment + (i_1 * 2)) = make_float2(0x0p+0f/*0.000000e+00*/, 0x0p+0f/*0.000000e+00*/);
+    }
+    #pragma unroll
+    for (int i_2 = 0; i_2 < 16; ++i_2) {
+      tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((((i_2 & 7) >> 2) * 8192) + ((i_2 >> 3) * 4096)) + ((((int)threadIdx.x) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_2 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_2 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 163840)])), __pack_half2(((bfloat16_t)b_h_fragment[(i_2 * 8)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 1)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 2)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 3)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 4)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 5)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 6)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 7)])));
+    }
+    for (int i_s_1 = 0; i_s_1 < 512; ++i_s_1) {
+      tl::__sync_thread_partial<3, 128>();
+      if (tl::tl_shuffle_elect<128>()) {
+        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[163840])), (((int)blockIdx.x) * 128), 0, ((int)blockIdx.y), i_s_1, 0);
+        tl::tma_store_arrive();
+        tl::tma_store_wait<0>();
+        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[172032])), ((((int)blockIdx.x) * 128) + 64), 0, ((int)blockIdx.y), i_s_1, 0);
+        tl::tma_store_arrive();
+        tl::tma_store_wait<0>();
+      }
+      mbarrier[(i_s_1 & 3)].wait(((i_s_1 & 7) >> 2));
+      tl::gemm_ss<64, 128, 128, 4, 1, 0, 0, 1, 128, 128, 0, 0, true>((&(((bfloat16_t*)buf_dyn_shmem)[(((i_s_1 & 3) * 8192) + 65536)])), (&(((bfloat16_t*)buf_dyn_shmem)[163840])), (&(V_new_fragment[0])));
+      mbarrier[((i_s_1 & 3) + 12)].arrive();
+      mbarrier[((i_s_1 & 3) + 4)].wait(((i_s_1 & 7) >> 2));
+      #pragma unroll
+      for (int i_3 = 0; i_3 < 32; ++i_3) {
+        float2 __1;
+        uint1 v_ = *(uint1*)(((bfloat16_t*)buf_dyn_shmem) + (((((((((((i_s_1 & 3) * 8192) + ((i_3 >> 4) * 4096)) + ((((int)threadIdx.x) >> 5) * 1024)) + ((i_3 & 1) * 512)) + (((((int)threadIdx.x) & 31) >> 2) * 64)) + ((((((((i_3 & 15) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 5) + ((((int)threadIdx.x) & 31) >> 4)) & 1) * 32)) + ((((((((i_3 & 7) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 4) + ((((int)threadIdx.x) & 15) >> 3)) & 1) * 16)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_3 & 3) >> 1)) & 1) * 8)) + ((((int)threadIdx.x) & 3) * 2)) + 98304));
+#ifdef ENABLE_BF16
+        reinterpret_cast<float2 &>(__1) = fastertransformer::bf1622float2(reinterpret_cast<__nv_bfloat162 const &>(v_));
+#else
+        __1.x = (float)(((nv_bfloat162*)(&(v_.x)))->x);
+        __1.y = (float)(((nv_bfloat162*)(&(v_.x)))->y);
+#endif
+        *(float2*)(U_fragment + (i_3 * 2)) = __1;
+      }
+      tl::fence_proxy_async();
+      mbarrier[((i_s_1 & 3) + 16)].arrive();
+      #pragma unroll
+      for (int i_4 = 0; i_4 < 64; ++i_4) {
+        V_new_fragment[i_4] = ((V_new_fragment[i_4] * -0x1p+0f/*-1.000000e+00*/) + U_fragment[i_4]);
+      }
+      tl::__sync_thread_partial<3, 128>();
+      #pragma unroll
+      for (int i_5 = 0; i_5 < 8; ++i_5) {
+        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((i_5 >> 2) * 4096) + ((((int)threadIdx.x) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_5 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_5 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 180224)])), __pack_half2(((bfloat16_t)V_new_fragment[(i_5 * 8)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 1)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 2)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 3)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 4)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 5)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 6)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 7)])));
+      }
+      tl::fence_proxy_async();
+      tl::__sync_thread_partial<3, 128>();
+      if (tl::tl_shuffle_elect<128>()) {
+        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[180224])), (((int)blockIdx.x) * 128), ((int)blockIdx.y), (i_s_1 * 64), 0);
+        tl::tma_store_arrive();
+        tl::tma_store_wait<0>();
+        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[184320])), ((((int)blockIdx.x) * 128) + 64), ((int)blockIdx.y), (i_s_1 * 64), 0);
+        tl::tma_store_arrive();
+        tl::tma_store_wait<0>();
+      }
+      G_last_local[0] = G[(((i_s_1 * 768) + ((int)blockIdx.y)) + 756)];
+      tl::fence_proxy_async();
+      mbarrier[((i_s_1 & 3) + 8)].wait(((i_s_1 & 7) >> 2));
+      #pragma unroll
+      for (int i_6 = 0; i_6 < 32; ++i_6) {
+        *(float2*)(G_fragment + (i_6 * 2)) = *(float2*)(((float*)buf_dyn_shmem) + ((((((((((i_s_1 & 3) * 8192) + ((i_6 >> 3) * 2048)) + ((((int)threadIdx.x) >> 5) * 512)) + ((i_6 & 1) * 256)) + (((((int)threadIdx.x) & 31) >> 2) * 32)) + ((((((((i_6 & 7) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 4) + ((((int)threadIdx.x) & 31) >> 4)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + ((i_6 & 3) >> 1)) & 1) * 8)) + (((((((int)threadIdx.x) & 7) >> 2) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 4)) + ((((int)threadIdx.x) & 1) * 2)));
+      }
+      #pragma unroll
+      for (int i_7 = 0; i_7 < 64; ++i_7) {
+        if ((G_last_local[0] - G_fragment[i_7]) <= 0x0p+0f/*0.000000e+00*/) {
+          V_new_fragment[i_7] = (V_new_fragment[i_7] * __expf((G_last_local[0] - G_fragment[i_7])));
+        } else {
+          V_new_fragment[i_7] = 0x0p+0f/*0.000000e+00*/;
+        }
+      }
+      G_last_local[0] = __expf(G_last_local[0]);
+      #pragma unroll
+      for (int i_8 = 0; i_8 < 128; ++i_8) {
+        b_h_fragment[i_8] = (b_h_fragment[i_8] * G_last_local[0]);
+      }
+      tl::__sync_thread_partial<3, 128>();
+      #pragma unroll
+      for (int i_9 = 0; i_9 < 8; ++i_9) {
+        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((i_9 >> 2) * 4096) + ((((int)threadIdx.x) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_9 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_9 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 180224)])), __pack_half2(((bfloat16_t)V_new_fragment[(i_9 * 8)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 1)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 2)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 3)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 4)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 5)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 6)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 7)])));
+      }
+      tl::fence_proxy_async();
+      tl::__sync_thread_partial<3, 128>();
+      tl::gemm_ss<128, 128, 64, 4, 1, 1, 0, 0, 128, 128, 0, 0, true>((&(((bfloat16_t*)buf_dyn_shmem)[(((i_s_1 & 3) * 8192) + 131072)])), (&(((bfloat16_t*)buf_dyn_shmem)[180224])), (&(b_h_fragment[0])));
+      mbarrier[((i_s_1 & 3) + 20)].arrive();
+      tl::__sync_thread_partial<3, 128>();
+      #pragma unroll
+      for (int i_10 = 0; i_10 < 16; ++i_10) {
+        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((((i_10 & 7) >> 2) * 8192) + ((i_10 >> 3) * 4096)) + ((((int)threadIdx.x) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_10 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_10 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 163840)])), __pack_half2(((bfloat16_t)b_h_fragment[(i_10 * 8)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 1)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 2)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 3)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 4)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 5)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 6)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 7)])));
+      }
+    }
+    #pragma unroll
+    for (int i_11 = 0; i_11 < 64; ++i_11) {
+      *(float2*)(final_state + ((((((((((int)blockIdx.y) * 32768) + ((i_11 >> 5) * 16384)) + ((((int)threadIdx.x) >> 5) * 4096)) + ((i_11 & 1) * 2048)) + (((((int)threadIdx.x) & 31) >> 2) * 256)) + (((int)blockIdx.x) * 128)) + (((i_11 & 31) >> 1) * 8)) + ((((int)threadIdx.x) & 3) * 2))) = *(float2*)(b_h_fragment + (i_11 * 2));
+    }
+  }
+}
+
+
+#define ERROR_BUF_SIZE 1024
+static char error_buf[ERROR_BUF_SIZE];
+
+extern "C" const char* get_last_error() {
+    return error_buf;
+}
+
+extern "C" int init() {
+    error_buf[0] = '\0';
+    
+    cudaError_t result_kernel_kernel = cudaFuncSetAttribute(kernel_kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 376832);
+    if (result_kernel_kernel != CUDA_SUCCESS) {
+        snprintf(error_buf, ERROR_BUF_SIZE, "Failed to set the allowed dynamic shared memory size to %d with error: %s", 376832, cudaGetErrorString(result_kernel_kernel));
+        return -1;
+    }
+
+    return 0;
+}
+
+extern "C" int call(bfloat16_t* __restrict__ K, bfloat16_t* __restrict__ W, bfloat16_t* __restrict__ U, float* __restrict__ G, bfloat16_t* __restrict__ h, float* __restrict__ final_state, bfloat16_t* __restrict__ V_new, cudaStream_t stream=cudaStreamDefault) {
+
+	CUtensorMap K_desc;
+	CUtensorMapDataType K_desc_type= (CUtensorMapDataType)9;
+	cuuint32_t K_desc_tensorRank= 4;
+	void *K_desc_globalAddress= K;
+	cuuint64_t K_desc_globalDim[4]= {128,12,32768,1};
+	cuuint64_t K_desc_globalStride[4]= {2,256,3072,100663296};
+	cuuint32_t K_desc_boxDim[4]= {64,1,64,1};
+	cuuint32_t K_desc_elementStrides[4]= {1,1,1,1};
+	CUtensorMapInterleave K_desc_interleave= (CUtensorMapInterleave)0;
+	CUtensorMapSwizzle K_desc_swizzle= (CUtensorMapSwizzle)3;
+	CUtensorMapL2promotion K_desc_l2Promotion= (CUtensorMapL2promotion)2;
+	CUtensorMapFloatOOBfill K_desc_oobFill= (CUtensorMapFloatOOBfill)0;
+
+	CUresult K_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
+    &K_desc, K_desc_type, K_desc_tensorRank, K_desc_globalAddress, K_desc_globalDim, K_desc_globalStride + 1, K_desc_boxDim, K_desc_elementStrides, K_desc_interleave, K_desc_swizzle, K_desc_l2Promotion, K_desc_oobFill);
+
+	if (K_desc_result != CUDA_SUCCESS) {
+		std::stringstream ss;
+		ss << "Error: Failed to initialize the TMA descriptor K_desc";
+		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
+		return -1;
+	}
+
+	CUtensorMap U_desc;
+	CUtensorMapDataType U_desc_type= (CUtensorMapDataType)9;
+	cuuint32_t U_desc_tensorRank= 4;
+	void *U_desc_globalAddress= U;
+	cuuint64_t U_desc_globalDim[4]= {256,12,32768,1};
+	cuuint64_t U_desc_globalStride[4]= {2,512,6144,201326592};
+	cuuint32_t U_desc_boxDim[4]= {64,1,64,1};
+	cuuint32_t U_desc_elementStrides[4]= {1,1,1,1};
+	CUtensorMapInterleave U_desc_interleave= (CUtensorMapInterleave)0;
+	CUtensorMapSwizzle U_desc_swizzle= (CUtensorMapSwizzle)3;
+	CUtensorMapL2promotion U_desc_l2Promotion= (CUtensorMapL2promotion)2;
+	CUtensorMapFloatOOBfill U_desc_oobFill= (CUtensorMapFloatOOBfill)0;
+
+	CUresult U_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
+    &U_desc, U_desc_type, U_desc_tensorRank, U_desc_globalAddress, U_desc_globalDim, U_desc_globalStride + 1, U_desc_boxDim, U_desc_elementStrides, U_desc_interleave, U_desc_swizzle, U_desc_l2Promotion, U_desc_oobFill);
+
+	if (U_desc_result != CUDA_SUCCESS) {
+		std::stringstream ss;
+		ss << "Error: Failed to initialize the TMA descriptor U_desc";
+		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
+		return -1;
+	}
+
+	CUtensorMap V_new_desc;
+	CUtensorMapDataType V_new_desc_type= (CUtensorMapDataType)9;
+	cuuint32_t V_new_desc_tensorRank= 4;
+	void *V_new_desc_globalAddress= V_new;
+	cuuint64_t V_new_desc_globalDim[4]= {256,12,32768,1};
+	cuuint64_t V_new_desc_globalStride[4]= {2,512,6144,201326592};
+	cuuint32_t V_new_desc_boxDim[4]= {64,1,64,1};
+	cuuint32_t V_new_desc_elementStrides[4]= {1,1,1,1};
+	CUtensorMapInterleave V_new_desc_interleave= (CUtensorMapInterleave)0;
+	CUtensorMapSwizzle V_new_desc_swizzle= (CUtensorMapSwizzle)3;
+	CUtensorMapL2promotion V_new_desc_l2Promotion= (CUtensorMapL2promotion)2;
+	CUtensorMapFloatOOBfill V_new_desc_oobFill= (CUtensorMapFloatOOBfill)0;
+
+	CUresult V_new_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
+    &V_new_desc, V_new_desc_type, V_new_desc_tensorRank, V_new_desc_globalAddress, V_new_desc_globalDim, V_new_desc_globalStride + 1, V_new_desc_boxDim, V_new_desc_elementStrides, V_new_desc_interleave, V_new_desc_swizzle, V_new_desc_l2Promotion, V_new_desc_oobFill);
+
+	if (V_new_desc_result != CUDA_SUCCESS) {
+		std::stringstream ss;
+		ss << "Error: Failed to initialize the TMA descriptor V_new_desc";
+		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
+		return -1;
+	}
+
+	CUtensorMap W_desc;
+	CUtensorMapDataType W_desc_type= (CUtensorMapDataType)9;
+	cuuint32_t W_desc_tensorRank= 4;
+	void *W_desc_globalAddress= W;
+	cuuint64_t W_desc_globalDim[4]= {128,12,32768,1};
+	cuuint64_t W_desc_globalStride[4]= {2,256,3072,100663296};
+	cuuint32_t W_desc_boxDim[4]= {64,1,64,1};
+	cuuint32_t W_desc_elementStrides[4]= {1,1,1,1};
+	CUtensorMapInterleave W_desc_interleave= (CUtensorMapInterleave)0;
+	CUtensorMapSwizzle W_desc_swizzle= (CUtensorMapSwizzle)3;
+	CUtensorMapL2promotion W_desc_l2Promotion= (CUtensorMapL2promotion)2;
+	CUtensorMapFloatOOBfill W_desc_oobFill= (CUtensorMapFloatOOBfill)0;
+
+	CUresult W_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
+    &W_desc, W_desc_type, W_desc_tensorRank, W_desc_globalAddress, W_desc_globalDim, W_desc_globalStride + 1, W_desc_boxDim, W_desc_elementStrides, W_desc_interleave, W_desc_swizzle, W_desc_l2Promotion, W_desc_oobFill);
+
+	if (W_desc_result != CUDA_SUCCESS) {
+		std::stringstream ss;
+		ss << "Error: Failed to initialize the TMA descriptor W_desc";
+		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
+		return -1;
+	}
+
+	CUtensorMap h_desc;
+	CUtensorMapDataType h_desc_type= (CUtensorMapDataType)9;
+	cuuint32_t h_desc_tensorRank= 5;
+	void *h_desc_globalAddress= h;
+	cuuint64_t h_desc_globalDim[5]= {256,128,12,512,1};
+	cuuint64_t h_desc_globalStride[5]= {2,512,65536,786432,402653184};
+	cuuint32_t h_desc_boxDim[5]= {64,128,1,1,1};
+	cuuint32_t h_desc_elementStrides[5]= {1,1,1,1,1};
+	CUtensorMapInterleave h_desc_interleave= (CUtensorMapInterleave)0;
+	CUtensorMapSwizzle h_desc_swizzle= (CUtensorMapSwizzle)3;
+	CUtensorMapL2promotion h_desc_l2Promotion= (CUtensorMapL2promotion)2;
+	CUtensorMapFloatOOBfill h_desc_oobFill= (CUtensorMapFloatOOBfill)0;
+
+	CUresult h_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
+    &h_desc, h_desc_type, h_desc_tensorRank, h_desc_globalAddress, h_desc_globalDim, h_desc_globalStride + 1, h_desc_boxDim, h_desc_elementStrides, h_desc_interleave, h_desc_swizzle, h_desc_l2Promotion, h_desc_oobFill);
+
+	if (h_desc_result != CUDA_SUCCESS) {
+		std::stringstream ss;
+		ss << "Error: Failed to initialize the TMA descriptor h_desc";
+		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
+		return -1;
+	}
+	kernel_kernel<<<dim3(2, 12, 1), dim3(256, 1, 1), 376832, stream>>>(G, K_desc, U_desc, V_new_desc, W_desc, final_state, h_desc);
+	TILELANG_CHECK_LAST_ERROR("kernel_kernel");
+
+	return 0;
+}
+
+2025-10-06 00:28:33,657 DEBUG:Compilation failed for config {'block_DK': 128, 'block_DV': 128, 'threads': 128, 'num_stages': 3} at index 10 with error: Initialization failed: Failed to set the allowed dynamic shared memory size to 294912 with error: invalid argument
 #include <tl_templates/cuda/gemm.h>
 #include <tl_templates/cuda/copy.h>
 #include <tl_templates/cuda/reduce.h>
@@ -146,12 +793,12 @@ extern "C" __global__ void __launch_bounds__(256, 1) kernel_kernel(float* __rest
       #pragma unroll
       for (int i_7 = 0; i_7 < 64; ++i_7) {
         if ((G_last_local[0] - G_fragment[i_7]) <= 0x0p+0f/*0.000000e+00*/) {
-          V_new_fragment[i_7] = (V_new_fragment[i_7] * expf((G_last_local[0] - G_fragment[i_7])));
+          V_new_fragment[i_7] = (V_new_fragment[i_7] * __expf((G_last_local[0] - G_fragment[i_7])));
         } else {
           V_new_fragment[i_7] = 0x0p+0f/*0.000000e+00*/;
         }
       }
-      G_last_local[0] = expf(G_last_local[0]);
+      G_last_local[0] = __expf(G_last_local[0]);
       #pragma unroll
       for (int i_8 = 0; i_8 < 128; ++i_8) {
         b_h_fragment[i_8] = (b_h_fragment[i_8] * G_last_local[0]);
@@ -315,1655 +962,6 @@ extern "C" int call(bfloat16_t* __restrict__ K, bfloat16_t* __restrict__ W, bflo
 		return -1;
 	}
 	kernel_kernel<<<dim3(2, 12, 1), dim3(256, 1, 1), 294912, stream>>>(G, K_desc, U_desc, V_new_desc, W_desc, final_state, h_desc);
-	TILELANG_CHECK_LAST_ERROR("kernel_kernel");
-
-	return 0;
-}
-
-2025-10-06 02:08:41,138 DEBUG:Compilation failed for config {'block_DK': 128, 'block_DV': 128, 'threads': 256, 'num_stages': 3} at index 11 with error: Initialization failed: Failed to set the allowed dynamic shared memory size to 294912 with error: invalid argument
-#include <tl_templates/cuda/gemm.h>
-#include <tl_templates/cuda/copy.h>
-#include <tl_templates/cuda/reduce.h>
-#include <tl_templates/cuda/ldsm.h>
-#include <tl_templates/cuda/threadblock_swizzle.h>
-#include <tl_templates/cuda/debug.h>
-#ifdef ENABLE_BF16
-#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>
-#endif
-
-extern "C" __global__ void kernel_kernel(float* __restrict__ G, __grid_constant__ const CUtensorMap K_desc, __grid_constant__ const CUtensorMap U_desc, __grid_constant__ const CUtensorMap V_new_desc, __grid_constant__ const CUtensorMap W_desc, float* __restrict__ final_state, __grid_constant__ const CUtensorMap h_desc);
-extern "C" __global__ void __launch_bounds__(512, 1) kernel_kernel(float* __restrict__ G, __grid_constant__ const CUtensorMap K_desc, __grid_constant__ const CUtensorMap U_desc, __grid_constant__ const CUtensorMap V_new_desc, __grid_constant__ const CUtensorMap W_desc, float* __restrict__ final_state, __grid_constant__ const CUtensorMap h_desc) {
-  extern __shared__ __align__(1024) uchar buf_dyn_shmem[];
-  float b_h_fragment[64];
-  float V_new_fragment[32];
-  float U_fragment[32];
-  float G_last_local[1];
-  float G_fragment[32];
-  __shared__ uint64_t mbarrier_mem[18];
-  auto mbarrier = reinterpret_cast<Barrier*>(mbarrier_mem);
-  if (tl::tl_shuffle_elect<0>()) {
-    tl::prefetch_tma_descriptor(W_desc);
-    tl::prefetch_tma_descriptor(U_desc);
-    tl::prefetch_tma_descriptor(K_desc);
-    tl::prefetch_tma_descriptor(h_desc);
-    tl::prefetch_tma_descriptor(V_new_desc);
-    mbarrier[0].init(256);
-    mbarrier[1].init(256);
-    mbarrier[2].init(256);
-    mbarrier[3].init(256);
-    mbarrier[4].init(256);
-    mbarrier[5].init(256);
-    mbarrier[6].init(256);
-    mbarrier[7].init(256);
-    mbarrier[8].init(256);
-    mbarrier[9].init(256);
-    mbarrier[10].init(256);
-    mbarrier[11].init(256);
-    mbarrier[12].init(256);
-    mbarrier[13].init(256);
-    mbarrier[14].init(256);
-    mbarrier[15].init(256);
-    mbarrier[16].init(256);
-    mbarrier[17].init(256);
-  }
-  __syncthreads();
-  if (256 <= ((int)threadIdx.x)) {
-    tl::warpgroup_reg_dealloc<24>();
-    const dim3 blockIdx = tl::rasterization2DRow<10>();
-    for (int i_s = 0; i_s < 512; ++i_s) {
-      mbarrier[((i_s % 3) + 9)].wait((((i_s % 6) / 3) ^ 1));
-      if (tl::tl_shuffle_elect<256>()) {
-        mbarrier[(i_s % 3)].expect_transaction(16384);
-        tl::tma_load(W_desc, mbarrier[(i_s % 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 8192) + 49152)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(W_desc, mbarrier[(i_s % 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 8192) + 53248)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
-      }
-      mbarrier[(i_s % 3)].arrive();
-      mbarrier[((i_s % 3) + 12)].wait((((i_s % 6) / 3) ^ 1));
-      if (tl::tl_shuffle_elect<256>()) {
-        mbarrier[((i_s % 3) + 3)].expect_transaction(16384);
-        tl::tma_load(U_desc, mbarrier[((i_s % 3) + 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 8192) + 73728)])), (((int)blockIdx.x) * 128), ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(U_desc, mbarrier[((i_s % 3) + 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 8192) + 77824)])), ((((int)blockIdx.x) * 128) + 64), ((int)blockIdx.y), (i_s * 64), 0);
-      }
-      mbarrier[((i_s % 3) + 3)].arrive();
-      mbarrier[((i_s % 3) + 15)].wait((((i_s % 6) / 3) ^ 1));
-      if (tl::tl_shuffle_elect<256>()) {
-        mbarrier[((i_s % 3) + 6)].expect_transaction(16384);
-        tl::tma_load(K_desc, mbarrier[((i_s % 3) + 6)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 8192) + 98304)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(K_desc, mbarrier[((i_s % 3) + 6)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 8192) + 102400)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
-      }
-      #pragma unroll
-      for (int i = 0; i < 32; ++i) {
-        ((float*)buf_dyn_shmem)[((((((((((i_s % 3) * 8192) + (((((int)threadIdx.x) & 127) >> 5) * 2048)) + (i * 64)) + ((((int)threadIdx.x) >> 7) * 32)) + (((((((int)threadIdx.x) & 31) >> 4) + ((i & 3) >> 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + (i & 1)) & 1) * 8)) + ((((((int)threadIdx.x) >> 7) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 4)) + (((int)threadIdx.x) & 3)) - 64)] = G[(((((i_s * 768) + (i * 24)) + ((((int)threadIdx.x) >> 7) * 12)) + ((int)blockIdx.y)) - 24)];
-      }
-      tl::fence_proxy_async();
-      tl::mbarrier_cp_async_arrive(mbarrier[((i_s % 3) + 6)]);
-      mbarrier[((i_s % 3) + 6)].arrive();
-    }
-  } else {
-    tl::warpgroup_reg_alloc<240>();
-    const dim3 blockIdx = tl::rasterization2DRow<10>();
-    #pragma unroll
-    for (int i_1 = 0; i_1 < 32; ++i_1) {
-      *(float2*)(b_h_fragment + (i_1 * 2)) = make_float2(0x0p+0f/*0.000000e+00*/, 0x0p+0f/*0.000000e+00*/);
-    }
-    #pragma unroll
-    for (int i_2 = 0; i_2 < 8; ++i_2) {
-      tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((int)threadIdx.x) >> 7) * 8192) + ((i_2 >> 2) * 4096)) + (((((int)threadIdx.x) & 127) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_2 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_2 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 122880)])), __pack_half2(((bfloat16_t)b_h_fragment[(i_2 * 8)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 1)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 2)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 3)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 4)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 5)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 6)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 7)])));
-    }
-    for (int i_s_1 = 0; i_s_1 < 512; ++i_s_1) {
-      tl::__sync_thread_partial<3, 256>();
-      if (tl::tl_shuffle_elect<256>()) {
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[122880])), (((int)blockIdx.x) * 128), 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[131072])), ((((int)blockIdx.x) * 128) + 64), 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-      }
-      mbarrier[(i_s_1 % 3)].wait(((i_s_1 % 6) / 3));
-      tl::gemm_ss<64, 128, 128, 4, 2, 0, 0, 1, 128, 128, 0, 0, true>((&(((bfloat16_t*)buf_dyn_shmem)[(((i_s_1 % 3) * 8192) + 49152)])), (&(((bfloat16_t*)buf_dyn_shmem)[122880])), (&(V_new_fragment[0])));
-      mbarrier[((i_s_1 % 3) + 9)].arrive();
-      mbarrier[((i_s_1 % 3) + 3)].wait(((i_s_1 % 6) / 3));
-      #pragma unroll
-      for (int i_3 = 0; i_3 < 16; ++i_3) {
-        float2 __1;
-        uint1 v_ = *(uint1*)(((bfloat16_t*)buf_dyn_shmem) + ((((((((((i_s_1 % 3) * 8192) + ((((int)threadIdx.x) >> 5) * 1024)) + ((i_3 & 1) * 512)) + (((((int)threadIdx.x) & 31) >> 2) * 64)) + (((((((int)threadIdx.x) & 31) >> 4) + (i_3 >> 3)) & 1) * 32)) + ((((((((i_3 & 7) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 4) + ((((int)threadIdx.x) & 15) >> 3)) & 1) * 16)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_3 & 3) >> 1)) & 1) * 8)) + ((((int)threadIdx.x) & 3) * 2)) + 73728));
-#ifdef ENABLE_BF16
-        reinterpret_cast<float2 &>(__1) = fastertransformer::bf1622float2(reinterpret_cast<__nv_bfloat162 const &>(v_));
-#else
-        __1.x = (float)(((nv_bfloat162*)(&(v_.x)))->x);
-        __1.y = (float)(((nv_bfloat162*)(&(v_.x)))->y);
-#endif
-        *(float2*)(U_fragment + (i_3 * 2)) = __1;
-      }
-      tl::fence_proxy_async();
-      mbarrier[((i_s_1 % 3) + 12)].arrive();
-      #pragma unroll
-      for (int i_4 = 0; i_4 < 32; ++i_4) {
-        V_new_fragment[i_4] = ((V_new_fragment[i_4] * -0x1p+0f/*-1.000000e+00*/) + U_fragment[i_4]);
-      }
-      tl::__sync_thread_partial<3, 256>();
-      #pragma unroll
-      for (int i_5 = 0; i_5 < 4; ++i_5) {
-        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((int)threadIdx.x) >> 5) * 1024) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + (i_5 >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_5 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 139264)])), __pack_half2(((bfloat16_t)V_new_fragment[(i_5 * 8)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 1)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 2)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 3)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 4)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 5)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 6)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 7)])));
-      }
-      tl::fence_proxy_async();
-      tl::__sync_thread_partial<3, 256>();
-      if (tl::tl_shuffle_elect<256>()) {
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[139264])), (((int)blockIdx.x) * 128), ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[143360])), ((((int)blockIdx.x) * 128) + 64), ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-      }
-      G_last_local[0] = G[(((i_s_1 * 768) + ((int)blockIdx.y)) + 756)];
-      tl::fence_proxy_async();
-      mbarrier[((i_s_1 % 3) + 6)].wait(((i_s_1 % 6) / 3));
-      #pragma unroll
-      for (int i_6 = 0; i_6 < 16; ++i_6) {
-        *(float2*)(G_fragment + (i_6 * 2)) = *(float2*)(((float*)buf_dyn_shmem) + (((((((((((i_s_1 % 3) * 8192) + ((((int)threadIdx.x) >> 7) * 4096)) + ((i_6 >> 3) * 2048)) + (((((int)threadIdx.x) & 127) >> 5) * 512)) + ((i_6 & 1) * 256)) + (((((int)threadIdx.x) & 31) >> 2) * 32)) + ((((((((i_6 & 7) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 4) + ((((int)threadIdx.x) & 31) >> 4)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + ((i_6 & 3) >> 1)) & 1) * 8)) + (((((((int)threadIdx.x) & 7) >> 2) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 4)) + ((((int)threadIdx.x) & 1) * 2)));
-      }
-      #pragma unroll
-      for (int i_7 = 0; i_7 < 32; ++i_7) {
-        if ((G_last_local[0] - G_fragment[i_7]) <= 0x0p+0f/*0.000000e+00*/) {
-          V_new_fragment[i_7] = (V_new_fragment[i_7] * expf((G_last_local[0] - G_fragment[i_7])));
-        } else {
-          V_new_fragment[i_7] = 0x0p+0f/*0.000000e+00*/;
-        }
-      }
-      G_last_local[0] = expf(G_last_local[0]);
-      #pragma unroll
-      for (int i_8 = 0; i_8 < 64; ++i_8) {
-        b_h_fragment[i_8] = (b_h_fragment[i_8] * G_last_local[0]);
-      }
-      tl::__sync_thread_partial<3, 256>();
-      #pragma unroll
-      for (int i_9 = 0; i_9 < 4; ++i_9) {
-        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((int)threadIdx.x) >> 5) * 1024) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + (i_9 >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_9 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 139264)])), __pack_half2(((bfloat16_t)V_new_fragment[(i_9 * 8)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 1)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 2)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 3)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 4)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 5)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 6)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 7)])));
-      }
-      tl::fence_proxy_async();
-      tl::__sync_thread_partial<3, 256>();
-      tl::gemm_ss<128, 128, 64, 4, 2, 1, 0, 0, 128, 128, 0, 0, true>((&(((bfloat16_t*)buf_dyn_shmem)[(((i_s_1 % 3) * 8192) + 98304)])), (&(((bfloat16_t*)buf_dyn_shmem)[139264])), (&(b_h_fragment[0])));
-      mbarrier[((i_s_1 % 3) + 15)].arrive();
-      tl::__sync_thread_partial<3, 256>();
-      #pragma unroll
-      for (int i_10 = 0; i_10 < 8; ++i_10) {
-        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((int)threadIdx.x) >> 7) * 8192) + ((i_10 >> 2) * 4096)) + (((((int)threadIdx.x) & 127) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_10 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_10 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 122880)])), __pack_half2(((bfloat16_t)b_h_fragment[(i_10 * 8)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 1)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 2)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 3)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 4)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 5)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 6)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 7)])));
-      }
-    }
-    #pragma unroll
-    for (int i_11 = 0; i_11 < 32; ++i_11) {
-      *(float2*)(final_state + (((((((((((int)blockIdx.y) * 32768) + ((i_11 >> 4) * 16384)) + (((((int)threadIdx.x) & 127) >> 5) * 4096)) + ((i_11 & 1) * 2048)) + (((((int)threadIdx.x) & 31) >> 2) * 256)) + (((int)blockIdx.x) * 128)) + ((((int)threadIdx.x) >> 7) * 64)) + (((i_11 & 15) >> 1) * 8)) + ((((int)threadIdx.x) & 3) * 2))) = *(float2*)(b_h_fragment + (i_11 * 2));
-    }
-  }
-}
-
-
-#define ERROR_BUF_SIZE 1024
-static char error_buf[ERROR_BUF_SIZE];
-
-extern "C" const char* get_last_error() {
-    return error_buf;
-}
-
-extern "C" int init() {
-    error_buf[0] = '\0';
-    
-    cudaError_t result_kernel_kernel = cudaFuncSetAttribute(kernel_kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 294912);
-    if (result_kernel_kernel != CUDA_SUCCESS) {
-        snprintf(error_buf, ERROR_BUF_SIZE, "Failed to set the allowed dynamic shared memory size to %d with error: %s", 294912, cudaGetErrorString(result_kernel_kernel));
-        return -1;
-    }
-
-    return 0;
-}
-
-extern "C" int call(bfloat16_t* __restrict__ K, bfloat16_t* __restrict__ W, bfloat16_t* __restrict__ U, float* __restrict__ G, bfloat16_t* __restrict__ h, float* __restrict__ final_state, bfloat16_t* __restrict__ V_new, cudaStream_t stream=cudaStreamDefault) {
-
-	CUtensorMap K_desc;
-	CUtensorMapDataType K_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t K_desc_tensorRank= 4;
-	void *K_desc_globalAddress= K;
-	cuuint64_t K_desc_globalDim[4]= {128,12,32768,1};
-	cuuint64_t K_desc_globalStride[4]= {2,256,3072,100663296};
-	cuuint32_t K_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t K_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave K_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle K_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion K_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill K_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult K_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &K_desc, K_desc_type, K_desc_tensorRank, K_desc_globalAddress, K_desc_globalDim, K_desc_globalStride + 1, K_desc_boxDim, K_desc_elementStrides, K_desc_interleave, K_desc_swizzle, K_desc_l2Promotion, K_desc_oobFill);
-
-	if (K_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor K_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap U_desc;
-	CUtensorMapDataType U_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t U_desc_tensorRank= 4;
-	void *U_desc_globalAddress= U;
-	cuuint64_t U_desc_globalDim[4]= {256,12,32768,1};
-	cuuint64_t U_desc_globalStride[4]= {2,512,6144,201326592};
-	cuuint32_t U_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t U_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave U_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle U_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion U_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill U_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult U_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &U_desc, U_desc_type, U_desc_tensorRank, U_desc_globalAddress, U_desc_globalDim, U_desc_globalStride + 1, U_desc_boxDim, U_desc_elementStrides, U_desc_interleave, U_desc_swizzle, U_desc_l2Promotion, U_desc_oobFill);
-
-	if (U_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor U_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap V_new_desc;
-	CUtensorMapDataType V_new_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t V_new_desc_tensorRank= 4;
-	void *V_new_desc_globalAddress= V_new;
-	cuuint64_t V_new_desc_globalDim[4]= {256,12,32768,1};
-	cuuint64_t V_new_desc_globalStride[4]= {2,512,6144,201326592};
-	cuuint32_t V_new_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t V_new_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave V_new_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle V_new_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion V_new_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill V_new_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult V_new_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &V_new_desc, V_new_desc_type, V_new_desc_tensorRank, V_new_desc_globalAddress, V_new_desc_globalDim, V_new_desc_globalStride + 1, V_new_desc_boxDim, V_new_desc_elementStrides, V_new_desc_interleave, V_new_desc_swizzle, V_new_desc_l2Promotion, V_new_desc_oobFill);
-
-	if (V_new_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor V_new_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap W_desc;
-	CUtensorMapDataType W_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t W_desc_tensorRank= 4;
-	void *W_desc_globalAddress= W;
-	cuuint64_t W_desc_globalDim[4]= {128,12,32768,1};
-	cuuint64_t W_desc_globalStride[4]= {2,256,3072,100663296};
-	cuuint32_t W_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t W_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave W_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle W_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion W_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill W_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult W_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &W_desc, W_desc_type, W_desc_tensorRank, W_desc_globalAddress, W_desc_globalDim, W_desc_globalStride + 1, W_desc_boxDim, W_desc_elementStrides, W_desc_interleave, W_desc_swizzle, W_desc_l2Promotion, W_desc_oobFill);
-
-	if (W_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor W_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap h_desc;
-	CUtensorMapDataType h_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t h_desc_tensorRank= 5;
-	void *h_desc_globalAddress= h;
-	cuuint64_t h_desc_globalDim[5]= {256,128,12,512,1};
-	cuuint64_t h_desc_globalStride[5]= {2,512,65536,786432,402653184};
-	cuuint32_t h_desc_boxDim[5]= {64,128,1,1,1};
-	cuuint32_t h_desc_elementStrides[5]= {1,1,1,1,1};
-	CUtensorMapInterleave h_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle h_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion h_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill h_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult h_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &h_desc, h_desc_type, h_desc_tensorRank, h_desc_globalAddress, h_desc_globalDim, h_desc_globalStride + 1, h_desc_boxDim, h_desc_elementStrides, h_desc_interleave, h_desc_swizzle, h_desc_l2Promotion, h_desc_oobFill);
-
-	if (h_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor h_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-	kernel_kernel<<<dim3(2, 12, 1), dim3(512, 1, 1), 294912, stream>>>(G, K_desc, U_desc, V_new_desc, W_desc, final_state, h_desc);
-	TILELANG_CHECK_LAST_ERROR("kernel_kernel");
-
-	return 0;
-}
-
-2025-10-06 02:08:41,516 DEBUG:Compilation failed for config {'block_DK': 128, 'block_DV': 256, 'threads': 256, 'num_stages': 3} at index 17 with error: Initialization failed: Failed to set the allowed dynamic shared memory size to 491520 with error: invalid argument
-#include <tl_templates/cuda/gemm.h>
-#include <tl_templates/cuda/copy.h>
-#include <tl_templates/cuda/reduce.h>
-#include <tl_templates/cuda/ldsm.h>
-#include <tl_templates/cuda/threadblock_swizzle.h>
-#include <tl_templates/cuda/debug.h>
-#ifdef ENABLE_BF16
-#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>
-#endif
-
-extern "C" __global__ void kernel_kernel(float* __restrict__ G, __grid_constant__ const CUtensorMap K_desc, __grid_constant__ const CUtensorMap U_desc, __grid_constant__ const CUtensorMap V_new_desc, __grid_constant__ const CUtensorMap W_desc, float* __restrict__ final_state, __grid_constant__ const CUtensorMap h_desc);
-extern "C" __global__ void __launch_bounds__(512, 1) kernel_kernel(float* __restrict__ G, __grid_constant__ const CUtensorMap K_desc, __grid_constant__ const CUtensorMap U_desc, __grid_constant__ const CUtensorMap V_new_desc, __grid_constant__ const CUtensorMap W_desc, float* __restrict__ final_state, __grid_constant__ const CUtensorMap h_desc) {
-  extern __shared__ __align__(1024) uchar buf_dyn_shmem[];
-  float b_h_fragment[128];
-  float V_new_fragment[64];
-  float U_fragment[64];
-  float G_last_local[1];
-  float G_fragment[64];
-  __shared__ uint64_t mbarrier_mem[18];
-  auto mbarrier = reinterpret_cast<Barrier*>(mbarrier_mem);
-  if (tl::tl_shuffle_elect<0>()) {
-    tl::prefetch_tma_descriptor(W_desc);
-    tl::prefetch_tma_descriptor(U_desc);
-    tl::prefetch_tma_descriptor(K_desc);
-    tl::prefetch_tma_descriptor(h_desc);
-    tl::prefetch_tma_descriptor(V_new_desc);
-    mbarrier[0].init(256);
-    mbarrier[1].init(256);
-    mbarrier[2].init(256);
-    mbarrier[3].init(256);
-    mbarrier[4].init(256);
-    mbarrier[5].init(256);
-    mbarrier[6].init(256);
-    mbarrier[7].init(256);
-    mbarrier[8].init(256);
-    mbarrier[9].init(256);
-    mbarrier[10].init(256);
-    mbarrier[11].init(256);
-    mbarrier[12].init(256);
-    mbarrier[13].init(256);
-    mbarrier[14].init(256);
-    mbarrier[15].init(256);
-    mbarrier[16].init(256);
-    mbarrier[17].init(256);
-  }
-  __syncthreads();
-  if (256 <= ((int)threadIdx.x)) {
-    tl::warpgroup_reg_dealloc<24>();
-    const dim3 blockIdx = tl::rasterization2DRow<10>();
-    for (int i_s = 0; i_s < 512; ++i_s) {
-      mbarrier[((i_s % 3) + 9)].wait((((i_s % 6) / 3) ^ 1));
-      if (tl::tl_shuffle_elect<256>()) {
-        mbarrier[(i_s % 3)].expect_transaction(16384);
-        tl::tma_load(W_desc, mbarrier[(i_s % 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 8192) + 180224)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(W_desc, mbarrier[(i_s % 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 8192) + 184320)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
-      }
-      mbarrier[(i_s % 3)].arrive();
-      mbarrier[((i_s % 3) + 12)].wait((((i_s % 6) / 3) ^ 1));
-      if (tl::tl_shuffle_elect<256>()) {
-        mbarrier[((i_s % 3) + 3)].expect_transaction(32768);
-        tl::tma_load(U_desc, mbarrier[((i_s % 3) + 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 16384) + 98304)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(U_desc, mbarrier[((i_s % 3) + 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 16384) + 102400)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(U_desc, mbarrier[((i_s % 3) + 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 16384) + 106496)])), 128, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(U_desc, mbarrier[((i_s % 3) + 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 16384) + 110592)])), 192, ((int)blockIdx.y), (i_s * 64), 0);
-      }
-      mbarrier[((i_s % 3) + 3)].arrive();
-      mbarrier[((i_s % 3) + 15)].wait((((i_s % 6) / 3) ^ 1));
-      if (tl::tl_shuffle_elect<256>()) {
-        mbarrier[((i_s % 3) + 6)].expect_transaction(16384);
-        tl::tma_load(K_desc, mbarrier[((i_s % 3) + 6)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 8192) + 204800)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(K_desc, mbarrier[((i_s % 3) + 6)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 8192) + 208896)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
-      }
-      #pragma unroll
-      for (int i = 0; i < 64; ++i) {
-        ((float*)buf_dyn_shmem)[(((((((((i_s % 3) * 16384) + ((((int)threadIdx.x) >> 5) * 2048)) + (i * 32)) + (((((((int)threadIdx.x) & 31) >> 4) + ((i & 7) >> 2)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + ((i & 3) >> 1)) & 1) * 8)) + (((((((int)threadIdx.x) & 7) >> 2) + (i & 1)) & 1) * 4)) + (((int)threadIdx.x) & 3)) - 16384)] = G[(((i_s * 768) + (i * 12)) + ((int)blockIdx.y))];
-      }
-      tl::fence_proxy_async();
-      tl::mbarrier_cp_async_arrive(mbarrier[((i_s % 3) + 6)]);
-      mbarrier[((i_s % 3) + 6)].arrive();
-    }
-  } else {
-    tl::warpgroup_reg_alloc<240>();
-    const dim3 blockIdx = tl::rasterization2DRow<10>();
-    #pragma unroll
-    for (int i_1 = 0; i_1 < 64; ++i_1) {
-      *(float2*)(b_h_fragment + (i_1 * 2)) = make_float2(0x0p+0f/*0.000000e+00*/, 0x0p+0f/*0.000000e+00*/);
-    }
-    #pragma unroll
-    for (int i_2 = 0; i_2 < 16; ++i_2) {
-      tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((((((int)threadIdx.x) >> 7) * 16384) + (((i_2 & 7) >> 2) * 8192)) + ((i_2 >> 3) * 4096)) + (((((int)threadIdx.x) & 127) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_2 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_2 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 147456)])), __pack_half2(((bfloat16_t)b_h_fragment[(i_2 * 8)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 1)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 2)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 3)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 4)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 5)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 6)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 7)])));
-    }
-    for (int i_s_1 = 0; i_s_1 < 512; ++i_s_1) {
-      tl::__sync_thread_partial<3, 256>();
-      if (tl::tl_shuffle_elect<256>()) {
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[147456])), 0, 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[155648])), 64, 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[163840])), 128, 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[172032])), 192, 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-      }
-      mbarrier[(i_s_1 % 3)].wait(((i_s_1 % 6) / 3));
-      tl::gemm_ss<64, 256, 128, 4, 2, 0, 0, 1, 128, 256, 0, 0, true>((&(((bfloat16_t*)buf_dyn_shmem)[(((i_s_1 % 3) * 8192) + 180224)])), (&(((bfloat16_t*)buf_dyn_shmem)[147456])), (&(V_new_fragment[0])));
-      mbarrier[((i_s_1 % 3) + 9)].arrive();
-      mbarrier[((i_s_1 % 3) + 3)].wait(((i_s_1 % 6) / 3));
-      #pragma unroll
-      for (int i_3 = 0; i_3 < 32; ++i_3) {
-        float2 __1;
-        uint1 v_ = *(uint1*)(((bfloat16_t*)buf_dyn_shmem) + ((((((((((((i_s_1 % 3) * 16384) + ((((int)threadIdx.x) >> 7) * 8192)) + ((i_3 >> 4) * 4096)) + (((((int)threadIdx.x) & 127) >> 5) * 1024)) + ((i_3 & 1) * 512)) + (((((int)threadIdx.x) & 31) >> 2) * 64)) + ((((((((i_3 & 15) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 5) + ((((int)threadIdx.x) & 31) >> 4)) & 1) * 32)) + ((((((((i_3 & 7) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 4) + ((((int)threadIdx.x) & 15) >> 3)) & 1) * 16)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_3 & 3) >> 1)) & 1) * 8)) + ((((int)threadIdx.x) & 3) * 2)) + 98304));
-#ifdef ENABLE_BF16
-        reinterpret_cast<float2 &>(__1) = fastertransformer::bf1622float2(reinterpret_cast<__nv_bfloat162 const &>(v_));
-#else
-        __1.x = (float)(((nv_bfloat162*)(&(v_.x)))->x);
-        __1.y = (float)(((nv_bfloat162*)(&(v_.x)))->y);
-#endif
-        *(float2*)(U_fragment + (i_3 * 2)) = __1;
-      }
-      tl::fence_proxy_async();
-      mbarrier[((i_s_1 % 3) + 12)].arrive();
-      #pragma unroll
-      for (int i_4 = 0; i_4 < 64; ++i_4) {
-        V_new_fragment[i_4] = ((V_new_fragment[i_4] * -0x1p+0f/*-1.000000e+00*/) + U_fragment[i_4]);
-      }
-      tl::__sync_thread_partial<3, 256>();
-      #pragma unroll
-      for (int i_5 = 0; i_5 < 8; ++i_5) {
-        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((int)threadIdx.x) >> 7) * 8192) + ((i_5 >> 2) * 4096)) + (((((int)threadIdx.x) & 127) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_5 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_5 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 229376)])), __pack_half2(((bfloat16_t)V_new_fragment[(i_5 * 8)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 1)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 2)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 3)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 4)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 5)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 6)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 7)])));
-      }
-      tl::fence_proxy_async();
-      tl::__sync_thread_partial<3, 256>();
-      if (tl::tl_shuffle_elect<256>()) {
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[229376])), 0, ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[233472])), 64, ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[237568])), 128, ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[241664])), 192, ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-      }
-      G_last_local[0] = G[(((i_s_1 * 768) + ((int)blockIdx.y)) + 756)];
-      tl::fence_proxy_async();
-      mbarrier[((i_s_1 % 3) + 6)].wait(((i_s_1 % 6) / 3));
-      #pragma unroll
-      for (int i_6 = 0; i_6 < 32; ++i_6) {
-        *(float2*)(G_fragment + (i_6 * 2)) = *(float2*)(((float*)buf_dyn_shmem) + (((((((((((i_s_1 % 3) * 16384) + ((((int)threadIdx.x) >> 7) * 8192)) + ((i_6 >> 3) * 2048)) + (((((int)threadIdx.x) & 127) >> 5) * 512)) + ((i_6 & 1) * 256)) + (((((int)threadIdx.x) & 31) >> 2) * 32)) + ((((((((i_6 & 7) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 4) + ((((int)threadIdx.x) & 31) >> 4)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + ((i_6 & 3) >> 1)) & 1) * 8)) + (((((((int)threadIdx.x) & 7) >> 2) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 4)) + ((((int)threadIdx.x) & 1) * 2)));
-      }
-      #pragma unroll
-      for (int i_7 = 0; i_7 < 64; ++i_7) {
-        if ((G_last_local[0] - G_fragment[i_7]) <= 0x0p+0f/*0.000000e+00*/) {
-          V_new_fragment[i_7] = (V_new_fragment[i_7] * expf((G_last_local[0] - G_fragment[i_7])));
-        } else {
-          V_new_fragment[i_7] = 0x0p+0f/*0.000000e+00*/;
-        }
-      }
-      G_last_local[0] = expf(G_last_local[0]);
-      #pragma unroll
-      for (int i_8 = 0; i_8 < 128; ++i_8) {
-        b_h_fragment[i_8] = (b_h_fragment[i_8] * G_last_local[0]);
-      }
-      tl::__sync_thread_partial<3, 256>();
-      #pragma unroll
-      for (int i_9 = 0; i_9 < 8; ++i_9) {
-        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((int)threadIdx.x) >> 7) * 8192) + ((i_9 >> 2) * 4096)) + (((((int)threadIdx.x) & 127) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_9 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_9 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 229376)])), __pack_half2(((bfloat16_t)V_new_fragment[(i_9 * 8)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 1)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 2)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 3)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 4)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 5)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 6)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 7)])));
-      }
-      tl::fence_proxy_async();
-      tl::__sync_thread_partial<3, 256>();
-      tl::gemm_ss<128, 256, 64, 4, 2, 1, 0, 0, 128, 256, 0, 0, true>((&(((bfloat16_t*)buf_dyn_shmem)[(((i_s_1 % 3) * 8192) + 204800)])), (&(((bfloat16_t*)buf_dyn_shmem)[229376])), (&(b_h_fragment[0])));
-      mbarrier[((i_s_1 % 3) + 15)].arrive();
-      tl::__sync_thread_partial<3, 256>();
-      #pragma unroll
-      for (int i_10 = 0; i_10 < 16; ++i_10) {
-        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((((((int)threadIdx.x) >> 7) * 16384) + (((i_10 & 7) >> 2) * 8192)) + ((i_10 >> 3) * 4096)) + (((((int)threadIdx.x) & 127) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_10 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_10 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 147456)])), __pack_half2(((bfloat16_t)b_h_fragment[(i_10 * 8)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 1)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 2)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 3)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 4)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 5)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 6)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 7)])));
-      }
-    }
-    #pragma unroll
-    for (int i_11 = 0; i_11 < 64; ++i_11) {
-      *(float2*)(final_state + ((((((((((int)blockIdx.y) * 32768) + ((i_11 >> 5) * 16384)) + (((((int)threadIdx.x) & 127) >> 5) * 4096)) + ((i_11 & 1) * 2048)) + (((((int)threadIdx.x) & 31) >> 2) * 256)) + ((((int)threadIdx.x) >> 7) * 128)) + (((i_11 & 31) >> 1) * 8)) + ((((int)threadIdx.x) & 3) * 2))) = *(float2*)(b_h_fragment + (i_11 * 2));
-    }
-  }
-}
-
-
-#define ERROR_BUF_SIZE 1024
-static char error_buf[ERROR_BUF_SIZE];
-
-extern "C" const char* get_last_error() {
-    return error_buf;
-}
-
-extern "C" int init() {
-    error_buf[0] = '\0';
-    
-    cudaError_t result_kernel_kernel = cudaFuncSetAttribute(kernel_kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 491520);
-    if (result_kernel_kernel != CUDA_SUCCESS) {
-        snprintf(error_buf, ERROR_BUF_SIZE, "Failed to set the allowed dynamic shared memory size to %d with error: %s", 491520, cudaGetErrorString(result_kernel_kernel));
-        return -1;
-    }
-
-    return 0;
-}
-
-extern "C" int call(bfloat16_t* __restrict__ K, bfloat16_t* __restrict__ W, bfloat16_t* __restrict__ U, float* __restrict__ G, bfloat16_t* __restrict__ h, float* __restrict__ final_state, bfloat16_t* __restrict__ V_new, cudaStream_t stream=cudaStreamDefault) {
-
-	CUtensorMap K_desc;
-	CUtensorMapDataType K_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t K_desc_tensorRank= 4;
-	void *K_desc_globalAddress= K;
-	cuuint64_t K_desc_globalDim[4]= {128,12,32768,1};
-	cuuint64_t K_desc_globalStride[4]= {2,256,3072,100663296};
-	cuuint32_t K_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t K_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave K_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle K_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion K_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill K_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult K_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &K_desc, K_desc_type, K_desc_tensorRank, K_desc_globalAddress, K_desc_globalDim, K_desc_globalStride + 1, K_desc_boxDim, K_desc_elementStrides, K_desc_interleave, K_desc_swizzle, K_desc_l2Promotion, K_desc_oobFill);
-
-	if (K_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor K_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap U_desc;
-	CUtensorMapDataType U_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t U_desc_tensorRank= 4;
-	void *U_desc_globalAddress= U;
-	cuuint64_t U_desc_globalDim[4]= {256,12,32768,1};
-	cuuint64_t U_desc_globalStride[4]= {2,512,6144,201326592};
-	cuuint32_t U_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t U_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave U_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle U_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion U_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill U_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult U_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &U_desc, U_desc_type, U_desc_tensorRank, U_desc_globalAddress, U_desc_globalDim, U_desc_globalStride + 1, U_desc_boxDim, U_desc_elementStrides, U_desc_interleave, U_desc_swizzle, U_desc_l2Promotion, U_desc_oobFill);
-
-	if (U_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor U_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap V_new_desc;
-	CUtensorMapDataType V_new_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t V_new_desc_tensorRank= 4;
-	void *V_new_desc_globalAddress= V_new;
-	cuuint64_t V_new_desc_globalDim[4]= {256,12,32768,1};
-	cuuint64_t V_new_desc_globalStride[4]= {2,512,6144,201326592};
-	cuuint32_t V_new_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t V_new_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave V_new_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle V_new_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion V_new_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill V_new_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult V_new_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &V_new_desc, V_new_desc_type, V_new_desc_tensorRank, V_new_desc_globalAddress, V_new_desc_globalDim, V_new_desc_globalStride + 1, V_new_desc_boxDim, V_new_desc_elementStrides, V_new_desc_interleave, V_new_desc_swizzle, V_new_desc_l2Promotion, V_new_desc_oobFill);
-
-	if (V_new_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor V_new_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap W_desc;
-	CUtensorMapDataType W_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t W_desc_tensorRank= 4;
-	void *W_desc_globalAddress= W;
-	cuuint64_t W_desc_globalDim[4]= {128,12,32768,1};
-	cuuint64_t W_desc_globalStride[4]= {2,256,3072,100663296};
-	cuuint32_t W_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t W_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave W_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle W_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion W_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill W_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult W_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &W_desc, W_desc_type, W_desc_tensorRank, W_desc_globalAddress, W_desc_globalDim, W_desc_globalStride + 1, W_desc_boxDim, W_desc_elementStrides, W_desc_interleave, W_desc_swizzle, W_desc_l2Promotion, W_desc_oobFill);
-
-	if (W_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor W_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap h_desc;
-	CUtensorMapDataType h_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t h_desc_tensorRank= 5;
-	void *h_desc_globalAddress= h;
-	cuuint64_t h_desc_globalDim[5]= {256,128,12,512,1};
-	cuuint64_t h_desc_globalStride[5]= {2,512,65536,786432,402653184};
-	cuuint32_t h_desc_boxDim[5]= {64,128,1,1,1};
-	cuuint32_t h_desc_elementStrides[5]= {1,1,1,1,1};
-	CUtensorMapInterleave h_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle h_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion h_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill h_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult h_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &h_desc, h_desc_type, h_desc_tensorRank, h_desc_globalAddress, h_desc_globalDim, h_desc_globalStride + 1, h_desc_boxDim, h_desc_elementStrides, h_desc_interleave, h_desc_swizzle, h_desc_l2Promotion, h_desc_oobFill);
-
-	if (h_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor h_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-	kernel_kernel<<<dim3(1, 12, 1), dim3(512, 1, 1), 491520, stream>>>(G, K_desc, U_desc, V_new_desc, W_desc, final_state, h_desc);
-	TILELANG_CHECK_LAST_ERROR("kernel_kernel");
-
-	return 0;
-}
-
-2025-10-06 02:08:42,253 DEBUG:Compilation failed for config {'block_DK': 128, 'block_DV': 256, 'threads': 256, 'num_stages': 2} at index 16 with error: Initialization failed: Failed to set the allowed dynamic shared memory size to 360448 with error: invalid argument
-#include <tl_templates/cuda/gemm.h>
-#include <tl_templates/cuda/copy.h>
-#include <tl_templates/cuda/reduce.h>
-#include <tl_templates/cuda/ldsm.h>
-#include <tl_templates/cuda/threadblock_swizzle.h>
-#include <tl_templates/cuda/debug.h>
-#ifdef ENABLE_BF16
-#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>
-#endif
-
-extern "C" __global__ void kernel_kernel(float* __restrict__ G, __grid_constant__ const CUtensorMap K_desc, __grid_constant__ const CUtensorMap U_desc, __grid_constant__ const CUtensorMap V_new_desc, __grid_constant__ const CUtensorMap W_desc, float* __restrict__ final_state, __grid_constant__ const CUtensorMap h_desc);
-extern "C" __global__ void __launch_bounds__(512, 1) kernel_kernel(float* __restrict__ G, __grid_constant__ const CUtensorMap K_desc, __grid_constant__ const CUtensorMap U_desc, __grid_constant__ const CUtensorMap V_new_desc, __grid_constant__ const CUtensorMap W_desc, float* __restrict__ final_state, __grid_constant__ const CUtensorMap h_desc) {
-  extern __shared__ __align__(1024) uchar buf_dyn_shmem[];
-  float b_h_fragment[128];
-  float V_new_fragment[64];
-  float U_fragment[64];
-  float G_last_local[1];
-  float G_fragment[64];
-  __shared__ uint64_t mbarrier_mem[12];
-  auto mbarrier = reinterpret_cast<Barrier*>(mbarrier_mem);
-  if (tl::tl_shuffle_elect<0>()) {
-    tl::prefetch_tma_descriptor(W_desc);
-    tl::prefetch_tma_descriptor(U_desc);
-    tl::prefetch_tma_descriptor(K_desc);
-    tl::prefetch_tma_descriptor(h_desc);
-    tl::prefetch_tma_descriptor(V_new_desc);
-    mbarrier[0].init(256);
-    mbarrier[1].init(256);
-    mbarrier[2].init(256);
-    mbarrier[3].init(256);
-    mbarrier[4].init(256);
-    mbarrier[5].init(256);
-    mbarrier[6].init(256);
-    mbarrier[7].init(256);
-    mbarrier[8].init(256);
-    mbarrier[9].init(256);
-    mbarrier[10].init(256);
-    mbarrier[11].init(256);
-  }
-  __syncthreads();
-  if (256 <= ((int)threadIdx.x)) {
-    tl::warpgroup_reg_dealloc<24>();
-    const dim3 blockIdx = tl::rasterization2DRow<10>();
-    for (int i_s = 0; i_s < 512; ++i_s) {
-      mbarrier[((i_s & 1) + 6)].wait((((i_s & 3) >> 1) ^ 1));
-      if (tl::tl_shuffle_elect<256>()) {
-        mbarrier[(i_s & 1)].expect_transaction(16384);
-        tl::tma_load(W_desc, mbarrier[(i_s & 1)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 1) * 8192) + 131072)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(W_desc, mbarrier[(i_s & 1)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 1) * 8192) + 135168)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
-      }
-      mbarrier[(i_s & 1)].arrive();
-      mbarrier[((i_s & 1) + 8)].wait((((i_s & 3) >> 1) ^ 1));
-      if (tl::tl_shuffle_elect<256>()) {
-        mbarrier[((i_s & 1) + 2)].expect_transaction(32768);
-        tl::tma_load(U_desc, mbarrier[((i_s & 1) + 2)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 1) * 16384) + 65536)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(U_desc, mbarrier[((i_s & 1) + 2)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 1) * 16384) + 69632)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(U_desc, mbarrier[((i_s & 1) + 2)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 1) * 16384) + 73728)])), 128, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(U_desc, mbarrier[((i_s & 1) + 2)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 1) * 16384) + 77824)])), 192, ((int)blockIdx.y), (i_s * 64), 0);
-      }
-      mbarrier[((i_s & 1) + 2)].arrive();
-      mbarrier[((i_s & 1) + 10)].wait((((i_s & 3) >> 1) ^ 1));
-      if (tl::tl_shuffle_elect<256>()) {
-        mbarrier[((i_s & 1) + 4)].expect_transaction(16384);
-        tl::tma_load(K_desc, mbarrier[((i_s & 1) + 4)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 1) * 8192) + 163840)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(K_desc, mbarrier[((i_s & 1) + 4)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 1) * 8192) + 167936)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
-      }
-      #pragma unroll
-      for (int i = 0; i < 64; ++i) {
-        ((float*)buf_dyn_shmem)[(((((((((i_s & 1) * 16384) + ((((int)threadIdx.x) >> 5) * 2048)) + (i * 32)) + (((((((int)threadIdx.x) & 31) >> 4) + ((i & 7) >> 2)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + ((i & 3) >> 1)) & 1) * 8)) + (((((((int)threadIdx.x) & 7) >> 2) + (i & 1)) & 1) * 4)) + (((int)threadIdx.x) & 3)) - 16384)] = G[(((i_s * 768) + (i * 12)) + ((int)blockIdx.y))];
-      }
-      tl::fence_proxy_async();
-      tl::mbarrier_cp_async_arrive(mbarrier[((i_s & 1) + 4)]);
-      mbarrier[((i_s & 1) + 4)].arrive();
-    }
-  } else {
-    tl::warpgroup_reg_alloc<240>();
-    const dim3 blockIdx = tl::rasterization2DRow<10>();
-    #pragma unroll
-    for (int i_1 = 0; i_1 < 64; ++i_1) {
-      *(float2*)(b_h_fragment + (i_1 * 2)) = make_float2(0x0p+0f/*0.000000e+00*/, 0x0p+0f/*0.000000e+00*/);
-    }
-    #pragma unroll
-    for (int i_2 = 0; i_2 < 16; ++i_2) {
-      tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((((((int)threadIdx.x) >> 7) * 16384) + (((i_2 & 7) >> 2) * 8192)) + ((i_2 >> 3) * 4096)) + (((((int)threadIdx.x) & 127) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_2 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_2 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 98304)])), __pack_half2(((bfloat16_t)b_h_fragment[(i_2 * 8)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 1)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 2)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 3)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 4)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 5)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 6)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 7)])));
-    }
-    for (int i_s_1 = 0; i_s_1 < 512; ++i_s_1) {
-      tl::__sync_thread_partial<3, 256>();
-      if (tl::tl_shuffle_elect<256>()) {
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[98304])), 0, 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[106496])), 64, 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[114688])), 128, 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[122880])), 192, 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-      }
-      mbarrier[(i_s_1 & 1)].wait(((i_s_1 & 3) >> 1));
-      tl::gemm_ss<64, 256, 128, 4, 2, 0, 0, 1, 128, 256, 0, 0, true>((&(((bfloat16_t*)buf_dyn_shmem)[(((i_s_1 & 1) * 8192) + 131072)])), (&(((bfloat16_t*)buf_dyn_shmem)[98304])), (&(V_new_fragment[0])));
-      mbarrier[((i_s_1 & 1) + 6)].arrive();
-      mbarrier[((i_s_1 & 1) + 2)].wait(((i_s_1 & 3) >> 1));
-      #pragma unroll
-      for (int i_3 = 0; i_3 < 32; ++i_3) {
-        float2 __1;
-        uint1 v_ = *(uint1*)(((bfloat16_t*)buf_dyn_shmem) + ((((((((((((i_s_1 & 1) * 16384) + ((((int)threadIdx.x) >> 7) * 8192)) + ((i_3 >> 4) * 4096)) + (((((int)threadIdx.x) & 127) >> 5) * 1024)) + ((i_3 & 1) * 512)) + (((((int)threadIdx.x) & 31) >> 2) * 64)) + ((((((((i_3 & 15) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 5) + ((((int)threadIdx.x) & 31) >> 4)) & 1) * 32)) + ((((((((i_3 & 7) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 4) + ((((int)threadIdx.x) & 15) >> 3)) & 1) * 16)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_3 & 3) >> 1)) & 1) * 8)) + ((((int)threadIdx.x) & 3) * 2)) + 65536));
-#ifdef ENABLE_BF16
-        reinterpret_cast<float2 &>(__1) = fastertransformer::bf1622float2(reinterpret_cast<__nv_bfloat162 const &>(v_));
-#else
-        __1.x = (float)(((nv_bfloat162*)(&(v_.x)))->x);
-        __1.y = (float)(((nv_bfloat162*)(&(v_.x)))->y);
-#endif
-        *(float2*)(U_fragment + (i_3 * 2)) = __1;
-      }
-      tl::fence_proxy_async();
-      mbarrier[((i_s_1 & 1) + 8)].arrive();
-      #pragma unroll
-      for (int i_4 = 0; i_4 < 64; ++i_4) {
-        V_new_fragment[i_4] = ((V_new_fragment[i_4] * -0x1p+0f/*-1.000000e+00*/) + U_fragment[i_4]);
-      }
-      tl::__sync_thread_partial<3, 256>();
-      #pragma unroll
-      for (int i_5 = 0; i_5 < 8; ++i_5) {
-        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((int)threadIdx.x) >> 7) * 8192) + ((i_5 >> 2) * 4096)) + (((((int)threadIdx.x) & 127) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_5 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_5 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 147456)])), __pack_half2(((bfloat16_t)V_new_fragment[(i_5 * 8)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 1)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 2)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 3)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 4)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 5)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 6)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 7)])));
-      }
-      tl::fence_proxy_async();
-      tl::__sync_thread_partial<3, 256>();
-      if (tl::tl_shuffle_elect<256>()) {
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[147456])), 0, ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[151552])), 64, ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[155648])), 128, ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[159744])), 192, ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-      }
-      G_last_local[0] = G[(((i_s_1 * 768) + ((int)blockIdx.y)) + 756)];
-      tl::fence_proxy_async();
-      mbarrier[((i_s_1 & 1) + 4)].wait(((i_s_1 & 3) >> 1));
-      #pragma unroll
-      for (int i_6 = 0; i_6 < 32; ++i_6) {
-        *(float2*)(G_fragment + (i_6 * 2)) = *(float2*)(((float*)buf_dyn_shmem) + (((((((((((i_s_1 & 1) * 16384) + ((((int)threadIdx.x) >> 7) * 8192)) + ((i_6 >> 3) * 2048)) + (((((int)threadIdx.x) & 127) >> 5) * 512)) + ((i_6 & 1) * 256)) + (((((int)threadIdx.x) & 31) >> 2) * 32)) + ((((((((i_6 & 7) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 4) + ((((int)threadIdx.x) & 31) >> 4)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + ((i_6 & 3) >> 1)) & 1) * 8)) + (((((((int)threadIdx.x) & 7) >> 2) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 4)) + ((((int)threadIdx.x) & 1) * 2)));
-      }
-      #pragma unroll
-      for (int i_7 = 0; i_7 < 64; ++i_7) {
-        if ((G_last_local[0] - G_fragment[i_7]) <= 0x0p+0f/*0.000000e+00*/) {
-          V_new_fragment[i_7] = (V_new_fragment[i_7] * expf((G_last_local[0] - G_fragment[i_7])));
-        } else {
-          V_new_fragment[i_7] = 0x0p+0f/*0.000000e+00*/;
-        }
-      }
-      G_last_local[0] = expf(G_last_local[0]);
-      #pragma unroll
-      for (int i_8 = 0; i_8 < 128; ++i_8) {
-        b_h_fragment[i_8] = (b_h_fragment[i_8] * G_last_local[0]);
-      }
-      tl::__sync_thread_partial<3, 256>();
-      #pragma unroll
-      for (int i_9 = 0; i_9 < 8; ++i_9) {
-        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((int)threadIdx.x) >> 7) * 8192) + ((i_9 >> 2) * 4096)) + (((((int)threadIdx.x) & 127) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_9 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_9 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 147456)])), __pack_half2(((bfloat16_t)V_new_fragment[(i_9 * 8)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 1)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 2)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 3)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 4)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 5)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 6)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 7)])));
-      }
-      tl::fence_proxy_async();
-      tl::__sync_thread_partial<3, 256>();
-      tl::gemm_ss<128, 256, 64, 4, 2, 1, 0, 0, 128, 256, 0, 0, true>((&(((bfloat16_t*)buf_dyn_shmem)[(((i_s_1 & 1) * 8192) + 163840)])), (&(((bfloat16_t*)buf_dyn_shmem)[147456])), (&(b_h_fragment[0])));
-      mbarrier[((i_s_1 & 1) + 10)].arrive();
-      tl::__sync_thread_partial<3, 256>();
-      #pragma unroll
-      for (int i_10 = 0; i_10 < 16; ++i_10) {
-        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((((((int)threadIdx.x) >> 7) * 16384) + (((i_10 & 7) >> 2) * 8192)) + ((i_10 >> 3) * 4096)) + (((((int)threadIdx.x) & 127) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_10 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_10 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 98304)])), __pack_half2(((bfloat16_t)b_h_fragment[(i_10 * 8)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 1)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 2)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 3)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 4)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 5)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 6)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 7)])));
-      }
-    }
-    #pragma unroll
-    for (int i_11 = 0; i_11 < 64; ++i_11) {
-      *(float2*)(final_state + ((((((((((int)blockIdx.y) * 32768) + ((i_11 >> 5) * 16384)) + (((((int)threadIdx.x) & 127) >> 5) * 4096)) + ((i_11 & 1) * 2048)) + (((((int)threadIdx.x) & 31) >> 2) * 256)) + ((((int)threadIdx.x) >> 7) * 128)) + (((i_11 & 31) >> 1) * 8)) + ((((int)threadIdx.x) & 3) * 2))) = *(float2*)(b_h_fragment + (i_11 * 2));
-    }
-  }
-}
-
-
-#define ERROR_BUF_SIZE 1024
-static char error_buf[ERROR_BUF_SIZE];
-
-extern "C" const char* get_last_error() {
-    return error_buf;
-}
-
-extern "C" int init() {
-    error_buf[0] = '\0';
-    
-    cudaError_t result_kernel_kernel = cudaFuncSetAttribute(kernel_kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 360448);
-    if (result_kernel_kernel != CUDA_SUCCESS) {
-        snprintf(error_buf, ERROR_BUF_SIZE, "Failed to set the allowed dynamic shared memory size to %d with error: %s", 360448, cudaGetErrorString(result_kernel_kernel));
-        return -1;
-    }
-
-    return 0;
-}
-
-extern "C" int call(bfloat16_t* __restrict__ K, bfloat16_t* __restrict__ W, bfloat16_t* __restrict__ U, float* __restrict__ G, bfloat16_t* __restrict__ h, float* __restrict__ final_state, bfloat16_t* __restrict__ V_new, cudaStream_t stream=cudaStreamDefault) {
-
-	CUtensorMap K_desc;
-	CUtensorMapDataType K_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t K_desc_tensorRank= 4;
-	void *K_desc_globalAddress= K;
-	cuuint64_t K_desc_globalDim[4]= {128,12,32768,1};
-	cuuint64_t K_desc_globalStride[4]= {2,256,3072,100663296};
-	cuuint32_t K_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t K_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave K_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle K_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion K_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill K_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult K_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &K_desc, K_desc_type, K_desc_tensorRank, K_desc_globalAddress, K_desc_globalDim, K_desc_globalStride + 1, K_desc_boxDim, K_desc_elementStrides, K_desc_interleave, K_desc_swizzle, K_desc_l2Promotion, K_desc_oobFill);
-
-	if (K_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor K_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap U_desc;
-	CUtensorMapDataType U_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t U_desc_tensorRank= 4;
-	void *U_desc_globalAddress= U;
-	cuuint64_t U_desc_globalDim[4]= {256,12,32768,1};
-	cuuint64_t U_desc_globalStride[4]= {2,512,6144,201326592};
-	cuuint32_t U_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t U_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave U_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle U_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion U_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill U_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult U_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &U_desc, U_desc_type, U_desc_tensorRank, U_desc_globalAddress, U_desc_globalDim, U_desc_globalStride + 1, U_desc_boxDim, U_desc_elementStrides, U_desc_interleave, U_desc_swizzle, U_desc_l2Promotion, U_desc_oobFill);
-
-	if (U_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor U_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap V_new_desc;
-	CUtensorMapDataType V_new_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t V_new_desc_tensorRank= 4;
-	void *V_new_desc_globalAddress= V_new;
-	cuuint64_t V_new_desc_globalDim[4]= {256,12,32768,1};
-	cuuint64_t V_new_desc_globalStride[4]= {2,512,6144,201326592};
-	cuuint32_t V_new_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t V_new_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave V_new_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle V_new_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion V_new_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill V_new_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult V_new_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &V_new_desc, V_new_desc_type, V_new_desc_tensorRank, V_new_desc_globalAddress, V_new_desc_globalDim, V_new_desc_globalStride + 1, V_new_desc_boxDim, V_new_desc_elementStrides, V_new_desc_interleave, V_new_desc_swizzle, V_new_desc_l2Promotion, V_new_desc_oobFill);
-
-	if (V_new_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor V_new_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap W_desc;
-	CUtensorMapDataType W_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t W_desc_tensorRank= 4;
-	void *W_desc_globalAddress= W;
-	cuuint64_t W_desc_globalDim[4]= {128,12,32768,1};
-	cuuint64_t W_desc_globalStride[4]= {2,256,3072,100663296};
-	cuuint32_t W_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t W_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave W_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle W_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion W_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill W_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult W_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &W_desc, W_desc_type, W_desc_tensorRank, W_desc_globalAddress, W_desc_globalDim, W_desc_globalStride + 1, W_desc_boxDim, W_desc_elementStrides, W_desc_interleave, W_desc_swizzle, W_desc_l2Promotion, W_desc_oobFill);
-
-	if (W_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor W_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap h_desc;
-	CUtensorMapDataType h_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t h_desc_tensorRank= 5;
-	void *h_desc_globalAddress= h;
-	cuuint64_t h_desc_globalDim[5]= {256,128,12,512,1};
-	cuuint64_t h_desc_globalStride[5]= {2,512,65536,786432,402653184};
-	cuuint32_t h_desc_boxDim[5]= {64,128,1,1,1};
-	cuuint32_t h_desc_elementStrides[5]= {1,1,1,1,1};
-	CUtensorMapInterleave h_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle h_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion h_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill h_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult h_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &h_desc, h_desc_type, h_desc_tensorRank, h_desc_globalAddress, h_desc_globalDim, h_desc_globalStride + 1, h_desc_boxDim, h_desc_elementStrides, h_desc_interleave, h_desc_swizzle, h_desc_l2Promotion, h_desc_oobFill);
-
-	if (h_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor h_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-	kernel_kernel<<<dim3(1, 12, 1), dim3(512, 1, 1), 360448, stream>>>(G, K_desc, U_desc, V_new_desc, W_desc, final_state, h_desc);
-	TILELANG_CHECK_LAST_ERROR("kernel_kernel");
-
-	return 0;
-}
-
-2025-10-06 02:08:42,856 DEBUG:Compilation failed for config {'block_DK': 128, 'block_DV': 256, 'threads': 128, 'num_stages': 3} at index 14 with error: Initialization failed: Failed to set the allowed dynamic shared memory size to 491520 with error: invalid argument
-#include <tl_templates/cuda/gemm.h>
-#include <tl_templates/cuda/copy.h>
-#include <tl_templates/cuda/reduce.h>
-#include <tl_templates/cuda/ldsm.h>
-#include <tl_templates/cuda/threadblock_swizzle.h>
-#include <tl_templates/cuda/debug.h>
-#ifdef ENABLE_BF16
-#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>
-#endif
-
-extern "C" __global__ void kernel_kernel(float* __restrict__ G, __grid_constant__ const CUtensorMap K_desc, __grid_constant__ const CUtensorMap U_desc, __grid_constant__ const CUtensorMap V_new_desc, __grid_constant__ const CUtensorMap W_desc, float* __restrict__ final_state, __grid_constant__ const CUtensorMap h_desc);
-extern "C" __global__ void __launch_bounds__(256, 1) kernel_kernel(float* __restrict__ G, __grid_constant__ const CUtensorMap K_desc, __grid_constant__ const CUtensorMap U_desc, __grid_constant__ const CUtensorMap V_new_desc, __grid_constant__ const CUtensorMap W_desc, float* __restrict__ final_state, __grid_constant__ const CUtensorMap h_desc) {
-  extern __shared__ __align__(1024) uchar buf_dyn_shmem[];
-  float b_h_fragment[256];
-  float V_new_fragment[128];
-  float U_fragment[128];
-  float G_last_local[1];
-  float G_fragment[128];
-  __shared__ uint64_t mbarrier_mem[18];
-  auto mbarrier = reinterpret_cast<Barrier*>(mbarrier_mem);
-  if (tl::tl_shuffle_elect<0>()) {
-    tl::prefetch_tma_descriptor(W_desc);
-    tl::prefetch_tma_descriptor(U_desc);
-    tl::prefetch_tma_descriptor(K_desc);
-    tl::prefetch_tma_descriptor(h_desc);
-    tl::prefetch_tma_descriptor(V_new_desc);
-    mbarrier[0].init(128);
-    mbarrier[1].init(128);
-    mbarrier[2].init(128);
-    mbarrier[3].init(128);
-    mbarrier[4].init(128);
-    mbarrier[5].init(128);
-    mbarrier[6].init(128);
-    mbarrier[7].init(128);
-    mbarrier[8].init(128);
-    mbarrier[9].init(128);
-    mbarrier[10].init(128);
-    mbarrier[11].init(128);
-    mbarrier[12].init(128);
-    mbarrier[13].init(128);
-    mbarrier[14].init(128);
-    mbarrier[15].init(128);
-    mbarrier[16].init(128);
-    mbarrier[17].init(128);
-  }
-  __syncthreads();
-  if (128 <= ((int)threadIdx.x)) {
-    tl::warpgroup_reg_dealloc<24>();
-    const dim3 blockIdx = tl::rasterization2DRow<10>();
-    for (int i_s = 0; i_s < 512; ++i_s) {
-      mbarrier[((i_s % 3) + 9)].wait((((i_s % 6) / 3) ^ 1));
-      if (tl::tl_shuffle_elect<128>()) {
-        mbarrier[(i_s % 3)].expect_transaction(16384);
-        tl::tma_load(W_desc, mbarrier[(i_s % 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 8192) + 180224)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(W_desc, mbarrier[(i_s % 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 8192) + 184320)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
-      }
-      mbarrier[(i_s % 3)].arrive();
-      mbarrier[((i_s % 3) + 12)].wait((((i_s % 6) / 3) ^ 1));
-      if (tl::tl_shuffle_elect<128>()) {
-        mbarrier[((i_s % 3) + 3)].expect_transaction(32768);
-        tl::tma_load(U_desc, mbarrier[((i_s % 3) + 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 16384) + 98304)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(U_desc, mbarrier[((i_s % 3) + 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 16384) + 102400)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(U_desc, mbarrier[((i_s % 3) + 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 16384) + 106496)])), 128, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(U_desc, mbarrier[((i_s % 3) + 3)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 16384) + 110592)])), 192, ((int)blockIdx.y), (i_s * 64), 0);
-      }
-      mbarrier[((i_s % 3) + 3)].arrive();
-      mbarrier[((i_s % 3) + 15)].wait((((i_s % 6) / 3) ^ 1));
-      if (tl::tl_shuffle_elect<128>()) {
-        mbarrier[((i_s % 3) + 6)].expect_transaction(16384);
-        tl::tma_load(K_desc, mbarrier[((i_s % 3) + 6)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 8192) + 204800)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(K_desc, mbarrier[((i_s % 3) + 6)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s % 3) * 8192) + 208896)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
-      }
-      #pragma unroll
-      for (int i = 0; i < 128; ++i) {
-        ((float*)buf_dyn_shmem)[((((((((((i_s % 3) * 16384) + ((i & 1) * 8192)) + ((((int)threadIdx.x) >> 5) * 2048)) + ((i >> 1) * 32)) + (((((((int)threadIdx.x) & 31) >> 4) + ((i & 15) >> 3)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + ((i & 7) >> 2)) & 1) * 8)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i & 3) >> 1)) & 1) * 4)) + (((int)threadIdx.x) & 3)) - 8192)] = G[(((i_s * 768) + ((i >> 1) * 12)) + ((int)blockIdx.y))];
-      }
-      tl::fence_proxy_async();
-      tl::mbarrier_cp_async_arrive(mbarrier[((i_s % 3) + 6)]);
-      mbarrier[((i_s % 3) + 6)].arrive();
-    }
-  } else {
-    tl::warpgroup_reg_alloc<240>();
-    const dim3 blockIdx = tl::rasterization2DRow<10>();
-    #pragma unroll
-    for (int i_1 = 0; i_1 < 128; ++i_1) {
-      *(float2*)(b_h_fragment + (i_1 * 2)) = make_float2(0x0p+0f/*0.000000e+00*/, 0x0p+0f/*0.000000e+00*/);
-    }
-    #pragma unroll
-    for (int i_2 = 0; i_2 < 32; ++i_2) {
-      tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((((i_2 & 15) >> 2) * 8192) + ((i_2 >> 4) * 4096)) + ((((int)threadIdx.x) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_2 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_2 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 147456)])), __pack_half2(((bfloat16_t)b_h_fragment[(i_2 * 8)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 1)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 2)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 3)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 4)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 5)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 6)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 7)])));
-    }
-    for (int i_s_1 = 0; i_s_1 < 512; ++i_s_1) {
-      tl::__sync_thread_partial<3, 128>();
-      if (tl::tl_shuffle_elect<128>()) {
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[147456])), 0, 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[155648])), 64, 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[163840])), 128, 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[172032])), 192, 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-      }
-      mbarrier[(i_s_1 % 3)].wait(((i_s_1 % 6) / 3));
-      tl::gemm_ss<64, 256, 128, 4, 1, 0, 0, 1, 128, 256, 0, 0, true>((&(((bfloat16_t*)buf_dyn_shmem)[(((i_s_1 % 3) * 8192) + 180224)])), (&(((bfloat16_t*)buf_dyn_shmem)[147456])), (&(V_new_fragment[0])));
-      mbarrier[((i_s_1 % 3) + 9)].arrive();
-      mbarrier[((i_s_1 % 3) + 3)].wait(((i_s_1 % 6) / 3));
-      #pragma unroll
-      for (int i_3 = 0; i_3 < 64; ++i_3) {
-        float2 __1;
-        uint1 v_ = *(uint1*)(((bfloat16_t*)buf_dyn_shmem) + (((((((((((i_s_1 % 3) * 16384) + ((i_3 >> 4) * 4096)) + ((((int)threadIdx.x) >> 5) * 1024)) + ((i_3 & 1) * 512)) + (((((int)threadIdx.x) & 31) >> 2) * 64)) + ((((((((i_3 & 15) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 5) + ((((int)threadIdx.x) & 31) >> 4)) & 1) * 32)) + ((((((((i_3 & 7) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 4) + ((((int)threadIdx.x) & 15) >> 3)) & 1) * 16)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_3 & 3) >> 1)) & 1) * 8)) + ((((int)threadIdx.x) & 3) * 2)) + 98304));
-#ifdef ENABLE_BF16
-        reinterpret_cast<float2 &>(__1) = fastertransformer::bf1622float2(reinterpret_cast<__nv_bfloat162 const &>(v_));
-#else
-        __1.x = (float)(((nv_bfloat162*)(&(v_.x)))->x);
-        __1.y = (float)(((nv_bfloat162*)(&(v_.x)))->y);
-#endif
-        *(float2*)(U_fragment + (i_3 * 2)) = __1;
-      }
-      tl::fence_proxy_async();
-      mbarrier[((i_s_1 % 3) + 12)].arrive();
-      #pragma unroll
-      for (int i_4 = 0; i_4 < 128; ++i_4) {
-        V_new_fragment[i_4] = ((V_new_fragment[i_4] * -0x1p+0f/*-1.000000e+00*/) + U_fragment[i_4]);
-      }
-      tl::__sync_thread_partial<3, 128>();
-      #pragma unroll
-      for (int i_5 = 0; i_5 < 16; ++i_5) {
-        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((i_5 >> 2) * 4096) + ((((int)threadIdx.x) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_5 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_5 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 229376)])), __pack_half2(((bfloat16_t)V_new_fragment[(i_5 * 8)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 1)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 2)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 3)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 4)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 5)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 6)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 7)])));
-      }
-      tl::fence_proxy_async();
-      tl::__sync_thread_partial<3, 128>();
-      if (tl::tl_shuffle_elect<128>()) {
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[229376])), 0, ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[233472])), 64, ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[237568])), 128, ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[241664])), 192, ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-      }
-      G_last_local[0] = G[(((i_s_1 * 768) + ((int)blockIdx.y)) + 756)];
-      tl::fence_proxy_async();
-      mbarrier[((i_s_1 % 3) + 6)].wait(((i_s_1 % 6) / 3));
-      #pragma unroll
-      for (int i_6 = 0; i_6 < 64; ++i_6) {
-        *(float2*)(G_fragment + (i_6 * 2)) = *(float2*)(((float*)buf_dyn_shmem) + ((((((((((i_s_1 % 3) * 16384) + ((i_6 >> 3) * 2048)) + ((((int)threadIdx.x) >> 5) * 512)) + ((i_6 & 1) * 256)) + (((((int)threadIdx.x) & 31) >> 2) * 32)) + ((((((((i_6 & 7) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 4) + ((((int)threadIdx.x) & 31) >> 4)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + ((i_6 & 3) >> 1)) & 1) * 8)) + (((((((int)threadIdx.x) & 7) >> 2) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 4)) + ((((int)threadIdx.x) & 1) * 2)));
-      }
-      #pragma unroll
-      for (int i_7 = 0; i_7 < 128; ++i_7) {
-        if ((G_last_local[0] - G_fragment[i_7]) <= 0x0p+0f/*0.000000e+00*/) {
-          V_new_fragment[i_7] = (V_new_fragment[i_7] * expf((G_last_local[0] - G_fragment[i_7])));
-        } else {
-          V_new_fragment[i_7] = 0x0p+0f/*0.000000e+00*/;
-        }
-      }
-      G_last_local[0] = expf(G_last_local[0]);
-      #pragma unroll
-      for (int i_8 = 0; i_8 < 256; ++i_8) {
-        b_h_fragment[i_8] = (b_h_fragment[i_8] * G_last_local[0]);
-      }
-      tl::__sync_thread_partial<3, 128>();
-      #pragma unroll
-      for (int i_9 = 0; i_9 < 16; ++i_9) {
-        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((i_9 >> 2) * 4096) + ((((int)threadIdx.x) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_9 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_9 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 229376)])), __pack_half2(((bfloat16_t)V_new_fragment[(i_9 * 8)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 1)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 2)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 3)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 4)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 5)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 6)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 7)])));
-      }
-      tl::fence_proxy_async();
-      tl::__sync_thread_partial<3, 128>();
-      tl::gemm_ss<128, 256, 64, 4, 1, 1, 0, 0, 128, 256, 0, 0, true>((&(((bfloat16_t*)buf_dyn_shmem)[(((i_s_1 % 3) * 8192) + 204800)])), (&(((bfloat16_t*)buf_dyn_shmem)[229376])), (&(b_h_fragment[0])));
-      mbarrier[((i_s_1 % 3) + 15)].arrive();
-      tl::__sync_thread_partial<3, 128>();
-      #pragma unroll
-      for (int i_10 = 0; i_10 < 32; ++i_10) {
-        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((((i_10 & 15) >> 2) * 8192) + ((i_10 >> 4) * 4096)) + ((((int)threadIdx.x) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_10 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_10 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 147456)])), __pack_half2(((bfloat16_t)b_h_fragment[(i_10 * 8)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 1)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 2)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 3)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 4)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 5)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 6)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 7)])));
-      }
-    }
-    #pragma unroll
-    for (int i_11 = 0; i_11 < 128; ++i_11) {
-      *(float2*)(final_state + (((((((((int)blockIdx.y) * 32768) + ((i_11 >> 6) * 16384)) + ((((int)threadIdx.x) >> 5) * 4096)) + ((i_11 & 1) * 2048)) + (((((int)threadIdx.x) & 31) >> 2) * 256)) + (((i_11 & 63) >> 1) * 8)) + ((((int)threadIdx.x) & 3) * 2))) = *(float2*)(b_h_fragment + (i_11 * 2));
-    }
-  }
-}
-
-
-#define ERROR_BUF_SIZE 1024
-static char error_buf[ERROR_BUF_SIZE];
-
-extern "C" const char* get_last_error() {
-    return error_buf;
-}
-
-extern "C" int init() {
-    error_buf[0] = '\0';
-    
-    cudaError_t result_kernel_kernel = cudaFuncSetAttribute(kernel_kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 491520);
-    if (result_kernel_kernel != CUDA_SUCCESS) {
-        snprintf(error_buf, ERROR_BUF_SIZE, "Failed to set the allowed dynamic shared memory size to %d with error: %s", 491520, cudaGetErrorString(result_kernel_kernel));
-        return -1;
-    }
-
-    return 0;
-}
-
-extern "C" int call(bfloat16_t* __restrict__ K, bfloat16_t* __restrict__ W, bfloat16_t* __restrict__ U, float* __restrict__ G, bfloat16_t* __restrict__ h, float* __restrict__ final_state, bfloat16_t* __restrict__ V_new, cudaStream_t stream=cudaStreamDefault) {
-
-	CUtensorMap K_desc;
-	CUtensorMapDataType K_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t K_desc_tensorRank= 4;
-	void *K_desc_globalAddress= K;
-	cuuint64_t K_desc_globalDim[4]= {128,12,32768,1};
-	cuuint64_t K_desc_globalStride[4]= {2,256,3072,100663296};
-	cuuint32_t K_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t K_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave K_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle K_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion K_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill K_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult K_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &K_desc, K_desc_type, K_desc_tensorRank, K_desc_globalAddress, K_desc_globalDim, K_desc_globalStride + 1, K_desc_boxDim, K_desc_elementStrides, K_desc_interleave, K_desc_swizzle, K_desc_l2Promotion, K_desc_oobFill);
-
-	if (K_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor K_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap U_desc;
-	CUtensorMapDataType U_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t U_desc_tensorRank= 4;
-	void *U_desc_globalAddress= U;
-	cuuint64_t U_desc_globalDim[4]= {256,12,32768,1};
-	cuuint64_t U_desc_globalStride[4]= {2,512,6144,201326592};
-	cuuint32_t U_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t U_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave U_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle U_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion U_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill U_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult U_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &U_desc, U_desc_type, U_desc_tensorRank, U_desc_globalAddress, U_desc_globalDim, U_desc_globalStride + 1, U_desc_boxDim, U_desc_elementStrides, U_desc_interleave, U_desc_swizzle, U_desc_l2Promotion, U_desc_oobFill);
-
-	if (U_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor U_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap V_new_desc;
-	CUtensorMapDataType V_new_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t V_new_desc_tensorRank= 4;
-	void *V_new_desc_globalAddress= V_new;
-	cuuint64_t V_new_desc_globalDim[4]= {256,12,32768,1};
-	cuuint64_t V_new_desc_globalStride[4]= {2,512,6144,201326592};
-	cuuint32_t V_new_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t V_new_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave V_new_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle V_new_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion V_new_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill V_new_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult V_new_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &V_new_desc, V_new_desc_type, V_new_desc_tensorRank, V_new_desc_globalAddress, V_new_desc_globalDim, V_new_desc_globalStride + 1, V_new_desc_boxDim, V_new_desc_elementStrides, V_new_desc_interleave, V_new_desc_swizzle, V_new_desc_l2Promotion, V_new_desc_oobFill);
-
-	if (V_new_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor V_new_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap W_desc;
-	CUtensorMapDataType W_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t W_desc_tensorRank= 4;
-	void *W_desc_globalAddress= W;
-	cuuint64_t W_desc_globalDim[4]= {128,12,32768,1};
-	cuuint64_t W_desc_globalStride[4]= {2,256,3072,100663296};
-	cuuint32_t W_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t W_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave W_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle W_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion W_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill W_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult W_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &W_desc, W_desc_type, W_desc_tensorRank, W_desc_globalAddress, W_desc_globalDim, W_desc_globalStride + 1, W_desc_boxDim, W_desc_elementStrides, W_desc_interleave, W_desc_swizzle, W_desc_l2Promotion, W_desc_oobFill);
-
-	if (W_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor W_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap h_desc;
-	CUtensorMapDataType h_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t h_desc_tensorRank= 5;
-	void *h_desc_globalAddress= h;
-	cuuint64_t h_desc_globalDim[5]= {256,128,12,512,1};
-	cuuint64_t h_desc_globalStride[5]= {2,512,65536,786432,402653184};
-	cuuint32_t h_desc_boxDim[5]= {64,128,1,1,1};
-	cuuint32_t h_desc_elementStrides[5]= {1,1,1,1,1};
-	CUtensorMapInterleave h_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle h_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion h_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill h_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult h_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &h_desc, h_desc_type, h_desc_tensorRank, h_desc_globalAddress, h_desc_globalDim, h_desc_globalStride + 1, h_desc_boxDim, h_desc_elementStrides, h_desc_interleave, h_desc_swizzle, h_desc_l2Promotion, h_desc_oobFill);
-
-	if (h_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor h_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-	kernel_kernel<<<dim3(1, 12, 1), dim3(256, 1, 1), 491520, stream>>>(G, K_desc, U_desc, V_new_desc, W_desc, final_state, h_desc);
-	TILELANG_CHECK_LAST_ERROR("kernel_kernel");
-
-	return 0;
-}
-
-2025-10-06 02:08:42,903 DEBUG:Compilation failed for config {'block_DK': 128, 'block_DV': 256, 'threads': 128, 'num_stages': 2} at index 13 with error: Initialization failed: Failed to set the allowed dynamic shared memory size to 360448 with error: invalid argument
-#include <tl_templates/cuda/gemm.h>
-#include <tl_templates/cuda/copy.h>
-#include <tl_templates/cuda/reduce.h>
-#include <tl_templates/cuda/ldsm.h>
-#include <tl_templates/cuda/threadblock_swizzle.h>
-#include <tl_templates/cuda/debug.h>
-#ifdef ENABLE_BF16
-#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>
-#endif
-
-extern "C" __global__ void kernel_kernel(float* __restrict__ G, __grid_constant__ const CUtensorMap K_desc, __grid_constant__ const CUtensorMap U_desc, __grid_constant__ const CUtensorMap V_new_desc, __grid_constant__ const CUtensorMap W_desc, float* __restrict__ final_state, __grid_constant__ const CUtensorMap h_desc);
-extern "C" __global__ void __launch_bounds__(256, 1) kernel_kernel(float* __restrict__ G, __grid_constant__ const CUtensorMap K_desc, __grid_constant__ const CUtensorMap U_desc, __grid_constant__ const CUtensorMap V_new_desc, __grid_constant__ const CUtensorMap W_desc, float* __restrict__ final_state, __grid_constant__ const CUtensorMap h_desc) {
-  extern __shared__ __align__(1024) uchar buf_dyn_shmem[];
-  float b_h_fragment[256];
-  float V_new_fragment[128];
-  float U_fragment[128];
-  float G_last_local[1];
-  float G_fragment[128];
-  __shared__ uint64_t mbarrier_mem[12];
-  auto mbarrier = reinterpret_cast<Barrier*>(mbarrier_mem);
-  if (tl::tl_shuffle_elect<0>()) {
-    tl::prefetch_tma_descriptor(W_desc);
-    tl::prefetch_tma_descriptor(U_desc);
-    tl::prefetch_tma_descriptor(K_desc);
-    tl::prefetch_tma_descriptor(h_desc);
-    tl::prefetch_tma_descriptor(V_new_desc);
-    mbarrier[0].init(128);
-    mbarrier[1].init(128);
-    mbarrier[2].init(128);
-    mbarrier[3].init(128);
-    mbarrier[4].init(128);
-    mbarrier[5].init(128);
-    mbarrier[6].init(128);
-    mbarrier[7].init(128);
-    mbarrier[8].init(128);
-    mbarrier[9].init(128);
-    mbarrier[10].init(128);
-    mbarrier[11].init(128);
-  }
-  __syncthreads();
-  if (128 <= ((int)threadIdx.x)) {
-    tl::warpgroup_reg_dealloc<24>();
-    const dim3 blockIdx = tl::rasterization2DRow<10>();
-    for (int i_s = 0; i_s < 512; ++i_s) {
-      mbarrier[((i_s & 1) + 6)].wait((((i_s & 3) >> 1) ^ 1));
-      if (tl::tl_shuffle_elect<128>()) {
-        mbarrier[(i_s & 1)].expect_transaction(16384);
-        tl::tma_load(W_desc, mbarrier[(i_s & 1)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 1) * 8192) + 131072)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(W_desc, mbarrier[(i_s & 1)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 1) * 8192) + 135168)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
-      }
-      mbarrier[(i_s & 1)].arrive();
-      mbarrier[((i_s & 1) + 8)].wait((((i_s & 3) >> 1) ^ 1));
-      if (tl::tl_shuffle_elect<128>()) {
-        mbarrier[((i_s & 1) + 2)].expect_transaction(32768);
-        tl::tma_load(U_desc, mbarrier[((i_s & 1) + 2)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 1) * 16384) + 65536)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(U_desc, mbarrier[((i_s & 1) + 2)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 1) * 16384) + 69632)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(U_desc, mbarrier[((i_s & 1) + 2)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 1) * 16384) + 73728)])), 128, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(U_desc, mbarrier[((i_s & 1) + 2)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 1) * 16384) + 77824)])), 192, ((int)blockIdx.y), (i_s * 64), 0);
-      }
-      mbarrier[((i_s & 1) + 2)].arrive();
-      mbarrier[((i_s & 1) + 10)].wait((((i_s & 3) >> 1) ^ 1));
-      if (tl::tl_shuffle_elect<128>()) {
-        mbarrier[((i_s & 1) + 4)].expect_transaction(16384);
-        tl::tma_load(K_desc, mbarrier[((i_s & 1) + 4)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 1) * 8192) + 163840)])), 0, ((int)blockIdx.y), (i_s * 64), 0);
-        tl::tma_load(K_desc, mbarrier[((i_s & 1) + 4)], (&(((bfloat16_t*)buf_dyn_shmem)[(((i_s & 1) * 8192) + 167936)])), 64, ((int)blockIdx.y), (i_s * 64), 0);
-      }
-      #pragma unroll
-      for (int i = 0; i < 128; ++i) {
-        ((float*)buf_dyn_shmem)[((((((((((i_s & 1) * 16384) + ((i & 1) * 8192)) + ((((int)threadIdx.x) >> 5) * 2048)) + ((i >> 1) * 32)) + (((((((int)threadIdx.x) & 31) >> 4) + ((i & 15) >> 3)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + ((i & 7) >> 2)) & 1) * 8)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i & 3) >> 1)) & 1) * 4)) + (((int)threadIdx.x) & 3)) - 8192)] = G[(((i_s * 768) + ((i >> 1) * 12)) + ((int)blockIdx.y))];
-      }
-      tl::fence_proxy_async();
-      tl::mbarrier_cp_async_arrive(mbarrier[((i_s & 1) + 4)]);
-      mbarrier[((i_s & 1) + 4)].arrive();
-    }
-  } else {
-    tl::warpgroup_reg_alloc<240>();
-    const dim3 blockIdx = tl::rasterization2DRow<10>();
-    #pragma unroll
-    for (int i_1 = 0; i_1 < 128; ++i_1) {
-      *(float2*)(b_h_fragment + (i_1 * 2)) = make_float2(0x0p+0f/*0.000000e+00*/, 0x0p+0f/*0.000000e+00*/);
-    }
-    #pragma unroll
-    for (int i_2 = 0; i_2 < 32; ++i_2) {
-      tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((((i_2 & 15) >> 2) * 8192) + ((i_2 >> 4) * 4096)) + ((((int)threadIdx.x) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_2 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_2 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 98304)])), __pack_half2(((bfloat16_t)b_h_fragment[(i_2 * 8)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 1)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 2)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 3)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 4)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 5)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_2 * 8) + 6)]), ((bfloat16_t)b_h_fragment[((i_2 * 8) + 7)])));
-    }
-    for (int i_s_1 = 0; i_s_1 < 512; ++i_s_1) {
-      tl::__sync_thread_partial<3, 128>();
-      if (tl::tl_shuffle_elect<128>()) {
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[98304])), 0, 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[106496])), 64, 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[114688])), 128, 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(h_desc, (&(((bfloat16_t*)buf_dyn_shmem)[122880])), 192, 0, ((int)blockIdx.y), i_s_1, 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-      }
-      mbarrier[(i_s_1 & 1)].wait(((i_s_1 & 3) >> 1));
-      tl::gemm_ss<64, 256, 128, 4, 1, 0, 0, 1, 128, 256, 0, 0, true>((&(((bfloat16_t*)buf_dyn_shmem)[(((i_s_1 & 1) * 8192) + 131072)])), (&(((bfloat16_t*)buf_dyn_shmem)[98304])), (&(V_new_fragment[0])));
-      mbarrier[((i_s_1 & 1) + 6)].arrive();
-      mbarrier[((i_s_1 & 1) + 2)].wait(((i_s_1 & 3) >> 1));
-      #pragma unroll
-      for (int i_3 = 0; i_3 < 64; ++i_3) {
-        float2 __1;
-        uint1 v_ = *(uint1*)(((bfloat16_t*)buf_dyn_shmem) + (((((((((((i_s_1 & 1) * 16384) + ((i_3 >> 4) * 4096)) + ((((int)threadIdx.x) >> 5) * 1024)) + ((i_3 & 1) * 512)) + (((((int)threadIdx.x) & 31) >> 2) * 64)) + ((((((((i_3 & 15) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 5) + ((((int)threadIdx.x) & 31) >> 4)) & 1) * 32)) + ((((((((i_3 & 7) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 4) + ((((int)threadIdx.x) & 15) >> 3)) & 1) * 16)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_3 & 3) >> 1)) & 1) * 8)) + ((((int)threadIdx.x) & 3) * 2)) + 65536));
-#ifdef ENABLE_BF16
-        reinterpret_cast<float2 &>(__1) = fastertransformer::bf1622float2(reinterpret_cast<__nv_bfloat162 const &>(v_));
-#else
-        __1.x = (float)(((nv_bfloat162*)(&(v_.x)))->x);
-        __1.y = (float)(((nv_bfloat162*)(&(v_.x)))->y);
-#endif
-        *(float2*)(U_fragment + (i_3 * 2)) = __1;
-      }
-      tl::fence_proxy_async();
-      mbarrier[((i_s_1 & 1) + 8)].arrive();
-      #pragma unroll
-      for (int i_4 = 0; i_4 < 128; ++i_4) {
-        V_new_fragment[i_4] = ((V_new_fragment[i_4] * -0x1p+0f/*-1.000000e+00*/) + U_fragment[i_4]);
-      }
-      tl::__sync_thread_partial<3, 128>();
-      #pragma unroll
-      for (int i_5 = 0; i_5 < 16; ++i_5) {
-        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((i_5 >> 2) * 4096) + ((((int)threadIdx.x) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_5 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_5 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 147456)])), __pack_half2(((bfloat16_t)V_new_fragment[(i_5 * 8)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 1)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 2)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 3)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 4)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 5)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_5 * 8) + 6)]), ((bfloat16_t)V_new_fragment[((i_5 * 8) + 7)])));
-      }
-      tl::fence_proxy_async();
-      tl::__sync_thread_partial<3, 128>();
-      if (tl::tl_shuffle_elect<128>()) {
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[147456])), 0, ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[151552])), 64, ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[155648])), 128, ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-        tl::tma_store(V_new_desc, (&(((bfloat16_t*)buf_dyn_shmem)[159744])), 192, ((int)blockIdx.y), (i_s_1 * 64), 0);
-        tl::tma_store_arrive();
-        tl::tma_store_wait<0>();
-      }
-      G_last_local[0] = G[(((i_s_1 * 768) + ((int)blockIdx.y)) + 756)];
-      tl::fence_proxy_async();
-      mbarrier[((i_s_1 & 1) + 4)].wait(((i_s_1 & 3) >> 1));
-      #pragma unroll
-      for (int i_6 = 0; i_6 < 64; ++i_6) {
-        *(float2*)(G_fragment + (i_6 * 2)) = *(float2*)(((float*)buf_dyn_shmem) + ((((((((((i_s_1 & 1) * 16384) + ((i_6 >> 3) * 2048)) + ((((int)threadIdx.x) >> 5) * 512)) + ((i_6 & 1) * 256)) + (((((int)threadIdx.x) & 31) >> 2) * 32)) + ((((((((i_6 & 7) >> 1) * 8) + ((((int)threadIdx.x) & 3) * 2)) >> 4) + ((((int)threadIdx.x) & 31) >> 4)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + ((i_6 & 3) >> 1)) & 1) * 8)) + (((((((int)threadIdx.x) & 7) >> 2) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 4)) + ((((int)threadIdx.x) & 1) * 2)));
-      }
-      #pragma unroll
-      for (int i_7 = 0; i_7 < 128; ++i_7) {
-        if ((G_last_local[0] - G_fragment[i_7]) <= 0x0p+0f/*0.000000e+00*/) {
-          V_new_fragment[i_7] = (V_new_fragment[i_7] * expf((G_last_local[0] - G_fragment[i_7])));
-        } else {
-          V_new_fragment[i_7] = 0x0p+0f/*0.000000e+00*/;
-        }
-      }
-      G_last_local[0] = expf(G_last_local[0]);
-      #pragma unroll
-      for (int i_8 = 0; i_8 < 256; ++i_8) {
-        b_h_fragment[i_8] = (b_h_fragment[i_8] * G_last_local[0]);
-      }
-      tl::__sync_thread_partial<3, 128>();
-      #pragma unroll
-      for (int i_9 = 0; i_9 < 16; ++i_9) {
-        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((i_9 >> 2) * 4096) + ((((int)threadIdx.x) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_9 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_9 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 147456)])), __pack_half2(((bfloat16_t)V_new_fragment[(i_9 * 8)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 1)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 2)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 3)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 4)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 5)])), __pack_half2(((bfloat16_t)V_new_fragment[((i_9 * 8) + 6)]), ((bfloat16_t)V_new_fragment[((i_9 * 8) + 7)])));
-      }
-      tl::fence_proxy_async();
-      tl::__sync_thread_partial<3, 128>();
-      tl::gemm_ss<128, 256, 64, 4, 1, 1, 0, 0, 128, 256, 0, 0, true>((&(((bfloat16_t*)buf_dyn_shmem)[(((i_s_1 & 1) * 8192) + 163840)])), (&(((bfloat16_t*)buf_dyn_shmem)[147456])), (&(b_h_fragment[0])));
-      mbarrier[((i_s_1 & 1) + 10)].arrive();
-      tl::__sync_thread_partial<3, 128>();
-      #pragma unroll
-      for (int i_10 = 0; i_10 < 32; ++i_10) {
-        tl::ptx_stmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((((i_10 & 15) >> 2) * 8192) + ((i_10 >> 4) * 4096)) + ((((int)threadIdx.x) >> 5) * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_10 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_10 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 98304)])), __pack_half2(((bfloat16_t)b_h_fragment[(i_10 * 8)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 1)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 2)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 3)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 4)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 5)])), __pack_half2(((bfloat16_t)b_h_fragment[((i_10 * 8) + 6)]), ((bfloat16_t)b_h_fragment[((i_10 * 8) + 7)])));
-      }
-    }
-    #pragma unroll
-    for (int i_11 = 0; i_11 < 128; ++i_11) {
-      *(float2*)(final_state + (((((((((int)blockIdx.y) * 32768) + ((i_11 >> 6) * 16384)) + ((((int)threadIdx.x) >> 5) * 4096)) + ((i_11 & 1) * 2048)) + (((((int)threadIdx.x) & 31) >> 2) * 256)) + (((i_11 & 63) >> 1) * 8)) + ((((int)threadIdx.x) & 3) * 2))) = *(float2*)(b_h_fragment + (i_11 * 2));
-    }
-  }
-}
-
-
-#define ERROR_BUF_SIZE 1024
-static char error_buf[ERROR_BUF_SIZE];
-
-extern "C" const char* get_last_error() {
-    return error_buf;
-}
-
-extern "C" int init() {
-    error_buf[0] = '\0';
-    
-    cudaError_t result_kernel_kernel = cudaFuncSetAttribute(kernel_kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 360448);
-    if (result_kernel_kernel != CUDA_SUCCESS) {
-        snprintf(error_buf, ERROR_BUF_SIZE, "Failed to set the allowed dynamic shared memory size to %d with error: %s", 360448, cudaGetErrorString(result_kernel_kernel));
-        return -1;
-    }
-
-    return 0;
-}
-
-extern "C" int call(bfloat16_t* __restrict__ K, bfloat16_t* __restrict__ W, bfloat16_t* __restrict__ U, float* __restrict__ G, bfloat16_t* __restrict__ h, float* __restrict__ final_state, bfloat16_t* __restrict__ V_new, cudaStream_t stream=cudaStreamDefault) {
-
-	CUtensorMap K_desc;
-	CUtensorMapDataType K_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t K_desc_tensorRank= 4;
-	void *K_desc_globalAddress= K;
-	cuuint64_t K_desc_globalDim[4]= {128,12,32768,1};
-	cuuint64_t K_desc_globalStride[4]= {2,256,3072,100663296};
-	cuuint32_t K_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t K_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave K_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle K_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion K_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill K_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult K_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &K_desc, K_desc_type, K_desc_tensorRank, K_desc_globalAddress, K_desc_globalDim, K_desc_globalStride + 1, K_desc_boxDim, K_desc_elementStrides, K_desc_interleave, K_desc_swizzle, K_desc_l2Promotion, K_desc_oobFill);
-
-	if (K_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor K_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap U_desc;
-	CUtensorMapDataType U_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t U_desc_tensorRank= 4;
-	void *U_desc_globalAddress= U;
-	cuuint64_t U_desc_globalDim[4]= {256,12,32768,1};
-	cuuint64_t U_desc_globalStride[4]= {2,512,6144,201326592};
-	cuuint32_t U_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t U_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave U_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle U_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion U_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill U_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult U_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &U_desc, U_desc_type, U_desc_tensorRank, U_desc_globalAddress, U_desc_globalDim, U_desc_globalStride + 1, U_desc_boxDim, U_desc_elementStrides, U_desc_interleave, U_desc_swizzle, U_desc_l2Promotion, U_desc_oobFill);
-
-	if (U_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor U_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap V_new_desc;
-	CUtensorMapDataType V_new_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t V_new_desc_tensorRank= 4;
-	void *V_new_desc_globalAddress= V_new;
-	cuuint64_t V_new_desc_globalDim[4]= {256,12,32768,1};
-	cuuint64_t V_new_desc_globalStride[4]= {2,512,6144,201326592};
-	cuuint32_t V_new_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t V_new_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave V_new_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle V_new_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion V_new_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill V_new_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult V_new_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &V_new_desc, V_new_desc_type, V_new_desc_tensorRank, V_new_desc_globalAddress, V_new_desc_globalDim, V_new_desc_globalStride + 1, V_new_desc_boxDim, V_new_desc_elementStrides, V_new_desc_interleave, V_new_desc_swizzle, V_new_desc_l2Promotion, V_new_desc_oobFill);
-
-	if (V_new_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor V_new_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap W_desc;
-	CUtensorMapDataType W_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t W_desc_tensorRank= 4;
-	void *W_desc_globalAddress= W;
-	cuuint64_t W_desc_globalDim[4]= {128,12,32768,1};
-	cuuint64_t W_desc_globalStride[4]= {2,256,3072,100663296};
-	cuuint32_t W_desc_boxDim[4]= {64,1,64,1};
-	cuuint32_t W_desc_elementStrides[4]= {1,1,1,1};
-	CUtensorMapInterleave W_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle W_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion W_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill W_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult W_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &W_desc, W_desc_type, W_desc_tensorRank, W_desc_globalAddress, W_desc_globalDim, W_desc_globalStride + 1, W_desc_boxDim, W_desc_elementStrides, W_desc_interleave, W_desc_swizzle, W_desc_l2Promotion, W_desc_oobFill);
-
-	if (W_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor W_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-
-	CUtensorMap h_desc;
-	CUtensorMapDataType h_desc_type= (CUtensorMapDataType)9;
-	cuuint32_t h_desc_tensorRank= 5;
-	void *h_desc_globalAddress= h;
-	cuuint64_t h_desc_globalDim[5]= {256,128,12,512,1};
-	cuuint64_t h_desc_globalStride[5]= {2,512,65536,786432,402653184};
-	cuuint32_t h_desc_boxDim[5]= {64,128,1,1,1};
-	cuuint32_t h_desc_elementStrides[5]= {1,1,1,1,1};
-	CUtensorMapInterleave h_desc_interleave= (CUtensorMapInterleave)0;
-	CUtensorMapSwizzle h_desc_swizzle= (CUtensorMapSwizzle)3;
-	CUtensorMapL2promotion h_desc_l2Promotion= (CUtensorMapL2promotion)2;
-	CUtensorMapFloatOOBfill h_desc_oobFill= (CUtensorMapFloatOOBfill)0;
-
-	CUresult h_desc_result = CUTLASS_CUDA_DRIVER_WRAPPER_CALL(cuTensorMapEncodeTiled)(
-    &h_desc, h_desc_type, h_desc_tensorRank, h_desc_globalAddress, h_desc_globalDim, h_desc_globalStride + 1, h_desc_boxDim, h_desc_elementStrides, h_desc_interleave, h_desc_swizzle, h_desc_l2Promotion, h_desc_oobFill);
-
-	if (h_desc_result != CUDA_SUCCESS) {
-		std::stringstream ss;
-		ss << "Error: Failed to initialize the TMA descriptor h_desc";
-		snprintf(error_buf, ERROR_BUF_SIZE, "%s", ss.str().c_str());
-		return -1;
-	}
-	kernel_kernel<<<dim3(1, 12, 1), dim3(256, 1, 1), 360448, stream>>>(G, K_desc, U_desc, V_new_desc, W_desc, final_state, h_desc);
 	TILELANG_CHECK_LAST_ERROR("kernel_kernel");
 
 	return 0;
