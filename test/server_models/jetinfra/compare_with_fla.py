@@ -18,7 +18,8 @@ except ImportError:
 import torch
 import torch.nn.functional as F
 from tilelang.engine.callback import register_cuda_postproc_callback  # noqa: F401
-
+import itertools
+from tilelang.autotuner import autotune
 from utils import *
 
 # (zhengju) We can slightly modify the generated cuda code from tilelang lowering
@@ -81,7 +82,20 @@ def prepare_output(
     V_new = torch.empty(B, S, H, DV, dtype=output_dtype).cuda()
     return h, final_state, V_new
 
-
+# def get_configs():
+#     block_DK = [128]
+#     block_DV = [64, 128, 256]
+#     threads = [128, 256]
+#     num_stages = [1, 2, 3]
+#     _configs = list(itertools.product(block_DK, block_DV, threads, num_stages))
+#     configs = [{
+#         'block_DK': c[0],
+#         'block_DV': c[1],
+#         'threads': c[2],
+#         'num_stages': c[3]
+#     } for c in _configs]
+#     return configs
+# @autotune(configs=get_configs(), warmup=10, rep=10)
 @tilelang.jit(out_idx=[-3, -2, -1])
 def tilelang_chunk_gated_delta_rule_fwd_h(
     # task config
@@ -281,11 +295,11 @@ def run_test(
                                                                      save_new_value)
 
     # tilelang
+    print("setting",block_DK, block_DV, threads, num_stages)
     kernel = tilelang_chunk_gated_delta_rule_fwd_h(B, S, H, DK, DV, input_dtype, output_dtype,
                                                    accum_dtype, gate_dtype, state_dtype, chunk_size,
                                                    use_g, store_final_state,
-                                                   save_new_value, block_DK, block_DV, threads,
-                                                   num_stages)
+                                                   save_new_value, 128, 32, 128, 1)
     h_tilelang, final_state_tilelang, V_new_tilelang = kernel(K, W, U, G)
     # (zhengju) If you want to print the generated cuda code, you can uncomment the following line
     # print("CUDA Code:\n", kernel.get_kernel_source())
