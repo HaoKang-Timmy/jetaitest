@@ -115,10 +115,10 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
     store_final_state=True,
     save_new_value=True,
     # kernel config
-    block_DK=64,
-    block_DV=64,
+    block_DK=128,
+    block_DV=32,
     threads=256,
-    num_stages=0,
+    num_stages=2,
 ):
     block_S = chunk_size
     BS = S // block_S
