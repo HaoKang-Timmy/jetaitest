@@ -649,7 +649,7 @@ def tilelang_chunk_gated_delta_rule(
         state_dtype = "float32",
         chunk_size = 64,
         use_g = g is not None,
-        use_initial_state = initial_state is not None,
+        # use_initial_state = initial_state is not None,
         store_final_state = output_final_state,
         save_new_value = save_new_value,
         block_DK = 64,
