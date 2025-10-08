@@ -2,3 +2,4 @@ from .tl_fusedlinear import fused_linear_silu_l2norm
 from .tl_dconv import tl_dynamic_conv_cache_w_silu
 from .tl_dconv_step import tilelang_dconv_step
 from .tl_fusedrecurrent import fused_recurrent_gated_delta_rule_tl
+from .tl_chunked_deltarule_new import chunk_gated_delta_rule_fwd

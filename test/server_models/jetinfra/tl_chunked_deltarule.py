@@ -7,6 +7,14 @@ import time
 import torch
 from typing import Optional
 from fla.ops.gated_delta_rule.chunk import solve_tril
+try:
+    import fla
+    print(fla.__file__)
+    from fla.ops.common.chunk_delta_h import chunk_gated_delta_rule_fwd_h
+except ImportError:
+    print("fla not found, using tilelang implementation")
+    fla = None
+
 def cdiv(a, b):
     return (a + b - 1) // b
 
@@ -373,6 +381,8 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
     h_shape = (B, BS, H, DK, DV)
     initial_state_shape = (B, H, DK, DV)
     final_state_shape = (B, H, DK, DV)
+    print("block_DK", block_DK)
+    print("DK", DK)
     assert block_DK >= DK
     @T.prim_func
     def kernel(
@@ -483,7 +493,27 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
                 #     b_h_fragment[i, j] = final_state[bb, bh, i, bv * block_DV + j]
 
     return kernel
-@tilelang.jit(out_idx=[-1])
+
+
+def get_configs():
+    block_DK = [32, 64, 128]
+    block_DV = [32, 64, 128]
+    threads = [128, 256]
+    num_stages = [1, 2, 3, 4]
+    _configs = list(itertools.product(block_DK, block_DV, threads, num_stages))
+    configs = [{
+        'block_DK': c[0],
+        'block_DV': c[1],
+        'threads': c[2],
+        'num_stages': c[3]
+    } for c in _configs]
+    return configs
+@autotune(configs=get_configs(), warmup=10, rep=10)
+@tilelang.jit(out_idx=[-1],
+pass_configs={
+        tilelang.PassConfigKey.TL_DISABLE_TMA_LOWER: True,
+        tilelang.PassConfigKey.TL_DISABLE_WARP_SPECIALIZED: True
+    })
 def tilelang_chunk_fwd_o(
     # task config
     B,
@@ -652,10 +682,6 @@ def tilelang_chunk_gated_delta_rule(
         # use_initial_state = initial_state is not None,
         store_final_state = output_final_state,
         save_new_value = save_new_value,
-        block_DK = 64,
-        block_DV = 32,  # 修改为 32 以兼容 DK=96, DV=96 的情况
-        threads = 128,
-        num_stages = 2,
     )
     h, final_state, v_new, = kernel(k, w, u, g)
 
@@ -711,7 +737,14 @@ def tl_chunk_gated_delta_rule(
     print("w nan_count:", nan_count)
     nan_count = torch.isnan(u).sum()
     print("u nan_count:", nan_count)
-    h, v_new, final_state = tilelang_chunk_gated_delta_rule(k, w, u, g, initial_state, output_final_state)
+    print("k shape:", k.shape)
+    print("w shape:", w.shape)
+    print("u shape:", u.shape)
+    print("g shape:", g.shape)
+    h, v_new, final_state = chunk_gated_delta_rule_fwd_h(k, w, u, g, None,
+                                                                     True, 64,
+                                                                     True)
+    # h, v_new, final_state = tilelang_chunk_gated_delta_rule(k, w, u, g, initial_state, output_final_state)
     nan_count = torch.isnan(h).sum()
     print("h nan_count:", nan_count)
     nan_count = torch.isnan(v_new).sum()
@@ -728,9 +761,9 @@ if __name__ == "__main__":
     # kernel = tilelang_chunk_scaled_matmul_fwd(1, 1024, 12, 96)
     # kernel = tilelang_chunk_scaled_dot_kkt_fwd(2, 1024, 12, 96)
     # 修改维度：DK 和 DV 从 96 改为 128，避免 warp_m=24 的布局推断错误
-    q = torch.randn(1, 2048, 12, 128, dtype=torch.bfloat16).cuda()
-    k = torch.randn(1, 2048, 12, 128, dtype=torch.bfloat16).cuda()
-    v = torch.randn(1, 2048, 12, 128, dtype=torch.bfloat16).cuda()
+    q = torch.randn(1, 2048, 12, 96, dtype=torch.bfloat16).cuda()
+    k = torch.randn(1, 2048, 12, 96, dtype=torch.bfloat16).cuda()
+    v = torch.randn(1, 2048, 12, 256, dtype=torch.bfloat16).cuda()
     beta = torch.randn(1, 2048, 12, dtype=torch.bfloat16).cuda()
     g = torch.randn(1, 2048, 12, dtype=torch.bfloat16).cuda()
     scale = 0.102

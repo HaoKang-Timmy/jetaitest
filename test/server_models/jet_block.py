@@ -37,7 +37,7 @@ from fla.ops.gated_delta_rule import (chunk_gated_delta_rule,
 from .dynamic_conv import DynamicShortConvolution
 from .configuration_jet_nemotron import JetNemotronConfig
 from .kv_cache import JetNemotronCache
-from .jetinfra import fused_linear_silu_l2norm, fused_recurrent_gated_delta_rule_tl
+from .jetinfra import fused_linear_silu_l2norm, fused_recurrent_gated_delta_rule_tl, chunk_gated_delta_rule_fwd
 
 @dataclass
 class JetBlockConfig():
@@ -222,17 +222,31 @@ class JetBlock(nn.Module):
 
         recurrent_state = last_state['recurrent_state'] if last_state is not None else None
         if mode == 'chunk':
-            o, recurrent_state = chunk_gated_delta_rule(
+            # o, recurrent_state = chunk_gated_delta_rule(
+            #     q=q,
+            #     k=k,
+            #     v=v,
+            #     g=g,
+            #     beta=beta,
+            #     initial_state=recurrent_state,
+            #     output_final_state=use_cache,
+            #     cu_seqlens=cu_seqlens,
+            #     use_qk_l2norm_in_kernel=True,
+            #     autotune_interval=self.autotune_interval
+            # )
+            # if scale is None:
+            scale = k.shape[-1] ** -0.5
+            _, o, _, recurrent_state = chunk_gated_delta_rule_fwd(
                 q=q,
                 k=k,
                 v=v,
                 g=g,
                 beta=beta,
+                scale=scale,
                 initial_state=recurrent_state,
                 output_final_state=use_cache,
                 cu_seqlens=cu_seqlens,
-                use_qk_l2norm_in_kernel=True,
-                autotune_interval=self.autotune_interval
+
             )
         elif mode == 'fused_recurrent':
             # o, recurrent_state = fused_recurrent_gated_delta_rule(

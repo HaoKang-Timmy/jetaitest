@@ -65,6 +65,10 @@ def chunk_gated_delta_rule_fwd(
     end_time = time.time()
     print("recompute_w_u_fwd time:", end_time - start_time)
     start_time = time.time()
+    print("k shape:", k.shape)
+    print("w shape:", w.shape)
+    print("u shape:", u.shape)
+    print("g shape:", g.shape)
 
     h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
         k=k,
