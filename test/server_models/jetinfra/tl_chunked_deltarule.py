@@ -43,7 +43,7 @@ def get_configs():
     } for c in _configs]
     return configs
 # tilelang.disable_cache()
-@autotune(configs=get_configs(), warmup=10, rep=10)
+# @autotune(configs=get_configs(), warmup=10, rep=10)
 @tilelang.jit(
     out_idx=[-1]
 )
@@ -52,10 +52,10 @@ def tl_chunk_cumsum(
     Token,
     H,
     chunk_size = 64,
-    input_dtype = "bfloat16",
+    input_dtype = "float32",
     output_dtype = "float32",
     Block_T = 128,
-    threads = 256,
+    threads = 128,
 ):
     assert Block_T % chunk_size == 0, "Block_T must be divisible by chunk_size"
     chunk_num = Block_T // chunk_size
@@ -69,14 +69,19 @@ def tl_chunk_cumsum(
             bb, bh = bbh // H, bbh % H
             InputG_shared = T.alloc_shared((Block_T), dtype=input_dtype)
             InputG_fragment = T.alloc_fragment((Block_T), dtype=output_dtype)
-            T.copy(InputG[bb, bt * Block_T:(bt + 1) * Block_T, bh], InputG_shared)
-
+            # unable to use TMA
+            # T.copy(InputG[bb, bt * Block_T:(bt + 1) * Block_T, bh], InputG_shared)
+            for i in T.Parallel(Block_T):
+                InputG_shared[i] = InputG[bb, bt * Block_T + i, bh]
             T.copy(InputG_shared, InputG_fragment)
             InputG_fragment_viewed = T.view(InputG_fragment, fragment_shape)
             T.cumsum(InputG_fragment_viewed, dim=1)
             InputG_fragment_viewed_reverse = T.view(InputG_fragment_viewed, [Block_T])
             T.copy(InputG_fragment_viewed_reverse, InputG_shared)
-            T.copy(InputG_shared, OutputG[bb, bt * Block_T:(bt + 1) * Block_T, bh])
+            # unable to use TMA
+            # T.copy(InputG_shared, OutputG[bb, bt * Block_T:(bt + 1) * Block_T, bh])
+            for i in T.Parallel(Block_T):
+                OutputG[bb, bt * Block_T + i, bh] = InputG_shared[i]
     return kernel
 
 
@@ -371,7 +376,7 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
     num_stages=2,
 ):
     block_S = chunk_size
-    BS = S // block_S
+    BS = (S + block_S - 1) // block_S
 
     K_shape = (B, S, H, DK)
     V_shape = (B, S, H, DV)
@@ -381,8 +386,6 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
     h_shape = (B, BS, H, DK, DV)
     initial_state_shape = (B, H, DK, DV)
     final_state_shape = (B, H, DK, DV)
-    print("block_DK", block_DK)
-    print("DK", DK)
     assert block_DK >= DK
     @T.prim_func
     def kernel(
@@ -441,10 +444,15 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
 
                 # Recurrence
                 # T.copy(W[bb, i_s * block_S:(i_s + 1) * block_S, bh, 0:DK], W_shared)
-                for i, j in T.Parallel(block_S, DK):
+                for i, j in T.Parallel(block_S, block_DK):
+                    # with T.If(i_s * block_S + i < S and j < block_DK):
+                    #     with T.Then():
+                    #         W_shared[i, j] = W[bb, i_s * block_S + i, bh, j]
+                    #     with T.Else():
+                    #         W_shared[i, j] = 0
                     W_shared[i, j] = W[bb, i_s * block_S + i, bh, j]
+                
                 T.gemm(W_shared, b_h_shared, V_new_fragment, clear_accum=True)
-
                 # U - W * S
                 T.copy(
                     U[bb, i_s * block_S:(i_s + 1) * block_S, bh, bv * block_DV:(bv + 1) * block_DV],
@@ -465,7 +473,8 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
                     K_shared[i, j] = K[bb, i_s * block_S + i, bh, j]
                 # use_g
                 if use_g:
-                    G_last_local[0] = G[bb, (i_s + 1) * block_S - 1, bh]
+                    last_idx = T.min((i_s + 1) * block_S, S) - 1
+                    G_last_local[0] = G[bb, last_idx, bh]
                     for i_s2, i_v in T.Parallel(block_S, block_DV):
                         G_shared[i_s2, i_v] = G[bb, i_s * block_S + i_s2, bh]
                     T.copy(G_shared, G_fragment)
@@ -765,7 +774,7 @@ if __name__ == "__main__":
     k = torch.randn(1, 2048, 12, 96, dtype=torch.bfloat16).cuda()
     v = torch.randn(1, 2048, 12, 256, dtype=torch.bfloat16).cuda()
     beta = torch.randn(1, 2048, 12, dtype=torch.bfloat16).cuda()
-    g = torch.randn(1, 2048, 12, dtype=torch.bfloat16).cuda()
+    g = torch.randn(1, 2048, 12, dtype=torch.float32).cuda()
     scale = 0.102
     initial_state = None
     output_final_state = True
