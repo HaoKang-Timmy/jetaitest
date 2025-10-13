@@ -36,7 +36,7 @@ def main():
                        help="Batch size for generation")
     parser.add_argument("--input_len", type=int, default=1000,
                        help="Input sequence length")
-    parser.add_argument("--max_new_tokens", type=int, default=1,
+    parser.add_argument("--max_new_tokens", type=int, default=2,
                        help="Number of tokens to generate")
     parser.add_argument("--num_runs", type=int, default=1,
                        help="Number of runs for averaging performance")
