@@ -27,7 +27,12 @@ def chunk_gated_delta_rule_fwd(
     output_final_state: bool,
     cu_seqlens: Optional[torch.LongTensor] = None
 ):
-
+    print("triton q shape:", q.shape)
+    print("triton k shape:", k.shape)
+    print("triton v shape:", v.shape)
+    print("triton g shape:", g.shape)
+    print("triton beta shape:", beta.shape)
+    print("triton scale shape:", scale)
     g = chunk_local_cumsum(g, chunk_size=64, cu_seqlens=cu_seqlens)
     # obtain WY representation. u is actually the new v.
     start_time = time.time()
@@ -65,10 +70,10 @@ def chunk_gated_delta_rule_fwd(
     end_time = time.time()
     print("recompute_w_u_fwd time:", end_time - start_time)
     start_time = time.time()
-    print("k shape:", k.shape)
-    print("w shape:", w.shape)
-    print("u shape:", u.shape)
-    print("g shape:", g.shape)
+    # print("k shape:", k.shape)
+    # print("w shape:", w.shape)
+    # print("u shape:", u.shape)
+    # print("g shape:", g.shape)
 
     h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
         k=k,
@@ -79,14 +84,14 @@ def chunk_gated_delta_rule_fwd(
         output_final_state=output_final_state,
         cu_seqlens=cu_seqlens,
     )
-    print("h shape:", h.shape)
-    print("v_new shape:", v_new.shape)
-    print("final_state shape:", final_state.shape)
+    # print("h shape:", h.shape)
+    # print("v_new shape:", v_new.shape)
+    # print("final_state shape:", final_state.shape)
     torch.cuda.synchronize()
     end_time = time.time()
-    print("chunk_gated_delta_rule_fwd_h time:", end_time - start_time)
+    # print("chunk_gated_delta_rule_fwd_h time:", end_time - start_time)
     start_time = time.time()
-    print("v_new shape:", v_new.shape)
+    # print("v_new shape:", v_new.shape)
     o = chunk_fwd_o(
         q=q,
         k=k,
@@ -98,7 +103,9 @@ def chunk_gated_delta_rule_fwd(
     )
     torch.cuda.synchronize()
     end_time = time.time()
-    print("chunk_fwd_o time:", end_time - start_time)
+    # print("chunk_fwd_o time:", end_time - start_time)
+    print("triton o shape:", o.shape)
+    print("triton final_state shape:", final_state.shape)
     return g, o, A, final_state
 
 

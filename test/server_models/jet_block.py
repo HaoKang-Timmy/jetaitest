@@ -207,13 +207,13 @@ class JetBlock(nn.Module):
         # print("v.shape:", v.shape)
         # print("conv_state_v.shape:", conv_state_v.shape)
         conv_state = conv_state + (conv_state_v,) if conv_state is not None else (conv_state_v,)
-
+        batch_size = q.shape[0]
         if attention_mask is not None and q_len > 1:
             q = index_first_axis(rearrange(q, "b s ... -> (b s) ..."), indices).unsqueeze(0)
             k = index_first_axis(rearrange(k, "b s ... -> (b s) ..."), indices).unsqueeze(0)
             v = index_first_axis(rearrange(v, "b s ... -> (b s) ..."), indices).unsqueeze(0)
             hidden_states = index_first_axis(rearrange(hidden_states, "b s ... -> (b s) ..."), indices).unsqueeze(0)
-        
+
         q, k = map(lambda x: rearrange(x, '... (h d) -> ... h d', d=self.head_k_dim), (q, k))
         v = rearrange(v, '... (h d) -> ... h d', d=self.head_v_dim)
         beta = self.b_proj(hidden_states).sigmoid()
@@ -222,33 +222,38 @@ class JetBlock(nn.Module):
 
         recurrent_state = last_state['recurrent_state'] if last_state is not None else None
         if mode == 'chunk':
-            # o, recurrent_state = chunk_gated_delta_rule(
-            #     q=q,
-            #     k=k,
-            #     v=v,
-            #     g=g,
-            #     beta=beta,
-            #     initial_state=recurrent_state,
-            #     output_final_state=use_cache,
-            #     cu_seqlens=cu_seqlens,
-            #     use_qk_l2norm_in_kernel=True,
-            #     autotune_interval=self.autotune_interval
-            # )
-            # if scale is None:
-            scale = k.shape[-1] ** -0.5
-
-            _, o, _, recurrent_state = chunk_gated_delta_rule_fwd(
+            # print("q shape:", q.shape)
+            # print("k shape:", k.shape)
+            # print("v shape:", v.shape)
+            # print("g shape:", g.shape)
+            o, recurrent_state = chunk_gated_delta_rule(
                 q=q,
                 k=k,
                 v=v,
                 g=g,
                 beta=beta,
-                scale=scale,
                 initial_state=recurrent_state,
                 output_final_state=use_cache,
                 cu_seqlens=cu_seqlens,
-
+                use_qk_l2norm_in_kernel=True,
+                autotune_interval=self.autotune_interval
             )
+            # if scale is None:
+            # scale = k.shape[-1] ** -0.5
+
+            # _, o, _, recurrent_state = chunk_gated_delta_rule_fwd(
+            #     batch_size=batch_size,
+            #     q=q,
+            #     k=k,
+            #     v=v,
+            #     g=g,
+            #     beta=beta,
+            #     scale=scale,
+            #     initial_state=recurrent_state,
+            #     output_final_state=use_cache,
+            #     cu_seqlens=cu_seqlens,
+
+            # )
             print("prefill recurrent state shape:", recurrent_state.shape)
         elif mode == 'fused_recurrent':
             # o, recurrent_state = fused_recurrent_gated_delta_rule(

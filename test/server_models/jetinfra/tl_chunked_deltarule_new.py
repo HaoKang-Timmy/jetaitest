@@ -454,6 +454,7 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
     return kernel
 
 def tilelang_chunk_gated_delta_rule(
+    batch_size: int,
     k: torch.Tensor,
     w: torch.Tensor,
     u: torch.Tensor,
@@ -479,7 +480,7 @@ def tilelang_chunk_gated_delta_rule(
         save_new_value = save_new_value,
     )
     h, final_state, v_new, = kernel(k, w, u, g)
-    print
+    
     return h, v_new, final_state
 
 def get_configs():
@@ -504,6 +505,7 @@ pass_configs={
 def tilelang_chunk_fwd_o(
     # task config
     B,
+    B1,
     S,
     H,
     DK,
@@ -642,6 +644,7 @@ def chunk_fwd_o(
     return output
 
 def chunk_gated_delta_rule_fwd(
+    batch_size: int,
     q: torch.Tensor,
     k: torch.Tensor,
     v: torch.Tensor,
@@ -707,7 +710,7 @@ def chunk_gated_delta_rule_fwd(
     #     output_final_state=output_final_state,
     #     cu_seqlens=cu_seqlens,
     # )
-    h,  v_new, final_state = tilelang_chunk_gated_delta_rule(k, w, u, g, output_final_state, chunk_size=64, save_new_value=True)
+    h,  v_new, final_state = tilelang_chunk_gated_delta_rule(batch_size, k, w, u, g, output_final_state, chunk_size=64, save_new_value=True)
     print("h shape:", h.shape)
     print("v_new shape:", v_new.shape)
     print("final_state shape:", final_state.shape)
