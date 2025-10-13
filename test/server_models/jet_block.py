@@ -226,34 +226,34 @@ class JetBlock(nn.Module):
             # print("k shape:", k.shape)
             # print("v shape:", v.shape)
             # print("g shape:", g.shape)
-            o, recurrent_state = chunk_gated_delta_rule(
-                q=q,
-                k=k,
-                v=v,
-                g=g,
-                beta=beta,
-                initial_state=recurrent_state,
-                output_final_state=use_cache,
-                cu_seqlens=cu_seqlens,
-                use_qk_l2norm_in_kernel=True,
-                autotune_interval=self.autotune_interval
-            )
-            # if scale is None:
-            # scale = k.shape[-1] ** -0.5
-
-            # _, o, _, recurrent_state = chunk_gated_delta_rule_fwd(
-            #     batch_size=batch_size,
+            # o, recurrent_state = chunk_gated_delta_rule(
             #     q=q,
             #     k=k,
             #     v=v,
             #     g=g,
             #     beta=beta,
-            #     scale=scale,
             #     initial_state=recurrent_state,
             #     output_final_state=use_cache,
             #     cu_seqlens=cu_seqlens,
-
+            #     use_qk_l2norm_in_kernel=True,
+            #     autotune_interval=self.autotune_interval
             # )
+            # if scale is None:
+            scale = k.shape[-1] ** -0.5
+
+            _, o, _, recurrent_state = chunk_gated_delta_rule_fwd(
+                batch_size=batch_size,
+                q=q,
+                k=k,
+                v=v,
+                g=g,
+                beta=beta,
+                scale=scale,
+                initial_state=recurrent_state,
+                output_final_state=use_cache,
+                cu_seqlens=cu_seqlens,
+
+            )
             print("prefill recurrent state shape:", recurrent_state.shape)
         elif mode == 'fused_recurrent':
             # o, recurrent_state = fused_recurrent_gated_delta_rule(

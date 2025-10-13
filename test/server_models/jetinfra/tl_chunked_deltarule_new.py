@@ -505,7 +505,6 @@ pass_configs={
 def tilelang_chunk_fwd_o(
     # task config
     B,
-    B1,
     S,
     H,
     DK,
@@ -521,8 +520,8 @@ def tilelang_chunk_fwd_o(
     block_S=64,
     block_DK=64,
     block_DV=64,
-    threads=256,
-    num_stages=0,
+    threads=128,
+    num_stages=1,
 ):
     assert chunk_size == block_S, "chunk_size must be equal to block_S"
     BS = chunk_size
@@ -655,6 +654,12 @@ def chunk_gated_delta_rule_fwd(
     output_final_state: bool,
     cu_seqlens: Optional[torch.LongTensor] = None
 ):
+    q = q.reshape(batch_size, -1, q.shape[-2], q.shape[-1])
+    k = k.reshape(batch_size, -1, k.shape[-2], k.shape[-1])
+    v = v.reshape(batch_size, -1, v.shape[-2], v.shape[-1])
+    g = g.reshape(batch_size, -1, g.shape[-1])
+    beta = beta.reshape(batch_size, -1, beta.shape[-1])
+    # initial_state = initial_state.reshape(batch_size, -1, initial_state.shape[-2], initial_state.shape[-1])
 
     # g = chunk_local_cumsum(g, chunk_size=64, cu_seqlens=cu_seqlens)
     g = chunk_cumsum(g, chunk_size=64)
@@ -673,12 +678,15 @@ def chunk_gated_delta_rule_fwd(
     end_time = time.time()
     # print("chunk_scaled_dot_kkt_fwd time:", end_time - start_time)
     start_time = time.time()
+    
+    A = A.reshape(1, -1, A.shape[-2], A.shape[-1])
     # print("A shape:", A.shape)
     A = solve_tril(
         A=A,
         cu_seqlens=cu_seqlens,
         output_dtype=k.dtype
     )
+    A = A.reshape(batch_size, -1, A.shape[-2], A.shape[-1])
     torch.cuda.synchronize()
     end_time = time.time()
     # print("solve_tril time:", end_time - start_time)
@@ -696,10 +704,10 @@ def chunk_gated_delta_rule_fwd(
     end_time = time.time()
     # print("recompute_w_u_fwd time:", end_time - start_time)
     start_time = time.time()
-    print("k shape:", k.shape)
-    print("w shape:", w.shape)
-    print("u shape:", u.shape)
-    print("g shape:", g.shape)
+    # print("k shape:", k.shape)
+    # print("w shape:", w.shape)
+    # print("u shape:", u.shape)
+    # print("g shape:", g.shape)
 
     # h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
     #     k=k,
@@ -711,14 +719,14 @@ def chunk_gated_delta_rule_fwd(
     #     cu_seqlens=cu_seqlens,
     # )
     h,  v_new, final_state = tilelang_chunk_gated_delta_rule(batch_size, k, w, u, g, output_final_state, chunk_size=64, save_new_value=True)
-    print("h shape:", h.shape)
-    print("v_new shape:", v_new.shape)
-    print("final_state shape:", final_state.shape)
+    # print("h shape:", h.shape)
+    # print("v_new shape:", v_new.shape)
+    # print("final_state shape:", final_state.shape)
     torch.cuda.synchronize()
     end_time = time.time()
     # print("chunk_gated_delta_rule_fwd_h time:", end_time - start_time)
     start_time = time.time()
-    print("v_new shape:", v_new.shape)
+    # print("v_new shape:", v_new.shape)
     # o = chunk_fwd_o(
     #     q=q,
     #     k=k,
@@ -731,5 +739,6 @@ def chunk_gated_delta_rule_fwd(
     o = chunk_fwd_o(q, k, v_new, h, g, scale)
     torch.cuda.synchronize()
     end_time = time.time()
-    print("chunk_fwd_o time:", end_time - start_time)
+    # print("chunk_fwd_o time:", end_time - start_time)
+    o = o.reshape(1, -1, o.shape[-2], o.shape[-1])
     return g, o, A, final_state
