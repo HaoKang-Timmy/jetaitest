@@ -7,12 +7,12 @@ from typing import Optional, Tuple
 import time
 import tilelang as tl
 import sys
-sys.path.insert(0, '/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/flash-linear-attention')
+# sys.path.insert(0, '/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/flash-linear-attention')
 from fla.ops.gated_delta_rule.fused_recurrent import fused_recurrent_gated_delta_rule
 def get_configs():
-    block_K = [128]
-    block_V = [128]
-    num_stages = [3, 4]
+    block_K = [32, 64, 128]
+    block_V = [32, 64, 128, 256]
+    num_stages = [1,2, 3, 4]
     threads = [128, 256]
     # head_split_k = [1, 2, 3, 4]
     # head_split_v = [1, 2, 3, 4]
@@ -28,7 +28,9 @@ def get_configs():
     return configs
 #### TODO Fp8 loading, load multiple heads to enlarge block size, tensore core process instead of cuda core. We need to put norm in matmul.
 @autotune(configs=get_configs(), warmup=10, rep=10)
-@tilelang.jit
+@tilelang.jit(
+    out_idx = [-1],
+)
 def fused_recurrent(
     Batch, 
     Token, 
@@ -71,10 +73,10 @@ def fused_recurrent(
         V: T.Tensor([Batch, Token, Head_V, V_Dim], dtype),
         g: T.Tensor([Batch, Token, Head_V], accum_dtype),
         Beta: T.Tensor([Batch, Token, Head_V],dtype),
-        O: T.Tensor([Batch, Token, Head_V, V_Dim], dtype),
         h0: T.Tensor([Batch, Head_V, K_Dim, V_Dim], accum_dtype),
         # ht: T.Tensor([Batch, Head_V, K_Dim, V_Dim], dtype),
         scale: T.Tensor([1], dtype),
+        O: T.Tensor([Batch, Token, Head_V, V_Dim], dtype),
         # O: T.Tensor(Batch, Token, Head_V, V_Dim, dtype),
     ):
         with T.Kernel(T.ceildiv(K_Dim, block_K), T.ceildiv(V_Dim, block_V), T.ceildiv(Batch*Head_V, 1), threads=threads) as (bx, by, bz):
@@ -93,8 +95,14 @@ def fused_recurrent(
             K_fragment = T.alloc_fragment([block_K], accum_dtype)
             v_min_reg = T.alloc_fragment([block_V], accum_dtype)
             
-            
-            
+            T.annotate_layout({
+                # Q_shared: tilelang.layout.make_swizzled_layout(Q_shared),
+                # K_shared: tilelang.layout.make_swizzled_layout(K_shared),
+                # V_shared: tilelang.layout.make_swizzled_layout(V_shared),
+                h0_shared: tilelang.layout.make_swizzled_layout(h0_shared),
+                # o_shared: tilelang.layout.make_swizzled_layout(o_shared),
+            })
+            T.disable_warp_group_reg_alloc()
             T.copy(h0[id_b, id_hv, bx * block_K, by * block_V], h0_shared)
             for t in T.serial(Token):
                 T.copy(Q[id_b, t, id_h, bx * block_K], Q_shared)
@@ -107,8 +115,8 @@ def fused_recurrent(
                 T.copy(V_shared, V_fragment)
                 T.copy(h0_shared, h0_fragment)
                 # if USE_QK_L2NORM_IN_KERNEL:
-                #     L2Norm_QK(Q_fragment)
-                #     L2Norm_QK(K_fragment)
+                # L2Norm_QK(Q_fragment)
+                # L2Norm_QK(K_fragment)
                 # b_q = b_q * scale
                 for i in T.Parallel(block_K):
                     Q_fragment[i] = Q_fragment[i] * scale[0]
@@ -166,8 +174,8 @@ def fused_recurrent_fwd(
     device, dtype = q.device, q.dtype
     if scale is None:
         scale = K ** -0.5
-    o = torch.empty(B, Token, HV, V, device=device, dtype=v.dtype)
-    # ht = torch.empty(B, HV, K, V, device=device, dtype=v.dtype)
+    # o = torch.empty(B, Token, HV, V, device=device, dtype=v.dtype)
+    # # ht = torch.empty(B, HV, K, V, device=device, dtype=v.dtype)
     if initial_state is None:
         h0 = torch.zeros(B, HV, K, V, device=device, dtype=torch.float)
     else:
@@ -183,7 +191,7 @@ def fused_recurrent_fwd(
     # print("o dtype:", o.dtype)
     # print("h0 dtype:", h0.dtype)
     # print("scale dtype:", scale.dtype)
-    kernel(q, k, v, g, beta, o, h0, scale)
+    o = kernel(q, k, v, g, beta, h0, scale)
     return o, h0
           # [B,T,HV]
 class FusedRecurrentFunctionTL(torch.autograd.Function):
@@ -254,7 +262,7 @@ def fused_recurrent_gated_delta_rule_tl(
 
 if __name__ == '__main__':
     print("=== 测试TileLang vs Triton实现差异 ===")
-    print("注意：已将TileLang中Q、K、V等变量类型改为float32，以排除混合精度影响")
+    # print("注意：已将TileLang中Q、K、V等变量类型改为float32，以排除混合精度影响")
     
     # 设置随机种子确保结果可重现
     torch.manual_seed(42)

@@ -5,6 +5,7 @@ import tilelang.language as T
 import itertools
 import time
 import torch.nn as nn
+from torch.nn import functional as F
 dtype_dict = {
     torch.bfloat16: "bfloat16",
     torch.float16: "float16",
@@ -13,10 +14,10 @@ dtype_dict = {
     torch.float8_e5m2: "float8_e5m2",
 }
 def get_configs():
-    block_M = [64,128]
-    block_K = [64,128]
+    block_M = [64, 128]
+    block_K = [64, 128]
     block_N = [128]
-    num_stages = [2, 3, 4]
+    num_stages = [1, 2, 3, 4]
     threads = [128, 256]
     # block_M = [64, 128]  
     # block_K = [64, 128] 
@@ -60,14 +61,14 @@ def _linear_kernel(
         squared_reg = T.alloc_fragment([block_M, block_N], dtype)
         sum_reg = T.alloc_fragment([block_M], dtype)
         
-        # 计算元素的平方用于求norm
+        
         for i, j in T.Parallel(block_M, block_N):
             squared_reg[i, j] = QK[i, j] * QK[i, j]
         T.reduce_sum(squared_reg, sum_reg, dim=1)
         for i in T.Parallel(block_M):
             sum_reg[i] = T.sqrt(sum_reg[i]) + 1e-6
         
-        # 用原始元素除以norm
+        
         for i, j in T.Parallel(block_M, block_N):
             QK[i, j] = QK[i, j] / sum_reg[i]
     @ T.macro
@@ -93,7 +94,7 @@ def _linear_kernel(
             T.annotate_layout({
                 output_shared: tilelang.layout.make_swizzled_layout(output_shared)
             })
-
+            T.disable_warp_group_reg_alloc()
             for bx, by in T.Persistent(
                 [T.ceildiv(Batch * Token, block_M), T.ceildiv(outdim, block_N)], sm_num, block_id):
                 T.clear(output_reg)
@@ -133,43 +134,89 @@ def pytorch_impl(Input, W_T):
     output = output.view(B, Token, D_out)
     return output
 if __name__ == "__main__":
-    B, Token, D_in, D_out = 40, 1000, 1536, 1152
-    Input_fp16 = torch.randn(B, Token, D_in).cuda().half()
-    W_T_fp16 = torch.randn(D_out, D_in).cuda().half()
-    # output_fp16 = torch.randn(B, Token, D_out).cuda().half()
-    # kernel = _linear_kernel(B, Token, D_in, D_out, "float16", out_dtype="float16")
-    # kernel(Input_fp16.view(-1, D_in), W_T_fp16, output_fp16.view(-1, D_out))
+    B, Token, D_in, D_out = 40, 1, 1536, 1152
+    Input_fp16 = torch.randn(B, Token, D_in).cuda().bfloat16()
+    W_T_fp16 = torch.randn(D_out, D_in).cuda().bfloat16()
+    W_T_fp16_2 = torch.randn(D_out, D_in).cuda().bfloat16()  # 第二个权重矩阵，模拟k_proj
+    layer_q = nn.Linear(D_in, D_out, bias=False).cuda().bfloat16()
+    layer_k = nn.Linear(D_in, D_out, bias=False).cuda().bfloat16()
+    # 分配一些额外的GPU内存来模拟模型环境
+    dummy_tensors = [torch.randn(100, 1536, 1536).cuda().bfloat16() for _ in range(5)]
+    print(f"GPU memory allocated: {torch.cuda.memory_allocated() / 1e9:.2f} GB")
+    print(f"GPU memory reserved: {torch.cuda.memory_reserved() / 1e9:.2f} GB")
+    
+    # 测试：模拟模型中的调用模式（连续调用两次不同权重）
+    print("\n=== Test 1: 模拟模型中的调用模式 (两次连续调用) ===")
     for _ in range(10):
-        # kernel(Input_fp16.view(-1, D_in), W_T_fp16, output_fp16.view(-1, D_out))
-        fused_linear_silu(Input_fp16, W_T_fp16)
+        _ = fused_linear_silu_l2norm(Input_fp16, layer_q.weight)
+        _ = fused_linear_silu_l2norm(Input_fp16, layer_k.weight)
+    torch.cuda.synchronize()
+    
+    start = time.time()
+    for _ in range(20):
+        q = fused_linear_silu_l2norm(Input_fp16, layer_q.weight)
+        k = fused_linear_silu_l2norm(Input_fp16, layer_k.weight)
+    torch.cuda.synchronize()
+    end = time.time()
+    print(f"Time taken tilelang (2 calls): {(end - start) / 20} seconds")
+    # print(f"Time per call: {(end - start) / 40} seconds")
+    
+    # # 测试单次调用
+    # print("\n=== Test 2: 单次调用测试 ===")
+    # for _ in range(10):
+    #     fused_linear_silu_l2norm(Input_fp16, layer_q.weight)
+    # torch.cuda.synchronize()
+    # start = time.time()
+    # for _ in range(20):
+    #     fused_linear_silu_l2norm(Input_fp16, W_T_fp16)
+    # torch.cuda.synchronize()
+    # end = time.time()
+    # print(f"Time taken tilelang (single): {(end - start) / 20} seconds")
+    
+    # PyTorch对比
+    print("\n=== Test 3: PyTorch baseline ===")
+    for _ in range(10):
+        # pytorch_impl(Input_fp16, W_T_fp16)
+        _ = F.silu(layer_q(Input_fp16))
+        _ = F.silu(layer_k(Input_fp16))
+        # _ = layer_q(Input_fp16)
+        # _ = layer_k(Input_fp16)
     torch.cuda.synchronize()
     start = time.time()
     for _ in range(20):
-        # output = torch.empty(B, Token, D_out).cuda().half()
-        # kernel(Input_fp16.view(-1, D_in), W_T_fp16, output_fp16.view(-1, D_out))
-        fused_linear_silu(Input_fp16, W_T_fp16)
+        _ = F.silu(layer_q(Input_fp16))
+        _ = F.silu(layer_k(Input_fp16))
+        # _ = layer_q(Input_fp16)
+        # _ = layer_k(Input_fp16)
     torch.cuda.synchronize()
     end = time.time()
-    print(f"Time taken: {end - start} seconds")
+    print(f"Time taken pytorch: {(end - start) / 20} seconds")
+    # pytorch matmul
     for _ in range(10):
-        pytorch_impl(Input_fp16, W_T_fp16)
+        _ = F.silu(torch.matmul(Input_fp16, W_T_fp16.T))
+        _ = F.silu(torch.matmul(Input_fp16, W_T_fp16_2.T))
+        # _ = torch.matmul(Input_fp16, W_T_fp16.T)
+        # _ = torch.matmul(Input_fp16, W_T_fp16_2.T)
     torch.cuda.synchronize()
     start = time.time()
     for _ in range(20):
-        pytorch_impl(Input_fp16, W_T_fp16)
+        _ = F.silu(torch.matmul(Input_fp16, W_T_fp16.T))
+        _ = F.silu(torch.matmul(Input_fp16, W_T_fp16_2.T))
+        # _ = torch.matmul(Input_fp16, W_T_fp16.T)
+        # _ = torch.matmul(Input_fp16, W_T_fp16_2.T)
     torch.cuda.synchronize()
     end = time.time()
-    print(f"Time taken: {end - start} seconds")
-    Input_fp8 = torch.randn(B, Token, D_in).cuda().to(torch.float8_e4m3fn)
-    W_T_fp8 = torch.randn(D_out, D_in).cuda().to(torch.float8_e4m3fn)
-    for _ in range(10):
-        fused_linear_silu(Input_fp8, W_T_fp8)
-    torch.cuda.synchronize()
-    start = time.time()
-    for _ in range(20):
-        fused_linear_silu(Input_fp8, W_T_fp8)
-    torch.cuda.synchronize()
-    end = time.time()
-    print(f"Time taken: {end - start} seconds")
+    print(f"Time taken pytorch matmul: {(end - start) / 20} seconds")
+    # Input_fp8 = torch.randn(B, Token, D_in).cuda().to(torch.float8_e4m3fn)
+    # W_T_fp8 = torch.randn(D_out, D_in).cuda().to(torch.float8_e4m3fn)
+    # for _ in range(10):
+    #     fused_linear_silu(Input_fp8, W_T_fp8)
+    # torch.cuda.synchronize()
+    # start = time.time()
+    # for _ in range(20):
+    #     fused_linear_silu(Input_fp8, W_T_fp8)
+    # torch.cuda.synchronize()
+    # end = time.time()
+    # print(f"Time taken: {end - start} seconds")
 
 

@@ -58,6 +58,8 @@ def _dconv_fwd_kernel(
             Kernel_reg = T.alloc_fragment([Kernel_size, block_D], reduce_type)
             batch_id = bx // Token
             token_id = bx % Token
+
+            T.disable_warp_group_reg_alloc()
             # T.copy(Kernel_input[bx, by * block_D,0], Kernel_shared)
             T.copy(Kernel_input[bx, 0:Kernel_size, by * block_D:by * block_D + block_D], Kernel_shared)
             # for i, j in T.Parallel(block_D, Kernel_size):

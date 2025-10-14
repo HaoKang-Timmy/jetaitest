@@ -674,10 +674,10 @@ def chunk_gated_delta_rule_fwd(
     #     output_dtype=torch.float32
     # )
     A = chunked_scaled_dot_ktt(k, beta, g)
-    torch.cuda.synchronize()
-    end_time = time.time()
+    # torch.cuda.synchronize()
+    # end_time = time.time()
     # print("chunk_scaled_dot_kkt_fwd time:", end_time - start_time)
-    start_time = time.time()
+    # start_time = time.time()
     
     A = A.reshape(1, -1, A.shape[-2], A.shape[-1])
     # print("A shape:", A.shape)
@@ -687,10 +687,10 @@ def chunk_gated_delta_rule_fwd(
         output_dtype=k.dtype
     )
     A = A.reshape(batch_size, -1, A.shape[-2], A.shape[-1])
-    torch.cuda.synchronize()
-    end_time = time.time()
+    # torch.cuda.synchronize()
+    # end_time = time.time()
     # print("solve_tril time:", end_time - start_time)
-    start_time = time.time()
+    # start_time = time.time()
     # w, u = recompute_w_u_fwd(
     #     k=k,
     #     v=v,
@@ -700,10 +700,10 @@ def chunk_gated_delta_rule_fwd(
     #     cu_seqlens=cu_seqlens,
     # )
     w, u = tl_recompute_wu_forward(k, v, beta, g, A)
-    torch.cuda.synchronize()
-    end_time = time.time()
+    # torch.cuda.synchronize()
+    # end_time = time.time()
     # print("recompute_w_u_fwd time:", end_time - start_time)
-    start_time = time.time()
+    # start_time = time.time()
     # print("k shape:", k.shape)
     # print("w shape:", w.shape)
     # print("u shape:", u.shape)
@@ -722,10 +722,10 @@ def chunk_gated_delta_rule_fwd(
     # print("h shape:", h.shape)
     # print("v_new shape:", v_new.shape)
     # print("final_state shape:", final_state.shape)
-    torch.cuda.synchronize()
-    end_time = time.time()
+    # torch.cuda.synchronize()
+    # end_time = time.time()
     # print("chunk_gated_delta_rule_fwd_h time:", end_time - start_time)
-    start_time = time.time()
+    # start_time = time.time()
     # print("v_new shape:", v_new.shape)
     # o = chunk_fwd_o(
     #     q=q,
@@ -737,8 +737,8 @@ def chunk_gated_delta_rule_fwd(
     #     cu_seqlens=cu_seqlens,
     # )
     o = chunk_fwd_o(q, k, v_new, h, g, scale)
-    torch.cuda.synchronize()
-    end_time = time.time()
+    # torch.cuda.synchronize()
+    # end_time = time.time()
     # print("chunk_fwd_o time:", end_time - start_time)
     o = o.reshape(1, -1, o.shape[-2], o.shape[-1])
     return g, o, A, final_state

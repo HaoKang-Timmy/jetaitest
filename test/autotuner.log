@@ -1,0 +1,1 @@
+2025-10-13 19:43:28,346 WARNING:Tunable parameters ['block_D', 'threads'] already provided during auto-tuning. Skipping compilation and using direct JIT

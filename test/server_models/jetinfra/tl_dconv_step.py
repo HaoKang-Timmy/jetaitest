@@ -30,7 +30,7 @@ def get_configs():
     } for c in _configs]
     return configs
 
-# @autotune(configs=get_configs(), warmup=10, rep=10)
+@autotune(configs=get_configs(), warmup=10, rep=10)
 @tilelang.jit(
     out_idx = [-1],
     pass_configs={
@@ -56,13 +56,14 @@ def _dconv_step_kernel(
         Output: T.Tensor([Batch, Token, Indim], dtype),
     ):
         with T.Kernel(Batch * Token, T.ceildiv(Indim, block_D), threads=threads) as (bx, by):
+            T.disable_warp_group_reg_alloc()
             Kernel_shared = T.alloc_shared([Kernel_size, block_D], dtype)
             Input_shared = T.alloc_shared([Kernel_size, block_D], dtype)
 
             Output_shared = T.alloc_shared([block_D], dtype)
 
             Input_reg = T.alloc_fragment([Kernel_size, block_D], reduce_type)
-            # Output_reg = T.alloc_fragment([Kernel_size, block_D], reduce_type)
+            Output_reg = T.alloc_fragment([Kernel_size, block_D], reduce_type)
             Output_reduced = T.alloc_fragment([block_D], reduce_type)
             Kernel_reg = T.alloc_fragment([Kernel_size, block_D], reduce_type)
             T.clear(Output_reduced)
@@ -83,12 +84,12 @@ def _dconv_step_kernel(
 
             T.copy(Input_shared, Input_reg)
             T.copy(Kernel_shared, Kernel_reg)
-            # for i, j in T.Parallel(Kernel_size, block_D):
-            #     Output_reg[i, j] = Input_reg[i, j] * Kernel_reg[i, j] 
-            # T.reduce_sum(Output_reg, Output_reduced, dim=0) 
-            for i in T.serial(Kernel_size):
-                for j in T.Parallel(block_D):
-                    Output_reduced[j] = Output_reduced[j] + Input_reg[i, j] * Kernel_reg[i, j]
+            for i, j in T.Parallel(Kernel_size, block_D):
+                Output_reg[i, j] = Input_reg[i, j] * Kernel_reg[i, j] 
+            T.reduce_sum(Output_reg, Output_reduced, dim=0) 
+            # for i in T.serial(Kernel_size):
+            #     for j in T.Parallel(block_D):
+            #         Output_reduced[j] = Output_reduced[j] + Input_reg[i, j] * Kernel_reg[i, j]
             for i in T.Parallel(block_D):
                 Output_reduced[i] = Output_reduced[i] / (1 + T.exp(-Output_reduced[i]))
             T.copy(Output_reduced, Output_shared)
