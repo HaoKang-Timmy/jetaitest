@@ -56,21 +56,23 @@ def _linear_kernel(
 ):
     @T.macro
     def L2Norm_QK(
-        QK: T.FragmentBuffer([block_M, block_N],dtype),
+        QK: T.FragmentBuffer([block_M, block_N],reduce_dtype),
     ):
-        squared_reg = T.alloc_fragment([block_M, block_N], dtype)
-        sum_reg = T.alloc_fragment([block_M], dtype)
+        squared_reg = T.alloc_fragment([block_M, block_N], reduce_dtype)
+        sum_reg = T.alloc_fragment([block_M], reduce_dtype)
         
         
         for i, j in T.Parallel(block_M, block_N):
             squared_reg[i, j] = QK[i, j] * QK[i, j]
         T.reduce_sum(squared_reg, sum_reg, dim=1)
-        for i in T.Parallel(block_M):
-            sum_reg[i] = T.sqrt(sum_reg[i]) + 1e-6
+        # for i in T.Parallel(block_M):
+        #     sum_reg[i] = T.sqrt(sum_reg[i]) + 1e-6
         
         
+        # for i, j in T.Parallel(block_M, block_N):
+        #     QK[i, j] = QK[i, j] / sum_reg[i]
         for i, j in T.Parallel(block_M, block_N):
-            QK[i, j] = QK[i, j] / sum_reg[i]
+            QK[i, j] = QK[i, j] * T.rsqrt(sum_reg[i]) 
     @ T.macro
     def silu(
         buffer: T.FragmentBuffer([block_M, block_N], reduce_dtype),
@@ -92,6 +94,8 @@ def _linear_kernel(
             output_shared = T.alloc_shared((block_M, block_N), dtype)
 
             T.annotate_layout({
+                Input_shared: tilelang.layout.make_swizzled_layout(Input_shared),
+                W_T_shared: tilelang.layout.make_swizzled_layout(W_T_shared),
                 output_shared: tilelang.layout.make_swizzled_layout(output_shared)
             })
             T.disable_warp_group_reg_alloc()
