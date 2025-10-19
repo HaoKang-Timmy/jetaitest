@@ -18,15 +18,15 @@ import os
 import argparse
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from edge_models import JetNemotronForCausalLM, JetNemotronConfig
+from server_models import JetNemotronForCausalLM, JetNemotronConfig
 
 def main():
     parser = argparse.ArgumentParser(description="Generate text using local Jet-Nemotron")
     parser.add_argument("--model_path", type=str, default="jet-ai/Jet-Nemotron-2B", 
                        help="Path to the model weights")
-    parser.add_argument("--input_text", type=str, default="Introduce yourself.",
+    parser.add_argument("--input_text", type=str, default="Hi, My name is Timmy. I am currently a 3rd year PhD student in Computer Science at Stanford University. I am interested in natural language processing and machine learning. How about you? Do you like to travel? Or do you like to read books? What is your favorite book? What is your favorite travel destination?",
                        help="Input text for generation")
-    parser.add_argument("--max_new_tokens", type=int, default=10,
+    parser.add_argument("--max_new_tokens", type=int, default=20,
                        help="Maximum number of new tokens to generate")
     parser.add_argument("--do_sample", action="store_true",
                        help="Whether to use sampling for generation")
@@ -49,7 +49,7 @@ def main():
     
     # 初始化模型
     model = JetNemotronForCausalLM(config)
-    model = model.eval().cuda().bfloat16()
+    model = model.eval().to("cuda").bfloat16()
     
     # 加载模型权重
     if os.path.isfile(args.model_path) or os.path.isdir(args.model_path):
@@ -73,7 +73,7 @@ def main():
 
     # 准备输入
     inputs = tokenizer(args.input_text, return_tensors="pt")
-    input_ids = inputs.input_ids.cuda()
+    input_ids = inputs.input_ids.to("cuda")
 
     # 生成参数
     gen_kwargs = {

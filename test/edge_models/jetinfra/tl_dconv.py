@@ -18,20 +18,21 @@ def get_configs():
     } for c in _configs]
     return configs
 
-@autotune(configs=get_configs(), warmup=10, rep=10)
+# @autotune(configs=get_configs(), warmup=10, rep=10)
 @tilelang.jit(
     # pass_configs={
     #     tilelang.PassConfigKey.TL_DISABLE_FAST_MATH: False,
     # }
+    out_idx = [-1],
 )
 def _dconv_fwd_kernel(
     Batch,
     Token,
     Indim,
     Kernel_size,
-    block_D,
-    threads,
-    dtype,  
+    block_D = 256,
+    threads = 128,
+    dtype = "bfloat16",  
     reduce_type = "float32"
 ):
     @T.prim_func
@@ -73,13 +74,12 @@ def _dconv_fwd_kernel(
 def tl_dynamic_conv_cache_w_silu(x, kernels):
     B, Token, D = x.shape
     W = kernels.shape[-1]
-    out = torch.empty_like(x)
     #### TODO hard code to float16
     kernel = _dconv_fwd_kernel(B, Token, D, W, dtype = "bfloat16")
     x = x.view(B * Token, D)
     kernels = kernels.view(B * Token, D, W)
-    out = out.view(B * Token, D)
-    kernel(x, kernels, out)
+
+    out = kernel(x, kernels)
     x = x.view(B, Token, D)
     out = out.view(B, Token, D)
     return out

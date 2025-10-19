@@ -244,6 +244,7 @@ def chunk_local_cumsum_scalar(
     BT = chunk_size
     chunk_indices = prepare_chunk_indices(cu_seqlens, BT) if cu_seqlens is not None else None
     NT = triton.cdiv(T, BT) if cu_seqlens is None else len(chunk_indices)
+
     g_org, g = g, torch.empty_like(g, dtype=output_dtype or g.dtype)
     grid = (NT, B * H)
     chunk_local_cumsum_scalar_kernel[grid](
@@ -392,9 +393,11 @@ def chunk_local_cumsum(
     output_dtype: Optional[torch.dtype] = torch.float,
     **kwargs
 ) -> torch.Tensor:
+
     if cu_seqlens is not None:
         assert g.shape[0] == 1, "Only batch size 1 is supported when cu_seqlens are provided"
     if len(g.shape) == 3:
+
         return chunk_local_cumsum_scalar(g, chunk_size, reverse, cu_seqlens, head_first, output_dtype)
     elif len(g.shape) == 4:
         return chunk_local_cumsum_vector(g, chunk_size, reverse, cu_seqlens, head_first, output_dtype)

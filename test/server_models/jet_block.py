@@ -17,6 +17,7 @@
 # This file is modified from https://github.com/fla-org/flash-linear-attention/blob/main/fla/layers/gated_deltanet.py
 
 from __future__ import annotations
+import time
 
 import math
 from dataclasses import dataclass
@@ -33,11 +34,11 @@ from fla.ops.gated_delta_rule import (chunk_gated_delta_rule,
                                       fused_recurrent_gated_delta_rule)
 
 
+# from .tl_dynamic_conv import TilelangDynamicShortConvolution
 from .dynamic_conv import DynamicShortConvolution
 from .configuration_jet_nemotron import JetNemotronConfig
 from .kv_cache import JetNemotronCache
-from .jetinfra import linear_w_silu
-
+from .jetinfra import fused_linear_silu_l2norm, fused_recurrent_gated_delta_rule_tl, chunk_gated_delta_rule_fwd
 
 @dataclass
 class JetBlockConfig():
@@ -156,9 +157,9 @@ class JetBlock(nn.Module):
         use_cache: Optional[bool] = False,
         **kwargs
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[JetNemotronCache]]:
-        
+        start_time = time.time()
         if attention_mask is not None:
-            
+            # print("attn mask shape:", attention_mask.shape)
             if len(attention_mask.shape) > 2:
                 attention_mask = attention_mask.squeeze(1)
                 attention_mask = torch.where(attention_mask[:, -1] > -1, 1, 0)
@@ -184,56 +185,130 @@ class JetBlock(nn.Module):
             indices, cu_seqlens, _ = get_unpad_data(attention_mask[:, -q_len:])
 
         conv_state = None
-
+        
         conv_mask = attention_mask[:, -hidden_states.shape[1]:] if attention_mask is not None else None
+        # print("conv_mask.shape:", conv_mask.shape if conv_mask is not None else None)
         # print("hidden_states.shape:", hidden_states.shape)
-        ## TODO FP8 kernel replacing
-        q = F.silu(self.q_proj(hidden_states))
-        k = F.silu(self.k_proj(hidden_states))
-        # q = linear_w_silu_prefill(hidden_states, self.q_proj.weight)
-        # k = linear_w_silu_prefill(hidden_states, self.k_proj.weight)
+        # print("self.q_proj.weight.shape:", self.q_proj.weight.shape)
+        # print("self.k_proj.weight.shape:", self.k_proj.weight.shape)
+        # print("hidden_states.dtype:", hidden_states.dtype)
+        # print("self.q_proj.weight.dtype:", self.q_proj.weight.dtype)
+        # print("self.k_proj.weight.dtype:", self.k_proj.weight.dtype)
+        # torch.cuda.synchronize()
+        start_time_qk = time.time()
+        # print("hidden_states.shape:", hidden_states.shape)
+        # q = F.silu(self.q_proj(hidden_states))
+        # k = F.silu(self.k_proj(hidden_states))
+        
+        q = fused_linear_silu_l2norm(hidden_states, self.q_proj.weight)
+        k = fused_linear_silu_l2norm(hidden_states, self.k_proj.weight)
+        torch.cuda.synchronize()
+        end_time_qk = time.time()
+        print("qk time:", end_time_qk - start_time_qk)
+        # print("q.shape:", q.shape)
+        # print("k.shape:", k.shape)
         conv_state_v = None
         if last_state is not None:
             conv_state_v = last_state['conv_state'][-1]
+        start_v_proj = time.time()
+        v = self.v_proj(hidden_states)
+        torch.cuda.synchronize()
+        end_v_proj = time.time()
+        print("v_proj time:", end_v_proj - start_v_proj)
+        start_dynamic_conv1d = time.time()
+
         v, conv_state_v = self.dynamic_conv1d(
-            x=self.v_proj(hidden_states),
+            x=v,
             generator_input=hidden_states,
             mask=conv_mask,
             cache=conv_state_v,
             output_final_state=use_cache,
         )
+        torch.cuda.synchronize()
+        end_dynamic_conv1d = time.time()
+        print("dynamic_conv1d time:", end_dynamic_conv1d - start_dynamic_conv1d)
         # print("v.shape:", v.shape)
         # print("conv_state_v.shape:", conv_state_v.shape)
         conv_state = conv_state + (conv_state_v,) if conv_state is not None else (conv_state_v,)
-
+        batch_size = q.shape[0]
         if attention_mask is not None and q_len > 1:
             q = index_first_axis(rearrange(q, "b s ... -> (b s) ..."), indices).unsqueeze(0)
             k = index_first_axis(rearrange(k, "b s ... -> (b s) ..."), indices).unsqueeze(0)
             v = index_first_axis(rearrange(v, "b s ... -> (b s) ..."), indices).unsqueeze(0)
             hidden_states = index_first_axis(rearrange(hidden_states, "b s ... -> (b s) ..."), indices).unsqueeze(0)
-        
+
         q, k = map(lambda x: rearrange(x, '... (h d) -> ... h d', d=self.head_k_dim), (q, k))
         v = rearrange(v, '... (h d) -> ... h d', d=self.head_v_dim)
+        torch.cuda.synchronize()
+        start_bg_proj = time.time()
         beta = self.b_proj(hidden_states).sigmoid()
 
         g = -self.A_log.float().exp() * F.softplus(self.a_proj(hidden_states).float() + self.dt_bias)
-
+        torch.cuda.synchronize()
+        end_bg_proj = time.time()
+        print("bg_proj time:", end_bg_proj - start_bg_proj)
         recurrent_state = last_state['recurrent_state'] if last_state is not None else None
+
         if mode == 'chunk':
-            o, recurrent_state = chunk_gated_delta_rule(
+            # torch.cuda.synchronize()
+            # prefill_start_time = time.time()
+            # print("q shape:", q.shape)
+            # print("k shape:", k.shape)
+            # print("v shape:", v.shape)
+            # print("g shape:", g.shape)
+            # o, recurrent_state = chunk_gated_delta_rule(
+            #     q=q,
+            #     k=k,
+            #     v=v,
+            #     g=g,
+            #     beta=beta,
+            #     initial_state=recurrent_state,
+            #     output_final_state=use_cache,
+            #     cu_seqlens=cu_seqlens,
+            #     use_qk_l2norm_in_kernel=True,
+            #     autotune_interval=self.autotune_interval
+            # )
+            # if scale is None:
+            scale = k.shape[-1] ** -0.5
+
+            _, o, _, recurrent_state = chunk_gated_delta_rule_fwd(
+                batch_size=batch_size,
                 q=q,
                 k=k,
                 v=v,
                 g=g,
                 beta=beta,
+                scale=scale,
                 initial_state=recurrent_state,
                 output_final_state=use_cache,
                 cu_seqlens=cu_seqlens,
-                use_qk_l2norm_in_kernel=True,
-                autotune_interval=self.autotune_interval
+
             )
+            # torch.cuda.synchronize()
+            # prefill_end_time = time.time()
+            # print("prefill time:", prefill_end_time - prefill_start_time)
+            # print("prefill recurrent state shape:", recurrent_state.shape)
         elif mode == 'fused_recurrent':
-            o, recurrent_state = fused_recurrent_gated_delta_rule(
+            decode_start_time = time.time()
+            # o, recurrent_state = fused_recurrent_gated_delta_rule(
+            #     q=q,
+            #     k=k,
+            #     v=v,
+            #     g=g,
+            #     beta=beta,
+            #     initial_state=recurrent_state,
+            #     output_final_state=use_cache,
+            #     cu_seqlens=cu_seqlens,
+            #     use_qk_l2norm_in_kernel=True
+            # )
+            # print("q shape:", q.shape)
+            # print("k shape:", k.shape)
+            # print("v shape:", v.shape)
+            # print("g shape:", g.shape)
+            # print("recurrent_state shape:", recurrent_state.shape)
+            # print("use_cache:", use_cache)
+            
+            o, recurrent_state = fused_recurrent_gated_delta_rule_tl(
                 q=q,
                 k=k,
                 v=v,
@@ -244,6 +319,9 @@ class JetBlock(nn.Module):
                 cu_seqlens=cu_seqlens,
                 use_qk_l2norm_in_kernel=True
             )
+            torch.cuda.synchronize()
+            decode_end_time = time.time()
+            print("decode time:", decode_end_time - decode_start_time)
         else:
             raise NotImplementedError(f"Not supported mode `{mode}`.")
 
@@ -256,10 +334,16 @@ class JetBlock(nn.Module):
             )
 
         g = rearrange(self.g_proj(hidden_states), '... (h d) -> ... h d', d=self.head_v_dim)
+        o_proj_start_time = time.time()
         o = self.o_norm(o, g)
         o = rearrange(o, 'b t h d -> b t (h d)')
         o = self.o_proj(o)
         if attention_mask is not None and q_len > 1:
             o = pad_input(o.squeeze(0), indices, batch_size, q_len)
-
+        # torch.cuda.synchronize()
+        # end_of_all = time.time()
+        # print("end of all time:", end_of_all - start_time)
+        torch.cuda.synchronize()
+        end_o_proj = time.time()
+        print("o_proj time:", end_o_proj - o_proj_start_time)
         return o, past_key_value

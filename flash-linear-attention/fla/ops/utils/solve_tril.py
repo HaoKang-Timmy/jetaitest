@@ -244,9 +244,12 @@ def solve_tril(
 
     B, T, H, BT = A.shape
     Ad = torch.empty(B, T, H, 16, device=A.device, dtype=torch.float if BT != 16 else output_dtype)
-
+ 
     chunk_indices = prepare_chunk_indices(cu_seqlens, 16) if cu_seqlens is not None else None
+    # print("A dtype", A.dtype)
+    # print("Ad dtype", Ad.dtype)
     NT = len(chunk_indices) if cu_seqlens is not None else triton.cdiv(T, 16)
+    # print("cu_seqlens", cu_seqlens)
     solve_tril_16x16_kernel[NT, B * H](
         A=A,
         Ad=Ad,
