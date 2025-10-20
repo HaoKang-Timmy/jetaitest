@@ -37,7 +37,7 @@ from .dynamic_conv import DynamicShortConvolution
 from .configuration_jet_nemotron import JetNemotronConfig
 from .kv_cache import JetNemotronCache
 
-from .jetinfra import gemv_silu_l2norm_kernel, fused_recurrent_gated_delta_rule_tl
+from .jetinfra import gemv_silu_l2norm_kernel, fused_recurrent_gated_delta_rule_tl, tl_fused_rmsnorm
 
 
 @dataclass
@@ -313,7 +313,8 @@ class JetBlock(nn.Module):
 
         g = rearrange(self.g_proj(hidden_states), '... (h d) -> ... h d', d=self.head_v_dim)
 
-        o = self.o_norm(o, g)
+        # o = self.o_norm(o, g)
+        o = tl_fused_rmsnorm(o, g, self.o_norm.weight)
         o = rearrange(o, 'b t h d -> b t (h d)')
         o = self.o_proj(o)
         if attention_mask is not None and q_len > 1:

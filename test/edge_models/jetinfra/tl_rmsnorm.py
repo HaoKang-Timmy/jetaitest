@@ -38,7 +38,7 @@ def RMSNorm(
         X: T.Tensor([B, S, Head, Dim], dtype),
         G: T.Tensor([B, S, Head, Dim], dtype),
         Weight: T.Tensor([Dim], dtype),
-        Y: T.Tensor([B, S, Head, Dim], dtype),
+        # Y: T.Tensor([B, S, Head, Dim], dtype),
         
     ):
         with T.Kernel(B * Head, S, T.ceildiv(Dim, block_D), threads=threads) as (id_bh, id_s, id_d):
@@ -78,10 +78,22 @@ def RMSNorm(
             for i in T.Parallel(block_D):
                 G_sigmoid_fragment[i] = T.sigmoid(G_fragment[i])
             for i in T.Parallel(block_D):
-                Y_fragment[i] = X_rms_fragment[i] * G_fragment[i] * G_sigmoid_fragment[i]
-            T.copy(Y_fragment, Y_shared)
-            T.copy(Y_shared, Y[id_b, id_s, id_h, id_d * block_D])
+                X_fragment[i] = X_rms_fragment[i] * G_fragment[i] * G_sigmoid_fragment[i]
+            T.copy(X_fragment, X_shared)
+            # inplace store to X
+            T.copy(X_shared, X[id_b, id_s, id_h, id_d * block_D])
     return main
+def tl_fused_rmsnorm(
+    X: torch.Tensor,
+    G: torch.Tensor,
+    Weight: torch.Tensor,
+):
+    B, S, H, Dim = X.shape
+    scale = 1.0 / Dim
+    kernel = RMSNorm(B, S, H, Dim, dtype="bfloat16", accum_dtype="float32", 
+                     block_D=256, threads=128, scale=scale)
+    kernel(X, G, Weight)
+    return X
 
 
 if __name__ == "__main__":
@@ -99,10 +111,11 @@ if __name__ == "__main__":
     
     # TileLang kernel 输出
     Y_tl = torch.empty(B, S, H, Dim, device='cuda', dtype=datatype)
-    scale = 1.0 / Dim  # 修复：应该是 1/Dim，不是 1/sqrt(Dim)
-    kernel = RMSNorm(B, S, H, Dim, dtype="bfloat16", accum_dtype="float32", 
-                     block_D=256, threads=128, scale=scale)
-    kernel(X, G, Weight, Y_tl)
+    # scale = 1.0 / Dim  # 修复：应该是 1/Dim，不是 1/sqrt(Dim)
+    # kernel = RMSNorm(B, S, H, Dim, dtype="bfloat16", accum_dtype="float32", 
+    #                  block_D=256, threads=128, scale=scale)
+    # kernel(X, G, Weight, Y_tl)
+    Y_tl = tl_fused_rmsnorm(X, G, Weight)
     torch.cuda.synchronize()
     
     # # FLA FusedRMSNormGated
