@@ -254,9 +254,15 @@ class JetBlock(nn.Module):
             
             
             
-            q = gemv_silu_l2norm_kernel(hidden_states, self.q_proj.weight)
-            k = gemv_silu_l2norm_kernel(hidden_states, self.k_proj.weight)
-            
+            # q = gemv_silu_l2norm_kernel(hidden_states, self.q_proj.weight)
+            # k = gemv_silu_l2norm_kernel(hidden_states, self.k_proj.weight)
+            q = F.silu(self.q_proj(hidden_states))
+            k = F.silu(self.k_proj(hidden_states))
+            ### TODO replace with fusion
+            q_norm = torch.norm(q, p=2, dim=-1, keepdim=True)
+            k_norm = torch.norm(k, p=2, dim=-1, keepdim=True)
+            q = q / q_norm
+            k = k / k_norm
             # q_abs_diff = (q - q_new).abs()
             # k_abs_diff = (k - k_new).abs()
             # print(f"DEBUG:: Layer {self.layer_idx} Q abs error max: {q_abs_diff.max().item()}")

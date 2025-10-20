@@ -46,9 +46,9 @@ def fused_recurrent(
     USE_QK_L2NORM_IN_KERNEL=True, 
     STORE_FINAL_STATE=True,
     dtype = "bfloat16",
-    accum_dtype = "float",
+    accum_dtype = "float32",
     block_K=128, 
-    block_V=128, 
+    block_V=64, 
     num_stages=2, 
     threads=128
 ):
@@ -80,7 +80,7 @@ def fused_recurrent(
         g: T.Tensor([Batch, Token, Head_V], accum_dtype),
         Beta: T.Tensor([Batch, Token, Head_V],dtype),
         O: T.Tensor([Batch, Token, Head_V, V_Dim], dtype),
-        h0: T.Tensor([Batch, Head_V, K_Dim, V_Dim], dtype),
+        h0: T.Tensor([Batch, Head_V, K_Dim, V_Dim], accum_dtype),
         # ht: T.Tensor([Batch, Head_V, K_Dim, V_Dim], dtype),
         scale: T.Tensor([1], dtype),
         # O: T.Tensor(Batch, Token, Head_V, V_Dim, dtype),
@@ -94,7 +94,7 @@ def fused_recurrent(
             K_shared = T.alloc_shared([block_K], dtype, scope="shared")
             V_shared = T.alloc_shared([block_V], dtype, scope="shared")
             V_fragment = T.alloc_fragment([block_V], dtype)
-            h0_shared = T.alloc_shared([block_K, block_V], dtype, scope="shared")
+            h0_shared = T.alloc_shared([block_K, block_V], accum_dtype, scope="shared")
             o_shared = T.alloc_shared([block_V], dtype, scope="shared")
             
             h0_fragment = T.alloc_fragment([block_K, block_V], accum_dtype)
@@ -116,7 +116,8 @@ def fused_recurrent(
                 T.copy(K_shared, K_fragment)
                 T.copy(V_shared, V_fragment)
                 T.copy(h0_shared, h0_fragment)
-
+                L2Norm_QK(Q_fragment)
+                L2Norm_QK(K_fragment)
                 for i in T.Parallel(block_K):
                     Q_fragment[i] = Q_fragment[i] * scale[0]
 
@@ -173,11 +174,11 @@ def fused_recurrent_fwd(
     o = torch.empty(B, Token, HV, V, device=device, dtype=v.dtype)
     # ht = torch.empty(B, HV, K, V, device=device, dtype=v.dtype)
     if initial_state is None:
-        h0 = torch.zeros(B, HV, K, V, device=device, dtype=v.dtype)
+        h0 = torch.zeros(B, HV, K, V, device=device, dtype=g.dtype)
     else:
         h0 = initial_state
     kernel = fused_recurrent(B, Token, H, HV, K, V, 
-                             use_qk_l2norm_in_kernel, STORE_FINAL_STATE=True, block_K = 32, block_V = 32, num_stages = 1, threads = 128)
+                             use_qk_l2norm_in_kernel, STORE_FINAL_STATE=True)
     # print(kernel.get_kernel_source())
     scale = torch.tensor([scale]).cuda().to(v.dtype)
     torch.cuda.synchronize()
@@ -265,7 +266,7 @@ if __name__ == '__main__':
     v = torch.randn(B, Token, HV, V, device='cuda', dtype=datatype)
     g = torch.randn(B, Token, HV, device='cuda', dtype=gdtype).sigmoid()
     beta = torch.randn(B, Token, HV, device='cuda', dtype=datatype).sigmoid()
-    h0 = torch.zeros(B, HV, K, V, device='cuda', dtype=datatype)
+    h0 = torch.zeros(B, HV, K, V, device='cuda', dtype=gdtype)
     
     o, final_state = fused_recurrent_gated_delta_rule_tl(
         q=q,
@@ -278,4 +279,33 @@ if __name__ == '__main__':
         output_final_state=True,
         use_qk_l2norm_in_kernel=True
     )
+    for _ in range(10):
+        o, final_state = fused_recurrent_gated_delta_rule_tl(
+            q=q,
+            k=k,
+            v=v,
+            g=g,
+            beta=beta,
+            scale=scale,
+            initial_state=h0,
+            output_final_state=True,
+            use_qk_l2norm_in_kernel=True
+        )
+    torch.cuda.synchronize()
+    start = time.time()
+    for _ in range(100):
+        o, final_state = fused_recurrent_gated_delta_rule_tl(
+            q=q,
+            k=k,
+            v=v,
+            g=g,
+            beta=beta,
+            scale=scale,
+            initial_state=h0,
+            output_final_state=True,
+            use_qk_l2norm_in_kernel=True
+        )
+    torch.cuda.synchronize()
+    end = time.time()
+    print(f"Time: {end - start}")
     

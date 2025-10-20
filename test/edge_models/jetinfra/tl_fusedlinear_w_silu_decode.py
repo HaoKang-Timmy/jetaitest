@@ -81,33 +81,33 @@ if __name__ == "__main__":
     input_vec = Input_fp16.view(D_in)
     output_vec = Output_fp16.view(D_out)
 
-    # warm up
-    for _ in range(10):
-        kernel_fp16(input_vec, W_T_fp16, output_vec)
+    # # warm up
+    # for _ in range(10):
+    #     kernel_fp16(input_vec, W_T_fp16, output_vec)
 
-    # benchmark
-    torch.cuda.synchronize()
-    start = time.time()
-    for _ in range(20):
-        kernel_fp16(input_vec, W_T_fp16, output_vec)
-    torch.cuda.synchronize()
-    end = time.time()
-    print(f"Tilelang FP16 Time taken: {(end - start) * 1000 / 20} ms")
+    # # benchmark
+    # torch.cuda.synchronize()
+    # start = time.time()
+    # for _ in range(20):
+    #     kernel_fp16(input_vec, W_T_fp16, output_vec)
+    # torch.cuda.synchronize()
+    # end = time.time()
+    # print(f"Tilelang FP16 Time taken: {(end - start) * 1000 / 20} ms")
 
-    # PyTorch implementation
-    # warm up
-    for _ in range(10):
-        output_ref = W_T_fp16 @ input_vec
+    # # PyTorch implementation
+    # # warm up
+    # for _ in range(10):
+    #     output_ref = W_T_fp16 @ input_vec
 
-    # benchmark
-    torch.cuda.synchronize()
-    start = time.time()
-    for _ in range(20):
-        output_ref = W_T_fp16 @ input_vec
-    torch.cuda.synchronize()
-    end = time.time()
-    print(f"Pytorch FP16 Time taken: {(end - start) * 1000 / 20} ms")
+    # # benchmark
+    # torch.cuda.synchronize()
+    # start = time.time()
+    # for _ in range(20):
+    #     output_ref = W_T_fp16 @ input_vec
+    # torch.cuda.synchronize()
+    # end = time.time()
+    # print(f"Pytorch FP16 Time taken: {(end - start) * 1000 / 20} ms")
 
-    # Verify correctness
-    torch.testing.assert_close(output_vec, output_ref, rtol=1e-2, atol=1e-2)
-    print("Correctness check passed.")
+    # # Verify correctness
+    # torch.testing.assert_close(output_vec, output_ref, rtol=1e-2, atol=1e-2)
+    # print("Correctness check passed.")

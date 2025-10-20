@@ -1,1 +1,1 @@
-2025-10-20 05:16:31,177 WARNING:Tunable parameters ['block_K', 'block_V', 'num_stages', 'threads'] already provided during auto-tuning. Skipping compilation and using direct JIT
+2025-10-20 06:31:06,914 INFO:Auto-tuning with 0.9 CPU utilizations, 20 CPUs available, 18 CPUs will be used

@@ -38,8 +38,8 @@ def splitk_gemv_vectorized_silu_l2norm(
     norm_dim: int,
     BLOCK_N: int = 128,
     reduce_threads: int = 4,
-    dtype: str = "float16",
-    accum_dtype: str = "float",
+    dtype: str = "bfloat16",
+    accum_dtype: str = "float32",
 ):
     MAX_TRANSACTION_SIZE_IN_BITS = 128
     TILE_K = MAX_TRANSACTION_SIZE_IN_BITS // DataType(dtype).bits
