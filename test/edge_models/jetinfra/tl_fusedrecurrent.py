@@ -8,7 +8,7 @@ import time
 import tilelang as tl
 import sys
 sys.path.insert(0, '/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/flash-linear-attention')
-# from fla.ops.gated_delta_rule.fused_recurrent import fused_recurrent_gated_delta_rule
+from fla.ops.gated_delta_rule.fused_recurrent import fused_recurrent_gated_delta_rule
 
 
 def get_configs():
@@ -279,33 +279,79 @@ if __name__ == '__main__':
         output_final_state=True,
         use_qk_l2norm_in_kernel=True
     )
-    for _ in range(10):
-        o, final_state = fused_recurrent_gated_delta_rule_tl(
-            q=q,
-            k=k,
-            v=v,
-            g=g,
-            beta=beta,
-            scale=scale,
-            initial_state=h0,
-            output_final_state=True,
-            use_qk_l2norm_in_kernel=True
-        )
-    torch.cuda.synchronize()
-    start = time.time()
-    for _ in range(100):
-        o, final_state = fused_recurrent_gated_delta_rule_tl(
-            q=q,
-            k=k,
-            v=v,
-            g=g,
-            beta=beta,
-            scale=scale,
-            initial_state=h0,
-            output_final_state=True,
-            use_qk_l2norm_in_kernel=True
-        )
-    torch.cuda.synchronize()
-    end = time.time()
-    print(f"Time: {end - start}")
+    o_fla, final_state_fla = fused_recurrent_gated_delta_rule(
+        q=q,
+        k=k,
+        v=v,
+        g=g,
+        beta=beta,
+        scale=scale,
+        initial_state=h0.clone(),
+        output_final_state=True,
+        use_qk_l2norm_in_kernel=True
+    )
+    
+    # 计算输出 o 的误差
+    eps = 1e-8
+    o_diff = torch.abs(o.float() - o_fla.float())
+    o_relative_error = o_diff / (torch.abs(o_fla.float()) + eps)
+    o_mean_relative_error = o_relative_error.mean().item()
+    o_max_relative_error = o_relative_error.max().item()
+    
+    # 计算最终状态 final_state 的误差
+    final_state_diff = torch.abs(final_state.float() - final_state_fla.float())
+    final_state_relative_error = final_state_diff / (torch.abs(final_state_fla.float()) + eps)
+    final_state_mean_relative_error = final_state_relative_error.mean().item()
+    final_state_max_relative_error = final_state_relative_error.max().item()
+    
+    # 打印结果
+    print("\n" + "="*60)
+    print("FLA vs TileLang Kernel 误差对比")
+    print("="*60)
+    print(f"\n输出 (o) 的误差:")
+    print(f"  平均相对误差: {o_mean_relative_error:.6e}")
+    print(f"  最大相对误差: {o_max_relative_error:.6e}")
+    print(f"  平均绝对误差: {o_diff.mean().item():.6e}")
+    print(f"  最大绝对误差: {o_diff.max().item():.6e}")
+    
+    print(f"\n最终状态 (final_state) 的误差:")
+    print(f"  平均相对误差: {final_state_mean_relative_error:.6e}")
+    print(f"  最大相对误差: {final_state_max_relative_error:.6e}")
+    print(f"  平均绝对误差: {final_state_diff.mean().item():.6e}")
+    print(f"  最大绝对误差: {final_state_diff.max().item():.6e}")
+    
+    print("\n" + "="*60)
+    print(f"输出形状: {o.shape}")
+    print(f"最终状态形状: {final_state.shape}")
+    print("="*60 + "\n")
+    
+    # for _ in range(10):
+    #     o, final_state = fused_recurrent_gated_delta_rule_tl(
+    #         q=q,
+    #         k=k,
+    #         v=v,
+    #         g=g,
+    #         beta=beta,
+    #         scale=scale,
+    #         initial_state=h0,
+    #         output_final_state=True,
+    #         use_qk_l2norm_in_kernel=True
+    #     )
+    # torch.cuda.synchronize()
+    # start = time.time()
+    # for _ in range(100):
+    #     o, final_state = fused_recurrent_gated_delta_rule_tl(
+    #         q=q,
+    #         k=k,
+    #         v=v,
+    #         g=g,
+    #         beta=beta,
+    #         scale=scale,
+    #         initial_state=h0,
+    #         output_final_state=True,
+    #         use_qk_l2norm_in_kernel=True
+    #     )
+    # torch.cuda.synchronize()
+    # end = time.time()
+    # print(f"Time: {end - start}")
     

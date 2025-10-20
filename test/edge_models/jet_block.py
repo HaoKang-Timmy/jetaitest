@@ -312,6 +312,7 @@ class JetBlock(nn.Module):
             )
 
         g = rearrange(self.g_proj(hidden_states), '... (h d) -> ... h d', d=self.head_v_dim)
+
         o = self.o_norm(o, g)
         o = rearrange(o, 'b t h d -> b t (h d)')
         o = self.o_proj(o)
