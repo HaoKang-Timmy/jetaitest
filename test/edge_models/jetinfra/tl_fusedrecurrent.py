@@ -29,7 +29,7 @@ def get_configs():
     } for c in _configs]
     return configs
 #### TODO Fp8 loading, load multiple heads to enlarge block size, tensore core process instead of cuda core. We need to put norm in matmul.
-@autotune(configs=get_configs(), warmup=10, rep=10)
+# @autotune(configs=get_configs(), warmup=10, rep=10)
 @tilelang.jit(
     pass_configs={
         tilelang.PassConfigKey.TL_DISABLE_TMA_LOWER: True,
@@ -105,7 +105,8 @@ def fused_recurrent(
             T.copy(h0[id_b, id_hv, bx * block_K, by * block_V], h0_shared)
   
             # T.use_swizzle(8)
-            for t in T.Pipelined(Token, num_stages=num_stages):
+            # for t in T.Pipelined(Token, num_stages=num_stages):
+            for t in T.serial(Token):
                 T.copy(Q[id_b, t, id_h, bx * block_K], Q_shared)
                 T.copy(K[id_b, t, id_h, bx * block_K], K_shared)
                 T.copy(V[id_b, t, id_hv, by * block_V], V_shared)
@@ -122,7 +123,7 @@ def fused_recurrent(
                 for i, j in T.Parallel(block_K, block_V):
                     h0_fragment[i, j] = h0_fragment[i, j] * T.exp(g[id_b, t, id_hv])
                 ### b_v -= tl.sum(b_h * b_k[:, None], 0)
-                
+                T.copy(h0_fragment, h0_shared)
                 for i, j in T.Parallel(block_K, block_V):
                     h0_fragment[i, j] = h0_fragment[i, j] * K_fragment[i]
                 T.reduce_sum(h0_fragment, v_min_reg, dim=0)
@@ -133,9 +134,11 @@ def fused_recurrent(
                 for i in T.Parallel(block_V):
                     V_fragment[i] = V_fragment[i] * Beta[id_b, t, id_hv]
                 ### b_h += b_k[:, None] * b_v[None, :]
+                T.copy(h0_shared, h0_fragment)
                 for i, j in T.Parallel(block_K, block_V):
                     h0_fragment[i, j] = h0_fragment[i, j] + K_fragment[i] * V_fragment[j]
                 ### b_o = tl.sum(b_h * b_q[:, None], 0)
+                T.copy(h0_fragment, h0_shared)
                 for i, j in T.Parallel(block_K, block_V):
                     h0_fragment[i, j] = h0_fragment[i, j] * Q_fragment[i]
                 ### reuse v_min_reg

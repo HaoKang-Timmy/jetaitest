@@ -95,14 +95,14 @@ def fused_recurrent(
             K_fragment = T.alloc_fragment([block_K], accum_dtype)
             v_min_reg = T.alloc_fragment([block_V], accum_dtype)
             
-            T.annotate_layout({
-                # Q_shared: tilelang.layout.make_swizzled_layout(Q_shared),
-                # K_shared: tilelang.layout.make_swizzled_layout(K_shared),
-                # V_shared: tilelang.layout.make_swizzled_layout(V_shared),
-                h0_shared: tilelang.layout.make_swizzled_layout(h0_shared),
-                # o_shared: tilelang.layout.make_swizzled_layout(o_shared),
-            })
-            T.disable_warp_group_reg_alloc()
+            # T.annotate_layout({
+            #     # Q_shared: tilelang.layout.make_swizzled_layout(Q_shared),
+            #     # K_shared: tilelang.layout.make_swizzled_layout(K_shared),
+            #     # V_shared: tilelang.layout.make_swizzled_layout(V_shared),
+            #     h0_shared: tilelang.layout.make_swizzled_layout(h0_shared),
+            #     # o_shared: tilelang.layout.make_swizzled_layout(o_shared),
+            # })
+            # T.disable_warp_group_reg_alloc()
             T.copy(h0[id_b, id_hv, bx * block_K, by * block_V], h0_shared)
             for t in T.serial(Token):
                 T.copy(Q[id_b, t, id_h, bx * block_K], Q_shared)
@@ -115,8 +115,8 @@ def fused_recurrent(
                 T.copy(V_shared, V_fragment)
                 T.copy(h0_shared, h0_fragment)
                 # if USE_QK_L2NORM_IN_KERNEL:
-                L2Norm_QK(Q_fragment)
-                L2Norm_QK(K_fragment)
+                # L2Norm_QK(Q_fragment)
+                # L2Norm_QK(K_fragment)
                 # b_q = b_q * scale
                 for i in T.Parallel(block_K):
                     Q_fragment[i] = Q_fragment[i] * scale[0]
@@ -180,6 +180,8 @@ def fused_recurrent_fwd(
         h0 = torch.zeros(B, HV, K, V, device=device, dtype=torch.float)
     else:
         h0 = initial_state
+    torch.cuda.synchronize()
+    print("start kernel")
     kernel = fused_recurrent(B, Token, H, HV, K, V, 
                              use_qk_l2norm_in_kernel, STORE_FINAL_STATE=True)
     scale = torch.tensor([scale]).to(device=q.device, dtype=dtype)
@@ -192,6 +194,8 @@ def fused_recurrent_fwd(
     # print("h0 dtype:", h0.dtype)
     # print("scale dtype:", scale.dtype)
     o = kernel(q, k, v, g, beta, h0, scale)
+    torch.cuda.synchronize()
+    print("end kernel")
     return o, h0
           # [B,T,HV]
 class FusedRecurrentFunctionTL(torch.autograd.Function):
