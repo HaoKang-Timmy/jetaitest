@@ -1,0 +1,1345 @@
+2025-10-20 03:45:13,817 INFO:Auto-tuning with 0.9 CPU utilizations, 240 CPUs available, 216 CPUs will be used
+2025-10-20 03:45:30,692 INFO:An error occurred while testing config {'block_K': 128, 'block_V': 32, 'num_stages': 3, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,693 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 389, in target_fn
+    latency = profiler.do_bench(
+              ^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 248, in do_bench
+    return do_bench(
+           ^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/bench.py", line 42, in do_bench
+    torch.cuda.synchronize()
+  File "/home/ubuntu/miniconda3/envs/kernel/lib/python3.12/site-packages/torch/cuda/__init__.py", line 1085, in synchronize
+    return torch._C._cuda_synchronize()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,697 INFO:An error occurred while testing config {'block_K': 64, 'block_V': 128, 'num_stages': 2, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,698 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,698 INFO:An error occurred while testing config {'block_K': 128, 'block_V': 64, 'num_stages': 3, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,698 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,699 INFO:An error occurred while testing config {'block_K': 128, 'block_V': 256, 'num_stages': 4, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,699 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,699 INFO:An error occurred while testing config {'block_K': 128, 'block_V': 64, 'num_stages': 4, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,699 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,700 INFO:An error occurred while testing config {'block_K': 32, 'block_V': 64, 'num_stages': 4, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,700 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,700 INFO:An error occurred while testing config {'block_K': 128, 'block_V': 64, 'num_stages': 1, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,701 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,701 INFO:An error occurred while testing config {'block_K': 64, 'block_V': 64, 'num_stages': 2, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,701 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,701 INFO:An error occurred while testing config {'block_K': 128, 'block_V': 32, 'num_stages': 2, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,702 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,702 INFO:An error occurred while testing config {'block_K': 32, 'block_V': 32, 'num_stages': 1, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,702 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,702 INFO:An error occurred while testing config {'block_K': 32, 'block_V': 64, 'num_stages': 3, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,703 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,703 INFO:An error occurred while testing config {'block_K': 128, 'block_V': 128, 'num_stages': 3, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,703 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,703 INFO:An error occurred while testing config {'block_K': 32, 'block_V': 32, 'num_stages': 2, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,704 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,704 INFO:An error occurred while testing config {'block_K': 32, 'block_V': 32, 'num_stages': 3, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,704 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,704 INFO:An error occurred while testing config {'block_K': 32, 'block_V': 128, 'num_stages': 2, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,705 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,705 INFO:An error occurred while testing config {'block_K': 64, 'block_V': 256, 'num_stages': 2, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,705 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,705 INFO:An error occurred while testing config {'block_K': 64, 'block_V': 256, 'num_stages': 1, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,706 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,706 INFO:An error occurred while testing config {'block_K': 64, 'block_V': 128, 'num_stages': 1, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,706 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,706 INFO:An error occurred while testing config {'block_K': 32, 'block_V': 256, 'num_stages': 2, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,707 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,707 INFO:An error occurred while testing config {'block_K': 64, 'block_V': 64, 'num_stages': 3, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,707 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,707 INFO:An error occurred while testing config {'block_K': 64, 'block_V': 128, 'num_stages': 3, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,708 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,708 INFO:An error occurred while testing config {'block_K': 128, 'block_V': 128, 'num_stages': 1, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,708 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,708 INFO:An error occurred while testing config {'block_K': 128, 'block_V': 256, 'num_stages': 3, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,709 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,709 INFO:An error occurred while testing config {'block_K': 128, 'block_V': 32, 'num_stages': 4, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,709 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,709 INFO:An error occurred while testing config {'block_K': 32, 'block_V': 32, 'num_stages': 4, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,710 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,710 INFO:An error occurred while testing config {'block_K': 32, 'block_V': 128, 'num_stages': 1, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,710 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,710 INFO:An error occurred while testing config {'block_K': 64, 'block_V': 256, 'num_stages': 4, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,711 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,711 INFO:An error occurred while testing config {'block_K': 32, 'block_V': 64, 'num_stages': 1, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,711 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,711 INFO:An error occurred while testing config {'block_K': 128, 'block_V': 128, 'num_stages': 4, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,712 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,712 INFO:An error occurred while testing config {'block_K': 64, 'block_V': 64, 'num_stages': 1, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,712 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,712 INFO:An error occurred while testing config {'block_K': 64, 'block_V': 256, 'num_stages': 3, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,713 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,713 INFO:An error occurred while testing config {'block_K': 32, 'block_V': 256, 'num_stages': 1, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,713 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,713 INFO:An error occurred while testing config {'block_K': 64, 'block_V': 64, 'num_stages': 4, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,714 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,714 INFO:An error occurred while testing config {'block_K': 64, 'block_V': 32, 'num_stages': 3, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,714 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,715 INFO:An error occurred while testing config {'block_K': 128, 'block_V': 128, 'num_stages': 2, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,715 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,715 INFO:An error occurred while testing config {'block_K': 64, 'block_V': 32, 'num_stages': 4, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,715 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,716 INFO:An error occurred while testing config {'block_K': 128, 'block_V': 64, 'num_stages': 2, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,716 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,716 INFO:An error occurred while testing config {'block_K': 64, 'block_V': 32, 'num_stages': 1, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,716 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,717 INFO:An error occurred while testing config {'block_K': 32, 'block_V': 128, 'num_stages': 4, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,717 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,717 INFO:An error occurred while testing config {'block_K': 32, 'block_V': 256, 'num_stages': 3, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,717 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,718 INFO:An error occurred while testing config {'block_K': 128, 'block_V': 256, 'num_stages': 1, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,718 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,718 INFO:An error occurred while testing config {'block_K': 32, 'block_V': 64, 'num_stages': 2, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,718 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,719 INFO:An error occurred while testing config {'block_K': 64, 'block_V': 32, 'num_stages': 2, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,719 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,719 INFO:An error occurred while testing config {'block_K': 128, 'block_V': 32, 'num_stages': 1, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,719 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,720 INFO:An error occurred while testing config {'block_K': 32, 'block_V': 128, 'num_stages': 3, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,720 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,720 INFO:An error occurred while testing config {'block_K': 128, 'block_V': 256, 'num_stages': 2, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,720 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,720 INFO:An error occurred while testing config {'block_K': 64, 'block_V': 128, 'num_stages': 4, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,721 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,721 INFO:An error occurred while testing config {'block_K': 32, 'block_V': 256, 'num_stages': 4, 'threads': 128}, checkout autotuner.log for more details
+2025-10-20 03:45:30,721 DEBUG:Error: Traceback (most recent call last):
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 503, in run
+    latency, ref_latency = run_with_timeout(target_fn, timeout, jit_kernel)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 50, in run_with_timeout
+    raise e
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 48, in run_with_timeout
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 374, in target_fn
+    self.jit_input_tensors = jit_input_tensors_supply()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/autotuner/tuner.py", line 334, in func
+    return profiler._get_inputs(with_output=with_output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/profiler/__init__.py", line 66, in _get_inputs
+    ins.append(self.supply(self.params[i]))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/hkang/tilelang/tilelang/utils/tensor.py", line 92, in get_tensor
+    return torch.empty(*shape, device=device, dtype=dtype).uniform_(-1.0, 1.0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.AcceleratorError: CUDA error: misaligned address
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+2025-10-20 03:45:30,727 ERROR:Auto-tuning failed: No configuration successfully compiled and passed benchmarking/validation.

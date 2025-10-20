@@ -7,15 +7,13 @@ from typing import Optional, Tuple
 import time
 import tilelang as tl
 import sys
-sys.path.insert(0, '/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/flash-linear-attention')
+# sys.path.insert(0, '/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/flash-linear-attention')
 from fla.ops.gated_delta_rule.fused_recurrent import fused_recurrent_gated_delta_rule
-
-
 def get_configs():
-    block_K = [128]
-    block_V = [128]
-    num_stages = [3, 4]
-    threads = [128, 256]
+    block_K = [32, 64, 128]
+    block_V = [32, 64, 128, 256]
+    num_stages = [1,2, 3, 4]
+    threads = [128]
     # head_split_k = [1, 2, 3, 4]
     # head_split_v = [1, 2, 3, 4]
     _configs = list(itertools.product(block_K, block_V, num_stages, threads))
@@ -29,8 +27,10 @@ def get_configs():
     } for c in _configs]
     return configs
 #### TODO Fp8 loading, load multiple heads to enlarge block size, tensore core process instead of cuda core. We need to put norm in matmul.
-@autotune(configs=get_configs(), warmup=10, rep=10)
-@tilelang.jit
+# @autotune(configs=get_configs(), warmup=10, rep=10)
+@tilelang.jit(
+    out_idx = [-1],
+)
 def fused_recurrent(
     Batch, 
     Token, 
@@ -41,32 +41,30 @@ def fused_recurrent(
     USE_QK_L2NORM_IN_KERNEL=True, 
     STORE_FINAL_STATE=True,
     dtype = "bfloat16",
-    accum_dtype = "float",
+    accum_dtype = "float32",
     block_K=128, 
     block_V=128, 
-    num_stages=2, 
+    num_stages=3, 
 
     threads=128
 ):
     @T.macro
     def L2Norm_QK(
-        QK: T.SharedBuffer([block_K],dtype),
+        QK: T.FragmentBuffer([block_K],dtype),
     ):
-        shared_reg = T.alloc_fragment([block_K], dtype)
         squared_reg = T.alloc_fragment([block_K], dtype)
         sum_reg = T.alloc_fragment([1], dtype)
-        T.copy(QK, shared_reg)
         
         # 计算元素的平方用于求norm
         for i in T.Parallel(block_K):
-            squared_reg[i] = shared_reg[i] * shared_reg[i]
+            squared_reg[i] = QK[i] * QK[i]
         T.reduce_sum(squared_reg, sum_reg, dim=0)
         sum_reg[0] = T.sqrt(sum_reg[0]) + 1e-6
         
         # 用原始元素除以norm
         for i in T.Parallel(block_K):
-            shared_reg[i] = shared_reg[i] / sum_reg[0]
-        T.copy(shared_reg, QK)
+            QK[i] = QK[i] / sum_reg[0]
+
 
     @T.prim_func
     def main(
@@ -75,83 +73,80 @@ def fused_recurrent(
         V: T.Tensor([Batch, Token, Head_V, V_Dim], dtype),
         g: T.Tensor([Batch, Token, Head_V], accum_dtype),
         Beta: T.Tensor([Batch, Token, Head_V],dtype),
-        O: T.Tensor([Batch, Token, Head_V, V_Dim], dtype),
         h0: T.Tensor([Batch, Head_V, K_Dim, V_Dim], accum_dtype),
         # ht: T.Tensor([Batch, Head_V, K_Dim, V_Dim], dtype),
         scale: T.Tensor([1], dtype),
+        O: T.Tensor([Batch, Token, Head_V, V_Dim], dtype),
         # O: T.Tensor(Batch, Token, Head_V, V_Dim, dtype),
     ):
         with T.Kernel(T.ceildiv(K_Dim, block_K), T.ceildiv(V_Dim, block_V), T.ceildiv(Batch*Head_V, 1), threads=threads) as (bx, by, bz):
             id_b = bz // Head_V
             id_hv = bz % Head_V
             id_h = id_hv // (Head_V // Head)
-            Q_shared = T.alloc_shared([block_K], dtype)
-            K_shared = T.alloc_shared([block_K], dtype)
-            V_shared = T.alloc_shared([block_V], dtype)
-            h0_shared = T.alloc_shared([block_K, block_V], accum_dtype)
-            o_shared = T.alloc_shared([block_V], dtype)
+            Q_shared = T.alloc_shared([block_K], dtype, scope="shared")
+            Q_fragment = T.alloc_fragment([block_K], dtype)
+            K_shared = T.alloc_shared([block_K], dtype, scope="shared")
+            V_shared = T.alloc_shared([block_V], dtype, scope="shared")
+            V_fragment = T.alloc_fragment([block_V], dtype)
+            h0_shared = T.alloc_shared([block_K, block_V], accum_dtype, scope="shared")
+            o_shared = T.alloc_shared([block_V], dtype, scope="shared")
             
-            scale_reg = T.alloc_fragment([1], dtype)
-            g_reg = T.alloc_local([1], dtype)
-            beta_reg = T.alloc_local([1], dtype)
-            h0_reg = T.alloc_fragment([block_K, block_V], accum_dtype)
-            k_reg = T.alloc_fragment([block_K], dtype)
-            v_min_reg = T.alloc_fragment([block_V], dtype)
+            h0_fragment = T.alloc_fragment([block_K, block_V], accum_dtype)
+            K_fragment = T.alloc_fragment([block_K], accum_dtype)
+            v_min_reg = T.alloc_fragment([block_V], accum_dtype)
             
-            scale_reg[0] = scale[0]
-            
+            T.annotate_layout({
+                # Q_shared: tilelang.layout.make_swizzled_layout(Q_shared),
+                # K_shared: tilelang.layout.make_swizzled_layout(K_shared),
+                # V_shared: tilelang.layout.make_swizzled_layout(V_shared),
+                h0_shared: tilelang.layout.make_swizzled_layout(h0_shared),
+                # o_shared: tilelang.layout.make_swizzled_layout(o_shared),
+            })
+            T.disable_warp_group_reg_alloc()
             T.copy(h0[id_b, id_hv, bx * block_K, by * block_V], h0_shared)
-            # T.annotate_layout(
-            #     {
-            #         Q_shared: tl.layout.make_swizzled_layout(Q_shared),
-            #         K_shared: tl.layout.make_swizzled_layout(K_shared),
-            #         V_shared: tl.layout.make_swizzled_layout(V_shared),
-            #         h0_shared: tl.layout.make_swizzled_layout(h0_shared),
-            #         o_shared: tl.layout.make_swizzled_layout(o_shared),
-            #     }
-            # )
-            # T.use_swizzle(8)
-            for t in T.Pipelined(Token, num_stages=num_stages):
+            for t in T.serial(Token):
                 T.copy(Q[id_b, t, id_h, bx * block_K], Q_shared)
                 T.copy(K[id_b, t, id_h, bx * block_K], K_shared)
                 T.copy(V[id_b, t, id_hv, by * block_V], V_shared)
-                T.copy(O[id_b, t, id_hv, by * block_V], o_shared)
-                # elementwise copy
-                beta_reg[0] = Beta[id_b, t, id_hv]
-                g_reg[0] = g[id_b, t, id_hv]
-                if USE_QK_L2NORM_IN_KERNEL:
-                    L2Norm_QK(Q_shared)
-                    L2Norm_QK(K_shared)
+ 
+                # b_q = b_q * scale
+                T.copy(Q_shared, Q_fragment)
+                T.copy(K_shared, K_fragment)
+                T.copy(V_shared, V_fragment)
+                T.copy(h0_shared, h0_fragment)
+                # if USE_QK_L2NORM_IN_KERNEL:
+                L2Norm_QK(Q_fragment)
+                L2Norm_QK(K_fragment)
                 # b_q = b_q * scale
                 for i in T.Parallel(block_K):
-                    Q_shared[i] = Q_shared[i] * scale_reg[0]
+                    Q_fragment[i] = Q_fragment[i] * scale[0]
                 #b_h *= exp(b_g)
                 
-                T.copy(h0_shared, h0_reg)
                 for i, j in T.Parallel(block_K, block_V):
-                    h0_reg[i, j] = h0_reg[i, j] * T.exp(g_reg[0])
-                T.copy(h0_reg, h0_shared)
+                    h0_fragment[i, j] = h0_fragment[i, j] * T.exp(g[id_b, t, id_hv])
+                T.copy(h0_fragment, h0_shared)
                 ### b_v -= tl.sum(b_h * b_k[:, None], 0)
-                
-                T.copy(K_shared, k_reg)
+
                 for i, j in T.Parallel(block_K, block_V):
-                    h0_reg[i, j] = h0_reg[i, j] * k_reg[i]
-                T.reduce_sum(h0_reg, v_min_reg, dim=0)
+                    h0_fragment[i, j] = h0_fragment[i, j] * K_fragment[i]
+                T.reduce_sum(h0_fragment, v_min_reg, dim=0)
                 for i in T.Parallel(block_V):
-                    V_shared[i] = V_shared[i] - v_min_reg[i]
+                    V_fragment[i] = V_fragment[i] - v_min_reg[i]
                 ### finished
                 ### b_v *= b_beta
                 for i in T.Parallel(block_V):
-                    V_shared[i] = V_shared[i] * beta_reg[0]
+                    V_fragment[i] = V_fragment[i] * Beta[id_b, t, id_hv]
                 ### b_h += b_k[:, None] * b_v[None, :]
+                T.copy(h0_shared, h0_fragment)
                 for i, j in T.Parallel(block_K, block_V):
-                    h0_shared[i, j] = h0_shared[i, j] + K_shared[i] * V_shared[j]
+                    h0_fragment[i, j] = h0_fragment[i, j] + K_fragment[i] * V_fragment[j]
                 ### b_o = tl.sum(b_h * b_q[:, None], 0)
-                T.copy(h0_shared, h0_reg)
+                # T.copy(h0_shared, h0_fragment)
+                T.copy(h0_fragment, h0_shared)
                 for i, j in T.Parallel(block_K, block_V):
-                    h0_reg[i, j] = h0_reg[i, j] * Q_shared[i]
+                    h0_fragment[i, j] = h0_fragment[i, j] * Q_fragment[i]
                 ### reuse v_min_reg
-                T.reduce_sum(h0_reg, v_min_reg, dim=0)
+                T.reduce_sum(h0_fragment, v_min_reg, dim=0)
                 T.copy(v_min_reg, o_shared)
                 
                 T.copy(o_shared, O[id_b, t, id_hv, by * block_V])
@@ -176,19 +171,27 @@ def fused_recurrent_fwd(
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     B, Token, H, K, V = *k.shape, v.shape[-1]
     HV = v.shape[2]
-    device = q.device
+    device, dtype = q.device, q.dtype
     if scale is None:
         scale = K ** -0.5
-    o = torch.empty(B, Token, HV, V, device=device, dtype=v.dtype)
-    # ht = torch.empty(B, HV, K, V, device=device, dtype=v.dtype)
+    # o = torch.empty(B, Token, HV, V, device=device, dtype=v.dtype)
+    # # ht = torch.empty(B, HV, K, V, device=device, dtype=v.dtype)
     if initial_state is None:
-        h0 = torch.zeros(B, HV, K, V, device=device, dtype=v.dtype)
+        h0 = torch.zeros(B, HV, K, V, device=device, dtype=torch.float)
     else:
         h0 = initial_state
     kernel = fused_recurrent(B, Token, H, HV, K, V, 
                              use_qk_l2norm_in_kernel, STORE_FINAL_STATE=True)
-    scale = torch.tensor([scale]).cuda().to(v.dtype)
-    kernel(q, k, v, g, beta, o, h0, scale)
+    scale = torch.tensor([scale]).to(device=q.device, dtype=dtype)
+    # print("q dtype:", q.dtype)
+    # print("k dtype:", k.dtype)
+    # print("v dtype:", v.dtype)
+    # print("g dtype:", g.dtype)
+    # print("beta dtype:", beta.dtype)
+    # print("o dtype:", o.dtype)
+    # print("h0 dtype:", h0.dtype)
+    # print("scale dtype:", scale.dtype)
+    o = kernel(q, k, v, g, beta, h0, scale)
     return o, h0
           # [B,T,HV]
 class FusedRecurrentFunctionTL(torch.autograd.Function):
@@ -258,64 +261,104 @@ def fused_recurrent_gated_delta_rule_tl(
 
 
 if __name__ == '__main__':
-    # 注释掉原始测试代码
-    B, Token, H, HV, K, V = 1, 10, 12, 12, 96, 256
+    print("=== 测试TileLang vs Triton实现差异 ===")
+    # print("注意：已将TileLang中Q、K、V等变量类型改为float32，以排除混合精度影响")
+    
+    # 设置随机种子确保结果可重现
+    torch.manual_seed(42)
+    torch.cuda.manual_seed(42)
+    torch.cuda.manual_seed_all(42)
+    
+    # 测试参数
+    B, Token, H, HV, K, V = 1, 10, 1, 1, 128, 128
     scale = K ** -0.5
     datatype = torch.bfloat16
     gdtype = torch.float32
-    # B = 30
+    
+    # 生成固定的测试数据
     q = torch.randn(B, Token, H, K, device='cuda', dtype=datatype)
     k = torch.randn(B, Token, H, K, device='cuda', dtype=datatype)
     v = torch.randn(B, Token, HV, V, device='cuda', dtype=datatype)
     g = torch.randn(B, Token, HV, device='cuda', dtype=gdtype).sigmoid()
     beta = torch.randn(B, Token, HV, device='cuda', dtype=datatype).sigmoid()
     h0 = torch.zeros(B, HV, K, V, device='cuda', dtype=gdtype)
+    h0_clone1 = h0.clone()
+    h0_clone2 = h0.clone()
     
-    o, final_state = fused_recurrent_gated_delta_rule_tl(
+    print("\n1. 运行TileLang kernel实现...")
+    o_tilelang, final_state_tilelang = fused_recurrent_gated_delta_rule_tl(
         q=q,
         k=k,
         v=v,
         g=g,
         beta=beta,
         scale=scale,
-        initial_state=h0.clone(),
+        initial_state=h0,
         output_final_state=True,
         use_qk_l2norm_in_kernel=True
     )
     
-    o_ref, final_state_ref = fused_recurrent_gated_delta_rule(
-        q=q,
-        k=k,
-        v=v,
-        g=g,
-        beta=beta,
-        scale=scale,
-        initial_state=h0.clone(),
-        output_final_state=True,
-        use_qk_l2norm_in_kernel=True
-    )
+    # print("2. 运行Triton kernel实现...")
+    # o_triton, final_state_triton = fused_recurrent_gated_delta_rule(
+    #     q=q,
+    #     k=k,
+    #     v=v,
+    #     g=g,
+    #     beta=beta,
+    #     scale=scale,
+    #     initial_state=h0_clone1,
+    #     output_final_state=True,
+    #     use_qk_l2norm_in_kernel=True
+    # )
+    # def calculate_relative_errors(actual, expected, eps=1e-10):
+    #     """
+    #     计算平均相对误差和最大相对误差
+    #     对于0值的处理：当expected为0时，如果actual也接近0则误差为0，否则使用绝对误差
+    #     """
+    #     actual_flat = actual.flatten()
+    #     expected_flat = expected.flatten()
+        
+    #     # 计算绝对误差
+    #     abs_diff = torch.abs(actual_flat - expected_flat)
+        
+    #     # 计算相对误差，对0值进行特殊处理
+    #     expected_abs = torch.abs(expected_flat)
+        
+    #     # 当expected不为0时，使用相对误差
+    #     non_zero_mask = expected_abs > eps
+    #     relative_errors = torch.zeros_like(abs_diff)
+    #     relative_errors[non_zero_mask] = abs_diff[non_zero_mask] / expected_abs[non_zero_mask]
+        
+    #     # 当expected为0时，如果actual也接近0则误差为0，否则使用绝对误差
+    #     zero_mask = ~non_zero_mask
+    #     actual_abs = torch.abs(actual_flat)
+    #     relative_errors[zero_mask] = torch.where(
+    #         actual_abs[zero_mask] <= eps, 
+    #         torch.zeros_like(actual_abs[zero_mask]), 
+    #         actual_abs[zero_mask]
+    #     )
+        
+    #     # 计算平均相对误差和最大相对误差
+    #     mean_rel_error = torch.mean(relative_errors).item()
+    #     max_rel_error = torch.max(relative_errors).item()
+        
+    #     return mean_rel_error, max_rel_error
 
-    print("Comparing implementation outputs...")
-    # Looser tolerance for float16
-    o_allclose = torch.allclose(o, o_ref, atol=1e-2, rtol=1e-2)
-    final_state_allclose = torch.allclose(final_state, final_state_ref.to(final_state.dtype), atol=1e-2, rtol=1e-2)
+    # print("\n=== 三种实现结果对比 ===")
 
-    print(f"Output 'o' is close: {o_allclose}")
-    print(f"Output 'final_state' is close: {final_state_allclose}")
-
-    if not o_allclose:
-        print("Output 'o' mismatch!")
-        print("TileLang output o sample:", o.flatten()[:10])
-        print("Reference output o sample:", o_ref.flatten()[:10])
-        print("Difference:", (o - o_ref).abs().max())
-
-    if not final_state_allclose:
-        print("Output 'final_state' mismatch!")
-        print("TileLang final_state sample:", final_state.flatten()[:10])
-        print("Reference final_state sample:", final_state_ref.flatten()[:10])
-        print("Difference:", (final_state - final_state_ref.to(final_state.dtype)).abs().max())
-
-    # # benchmark
+    
+    # # 3. TileLang vs Triton实现
+    # print("\n📊 TileLang vs Triton实现:")
+    # o_mean_rel_err, o_max_rel_err = calculate_relative_errors(o_tilelang, o_triton)
+    # print(f"  输出 'o' 的平均相对误差: {o_mean_rel_err:.6e}")
+    # print(f"  输出 'o' 的最大相对误差: {o_max_rel_err:.6e}")
+    
+    # fs_mean_rel_err, fs_max_rel_err = calculate_relative_errors(
+    #     final_state_tilelang, final_state_triton.to(final_state_tilelang.dtype)
+    # )
+    # print(f"  final_state 的平均相对误差: {fs_mean_rel_err:.6e}")
+    # print(f"  final_state 的最大相对误差: {fs_max_rel_err:.6e}")
+    # benchmark
     # torch.cuda.synchronize()
     # # warm up
     # for _ in range(10):
@@ -328,7 +371,7 @@ if __name__ == '__main__':
     #         scale=scale,
     #         initial_state=h0,
     #         output_final_state=True,
-    #         use_qk_l2norm_in_kernel=True
+    #         use_qk_l2norm_in_kernel=False
     #     )
     # torch.cuda.synchronize()
     # start = time.time()
@@ -342,13 +385,13 @@ if __name__ == '__main__':
     #         scale=scale,
     #         initial_state=h0,
     #         output_final_state=True,
-    #         use_qk_l2norm_in_kernel=True
+    #         use_qk_l2norm_in_kernel=False
     #     )
     # torch.cuda.synchronize()
     # end = time.time()
     # print(f"Batch size: {B}, time: {(end - start) / 100 * 1000} ms")
 
-    # # 新的性能测试代码
+    # 新的性能测试代码
     # import pandas as pd
     
     # # 固定参数
