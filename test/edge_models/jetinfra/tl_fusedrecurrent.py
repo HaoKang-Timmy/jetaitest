@@ -182,10 +182,10 @@ def fused_recurrent_fwd(
     # print(kernel.get_kernel_source())
     scale = torch.tensor([scale]).cuda().to(v.dtype)
     torch.cuda.synchronize()
-    print("before kernel")
+    # print("before kernel")
     kernel(q, k, v, g, beta, o, h0, scale)
     torch.cuda.synchronize()
-    print("after kernel")
+    # print("after kernel")
     return o, h0
           # [B,T,HV]
 class FusedRecurrentFunctionTL(torch.autograd.Function):

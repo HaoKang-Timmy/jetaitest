@@ -26,9 +26,9 @@ def main():
                        help="Path to the model weights")
     # parser.add_argument("--input_text", type=str, default="Hi, My name is Timmy. I am currently a 3rd year PhD student in Computer Science at Stanford University. I am interested in natural language processing and machine learning. How about you? Do you like to travel? Or do you like to read books? What is your favorite book? What is your favorite travel destination?",
     #                    help="Input text for generation")
-    parser.add_argument("--input_text", type=str, default="Hi, My name is Timmy.",
+    parser.add_argument("--input_text", type=str, default="Hi, My name is Timmy. I am 3rd year PhD student at Georgia Tech.",
                        help="Input text for generation")
-    parser.add_argument("--max_new_tokens", type=int, default=2,
+    parser.add_argument("--max_new_tokens", type=int, default=10,
                        help="Maximum number of new tokens to generate")
     parser.add_argument("--do_sample", action="store_true",
                        help="Whether to use sampling for generation")
