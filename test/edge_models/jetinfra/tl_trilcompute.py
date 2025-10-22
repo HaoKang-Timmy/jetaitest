@@ -32,6 +32,7 @@ def solve_tril_16x16(
     BT: int,
     NT: int,
     input_dtype = "bfloat16",
+    accum_dtype = "float32",
     output_dtype = "bfloat16",
     ):
     assert BT in [16, 32, 64]
@@ -40,8 +41,8 @@ def solve_tril_16x16(
     # NT = len(chunk_indices) if cu_seqlens is not None else cdiv(Token, 16)
     @T.prim_func
     def main(
-        A: T.Tensor(shape=(B, Token, H, BT), dtype=input_dtype),
-        Ad: T.Tensor(shape=(B, Token, H, 16), dtype=output_dtype),
+        A: T.Tensor([B, Token, H, BT], input_dtype),
+        Ad: T.Tensor([B, Token, H, 16], output_dtype),
     
     ):
         with T.Kernel(NT, B * H) as (i_t, i_bh):
@@ -49,38 +50,35 @@ def solve_tril_16x16(
             # i_n, i_tc = chunk_indices[i_t, 0], chunk_indices[i_t, 1]
             # bos, eos = cu_seqlens[i_n], cu_seqlens[i_n + 1]
             # seq = eos - bos
-            # offset = (i_t * 16) % BT
-            offset = i_t * 16
+            offset = (i_t * 16) % BT
+            # offset = i_t * 16
             
 
             A_shared = T.alloc_shared((16, 16), dtype=output_dtype, scope="shared")
-            A_fragment = T.alloc_fragment((16, 16), dtype=output_dtype)
-            reduce_fragment1 = T.alloc_fragment((16, 16), dtype=output_dtype)
-            reduce_fragment2 = T.alloc_fragment((16), dtype=output_dtype)
+            A_fragment = T.alloc_fragment((16, 16), dtype=accum_dtype)
+            reduce_fragment1 = T.alloc_fragment((16, 16), dtype=accum_dtype)
+            reduce_fragment2 = T.alloc_fragment((16), dtype=accum_dtype)
             a_shared = T.alloc_shared((16), dtype=output_dtype)
-            a_fragment = T.alloc_fragment((16), dtype=output_dtype)
-            with T.If(offset < BT):
-                with T.Then():
-                    T.copy(A[i_b, i_t * 16:(i_t + 1) * 16, ih, i_t * 16:i_t * 16 + 16], A_shared)
-                with T.Else():
-                    T.copy(A[i_b, i_t * 16:(i_t + 1) * 16, ih, i_t * 16 - BT :i_t * 16 + 16 - BT], A_shared)
-            # T.copy(A[i_b, i_t * 16:(i_t + 1) * 16, ih, offset:offset + 16], A_shared)
+            a_fragment = T.alloc_fragment((16), dtype=accum_dtype)
+
+            T.copy(A[i_b, i_t * 16:(i_t + 1) * 16, ih, offset:offset + 16], A_shared)
             T.copy(A_shared, A_fragment)
             for i, j in T.Parallel(16, 16):
                 A_fragment[i, j] = T.if_then_else(i >j, -A_fragment[i, j], 0)
                 
             for i in T.serial(1, T.min(16, Token - i_t * 16)):
-                with T.If(offset < BT):
-                    with T.Then():
-                        for j in T.Parallel(16):
-                            a_shared[j] = -A[i_b, i_t * 16 + i, ih, j + i_t * 16]
-                    with T.Else():
-                        for j in T.Parallel(16):
-                            a_shared[j] = -A[i_b, i_t * 16 + i, ih, j + i_t * 16 - BT]
-                # for j in T.Parallel(16):
-                #     a_shared[j] = -A[i_b, i_t * 16 + i, ih, j + i_t * 16]
+                T.copy(A[i_b, i_t * 16 + i, ih, offset:offset + 16], a_shared)
+                T.copy(a_shared, a_fragment)
                 for j in T.Parallel(16):
-                    a_fragment[j] = a_shared[j]
+                    a_fragment[j] = -a_fragment[j]
+                for ii, j in T.Parallel(16, 16):
+                    reduce_fragment1[ii, j] = A_fragment[ii, j] * a_fragment[ii]
+                T.reduce_sum(reduce_fragment1, reduce_fragment2, dim = 0)
+                for j in T.Parallel(16):
+                    a_fragment[j] = a_fragment[j] + reduce_fragment2[j]
+                for j in T.Parallel(16):
+                    A_fragment[i, j] = a_fragment[j]
+
             T.copy(A_fragment, A_shared)
             for i in T.Parallel(16):
                 A_shared[i, i] = A_shared[i, i] + 1.0
