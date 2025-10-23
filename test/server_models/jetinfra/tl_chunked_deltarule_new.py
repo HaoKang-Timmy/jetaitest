@@ -9,13 +9,13 @@ import itertools
 import torch
 from einops import rearrange
 
-from fla.modules.l2norm import l2norm_bwd, l2norm_fwd
-from fla.ops.common.chunk_delta_h import chunk_gated_delta_rule_bwd_dhu, chunk_gated_delta_rule_fwd_h
-from fla.ops.common.chunk_o import chunk_bwd_dqkwg, chunk_bwd_dv_local, chunk_fwd_o
-from fla.ops.common.chunk_scaled_dot_kkt import chunk_scaled_dot_kkt_fwd
-from fla.ops.gated_delta_rule.wy_fast import prepare_wy_repr_bwd, recompute_w_u_fwd
+# from fla.modules.l2norm import l2norm_bwd, l2norm_fwd
+# from fla.ops.common.chunk_delta_h import chunk_gated_delta_rule_bwd_dhu, chunk_gated_delta_rule_fwd_h
+# from fla.ops.common.chunk_o import chunk_bwd_dqkwg, chunk_bwd_dv_local, chunk_fwd_o
+# from fla.ops.common.chunk_scaled_dot_kkt import chunk_scaled_dot_kkt_fwd
+# from fla.ops.gated_delta_rule.wy_fast import prepare_wy_repr_bwd, recompute_w_u_fwd
 from fla.ops.utils import chunk_local_cumsum, solve_tril
-from fla.utils import autocast_custom_bwd, autocast_custom_fwd, input_guard
+# from fla.utils import autocast_custom_bwd, autocast_custom_fwd, input_guard
 import time
 @tilelang.jit(
     out_idx=[-1]
