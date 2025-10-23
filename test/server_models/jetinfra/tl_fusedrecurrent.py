@@ -10,7 +10,7 @@ import sys
 # sys.path.insert(0, '/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/flash-linear-attention')
 from fla.ops.gated_delta_rule.fused_recurrent import fused_recurrent_gated_delta_rule
 def get_configs():
-    block_K = [32, 64, 128]
+    block_K = [128]
     block_V = [32, 64, 128, 256]
     num_stages = [1,2, 3, 4]
     threads = [128, 256]

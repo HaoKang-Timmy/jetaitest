@@ -664,7 +664,7 @@ def chunk_gated_delta_rule_fwd(
     # g = chunk_local_cumsum(g, chunk_size=64, cu_seqlens=cu_seqlens)
     g = chunk_cumsum(g, chunk_size=64)
     # obtain WY representation. u is actually the new v.
-    start_time = time.time()
+
 
     # A = chunk_scaled_dot_kkt_fwd(
     #     k=k,
