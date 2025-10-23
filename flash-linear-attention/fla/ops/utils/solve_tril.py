@@ -267,15 +267,7 @@ def solve_tril(
     merge_fn = merge_16x16_to_32x32_inverse_kernel if BT == 32 else merge_16x16_to_64x64_inverse_kernel
     chunk_indices = prepare_chunk_indices(cu_seqlens, BT) if cu_seqlens is not None else None
     NT = len(chunk_indices) if cu_seqlens is not None else triton.cdiv(T, BT)
-    print("A shape", A.shape)
-    print("Ad shape", Ad.shape)
-    print("Ai shape", Ai.shape)
-    print("cu_seqlens", cu_seqlens)
-    print("chunk_indices", chunk_indices)
-    print("T", T)
-    print("H", H)
-    print("BT", BT)
-    print("NT", NT)
+
     merge_fn[NT, B * H](
         A=A,
         Ad=Ad,

@@ -115,8 +115,8 @@ def fused_recurrent(
                 T.copy(V_shared, V_fragment)
                 T.copy(h0_shared, h0_fragment)
                 # if USE_QK_L2NORM_IN_KERNEL:
-                # L2Norm_QK(Q_fragment)
-                # L2Norm_QK(K_fragment)
+                L2Norm_QK(Q_fragment)
+                L2Norm_QK(K_fragment)
                 # b_q = b_q * scale
                 for i in T.Parallel(block_K):
                     Q_fragment[i] = Q_fragment[i] * scale[0]
@@ -183,14 +183,7 @@ def fused_recurrent_fwd(
     kernel = fused_recurrent(B, Token, H, HV, K, V, 
                              use_qk_l2norm_in_kernel, STORE_FINAL_STATE=True)
     scale = torch.tensor([scale]).to(device=q.device, dtype=dtype)
-    # print("q dtype:", q.dtype)
-    # print("k dtype:", k.dtype)
-    # print("v dtype:", v.dtype)
-    # print("g dtype:", g.dtype)
-    # print("beta dtype:", beta.dtype)
-    # print("o dtype:", o.dtype)
-    # print("h0 dtype:", h0.dtype)
-    # print("scale dtype:", scale.dtype)
+
     o = kernel(q, k, v, g, beta, h0, scale)
     return o, h0
           # [B,T,HV]

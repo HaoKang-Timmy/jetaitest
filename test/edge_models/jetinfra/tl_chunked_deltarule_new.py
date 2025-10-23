@@ -40,7 +40,7 @@ def tl_chunk_cumsum(
     ):
         with T.Kernel(T.ceildiv(Token, Block_T), B * H, threads=threads) as (bt, bbh):
             bb, bh = bbh // H, bbh % H
-            InputG_shared = T.alloc_shared((Block_T), dtype=input_dtype, scope="shared")
+            InputG_shared = T.alloc_shared((Block_T), dtype=input_dtype)
             InputG_fragment = T.alloc_fragment((Block_T), dtype=output_dtype)
             # unable to use TMA
             # T.copy(InputG[bb, bt * Block_T:(bt + 1) * Block_T, bh], InputG_shared)
@@ -62,10 +62,6 @@ def chunk_cumsum(g, chunk_size = 64):
     kernel = tl_chunk_cumsum(B, Token, H, chunk_size)
     output = kernel(g)
     return output
-
-
-
-
 
 def get_configs():
     block_S = [64]
@@ -116,14 +112,14 @@ def tilelang_chunk_scaled_dot_kkt_fwd(
         with T.Kernel(T.ceildiv(S, block_S), B * H, threads=threads) as (bs, bbh):
             bb, bh = bbh // H, bbh % H
             # !! Pay attention to the scope of the shared memory: may cause misaligned address when shape is one dimension or the buffer is too small
-            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype, scope="shared")
-            K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype, scope="shared")
-            A_shared = T.alloc_shared((block_S, block_S), dtype=output_dtype, scope="shared")
+            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype )
+            K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
+            A_shared = T.alloc_shared((block_S, block_S), dtype=output_dtype)
             Beta_K_fragment = T.alloc_fragment((block_S, block_DK), dtype=input_dtype)
             A_fragment = T.alloc_fragment((block_S, block_S), dtype=accum_dtype)
 
             # Tensor used for gated:
-            G_shared = T.alloc_shared((block_S,), dtype=accum_dtype, scope="shared")
+            G_shared = T.alloc_shared((block_S,), dtype=accum_dtype )
             G_diff_local = T.alloc_fragment((block_S, block_S), dtype=accum_dtype)
 
             T.annotate_layout({
@@ -230,17 +226,17 @@ def tilelang_recompute_w_u_fwd(
     ):
         with T.Kernel(T.ceildiv(S, block_S), B * H, threads=threads) as (bs, bbh):
             bb, bh = bbh // H, bbh % H
-            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype, scope="shared")
-            K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype, scope="shared")
-            V_shared = T.alloc_shared((block_S, block_DV), dtype=input_dtype, scope="shared")
-            G_shared = T.alloc_shared((block_S,), dtype=gate_dtype, scope="shared")
-            A_shared = T.alloc_shared((block_S, block_S), dtype=output_dtype, scope="shared")
+            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype )
+            K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
+            V_shared = T.alloc_shared((block_S, block_DV), dtype=input_dtype)
+            G_shared = T.alloc_shared((block_S,), dtype=gate_dtype )
+            A_shared = T.alloc_shared((block_S, block_S), dtype=output_dtype)
             W_fragment = T.alloc_fragment((block_S, block_DK), dtype=accum_dtype)
             U_fragment = T.alloc_fragment((block_S, block_DV), dtype=accum_dtype)
-            W_shared = T.alloc_shared((block_S, block_DK), dtype=output_dtype, scope="shared")
-            U_shared = T.alloc_shared((block_S, block_DV), dtype=output_dtype, scope="shared")
-            W_Beta_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype, scope="shared")
-            U_Beta_shared = T.alloc_shared((block_S, block_DV), dtype=input_dtype, scope="shared")
+            W_shared = T.alloc_shared((block_S, block_DK), dtype=output_dtype)
+            U_shared = T.alloc_shared((block_S, block_DV), dtype=output_dtype)
+            W_Beta_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
+            U_Beta_shared = T.alloc_shared((block_S, block_DV), dtype=input_dtype)
 
             T.annotate_layout({
                 K_shared: tilelang.layout.make_swizzled_layout(K_shared),
@@ -357,19 +353,19 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
 
             # b_h_shared = T.alloc_shared((DK, block_DV), dtype=input_dtype)
             # b_h_fragment = T.alloc_fragment((DK, block_DV), dtype=accum_dtype)
-            b_h_shared = T.alloc_shared((block_DK, block_DV), dtype=input_dtype, scope="shared")
+            b_h_shared = T.alloc_shared((block_DK, block_DV), dtype=input_dtype)
             b_h_fragment = T.alloc_fragment((block_DK, block_DV), dtype=accum_dtype)
 
-            U_shared = T.alloc_shared((block_S, block_DV), dtype=input_dtype, scope="shared")
+            U_shared = T.alloc_shared((block_S, block_DV), dtype=input_dtype)
             U_fragment = T.alloc_fragment((block_S, block_DV), dtype=accum_dtype)
             # W_shared = T.alloc_shared((block_S, DK), dtype=input_dtype)
-            W_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype, scope="shared")
+            W_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
             V_new_fragment = T.alloc_fragment((block_S, block_DV), dtype=accum_dtype)
-            V_new_shared = T.alloc_shared((block_S, block_DV), dtype=output_dtype, scope="shared")
+            V_new_shared = T.alloc_shared((block_S, block_DV), dtype=output_dtype)
             # K_shared = T.alloc_shared((block_S, DK), dtype=input_dtype)
-            K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype, scope="shared")
+            K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
             G_last_local = T.alloc_local((1), dtype=gate_dtype)
-            G_shared = T.alloc_shared((block_S, block_DV), dtype=gate_dtype, scope="shared")
+            G_shared = T.alloc_shared((block_S, block_DV), dtype=gate_dtype)
             G_fragment = T.alloc_fragment((block_S, block_DV), dtype=gate_dtype)
 
             T.annotate_layout({
@@ -549,15 +545,15 @@ def tilelang_chunk_fwd_o(
                 T.ceildiv(DV, block_DV), T.ceildiv(S, block_S), B * H,
                 threads=threads) as (bv, bs, bbh):
             bb, bh = bbh // H, bbh % H
-            Q_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype, scope="shared")
-            K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype, scope="shared")
-            V_shared = T.alloc_shared((block_S, block_DV), dtype=input_dtype, scope="shared")
-            H_shared = T.alloc_shared((block_DK, block_DV), dtype=input_dtype, scope="shared")
-            A_shared = T.alloc_shared((block_S, block_S), dtype=input_dtype, scope="shared")
-            O_shared = T.alloc_shared((block_S, block_DV), dtype=output_dtype, scope="shared")
+            Q_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
+            K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
+            V_shared = T.alloc_shared((block_S, block_DV), dtype=input_dtype)
+            H_shared = T.alloc_shared((block_DK, block_DV), dtype=input_dtype)
+            A_shared = T.alloc_shared((block_S, block_S), dtype=input_dtype)
+            O_shared = T.alloc_shared((block_S, block_DV), dtype=output_dtype)
             A_fragment = T.alloc_fragment((block_S, block_S), dtype=accum_dtype)
             O_fragment = T.alloc_fragment((block_S, block_DV), dtype=accum_dtype)
-            G_shared = T.alloc_shared((block_S,), dtype=gate_dtype, scope="shared")
+            G_shared = T.alloc_shared((block_S,), dtype=gate_dtype )
             G_diff_local = T.alloc_fragment((block_S, block_S), dtype=gate_dtype)
 
             T.annotate_layout({
@@ -668,7 +664,7 @@ def chunk_gated_delta_rule_fwd(
     # g = chunk_local_cumsum(g, chunk_size=64, cu_seqlens=cu_seqlens)
     g = chunk_cumsum(g, chunk_size=64)
     # obtain WY representation. u is actually the new v.
-    # start_time = time.time()
+    start_time = time.time()
 
     # A = chunk_scaled_dot_kkt_fwd(
     #     k=k,
@@ -691,11 +687,55 @@ def chunk_gated_delta_rule_fwd(
         output_dtype=k.dtype
     )
     A = A.reshape(batch_size, -1, A.shape[-2], A.shape[-1])
-
+    # torch.cuda.synchronize()
+    # end_time = time.time()
+    # print("solve_tril time:", end_time - start_time)
+    # start_time = time.time()
+    # w, u = recompute_w_u_fwd(
+    #     k=k,
+    #     v=v,
+    #     beta=beta,
+    #     A=A,
+    #     g_cumsum=g,
+    #     cu_seqlens=cu_seqlens,
+    # )
     w, u = tl_recompute_wu_forward(k, v, beta, g, A)
+    # torch.cuda.synchronize()
+    # end_time = time.time()
+    # print("recompute_w_u_fwd time:", end_time - start_time)
+    # start_time = time.time()
+    # print("k shape:", k.shape)
+    # print("w shape:", w.shape)
+    # print("u shape:", u.shape)
+    # print("g shape:", g.shape)
 
+    # h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
+    #     k=k,
+    #     w=w,
+    #     u=u,
+    #     g=g,
+    #     initial_state=initial_state,
+    #     output_final_state=output_final_state,
+    #     cu_seqlens=cu_seqlens,
+    # )
     h,  v_new, final_state = tilelang_chunk_gated_delta_rule(batch_size, k, w, u, g, output_final_state, chunk_size=64, save_new_value=True)
-
+    # print("h shape:", h.shape)
+    # print("v_new shape:", v_new.shape)
+    # print("final_state shape:", final_state.shape)
+    # torch.cuda.synchronize()
+    # end_time = time.time()
+    # print("chunk_gated_delta_rule_fwd_h time:", end_time - start_time)
+    # start_time = time.time()
+    # print("v_new shape:", v_new.shape)
+    # o = chunk_fwd_o(
+    #     q=q,
+    #     k=k,
+    #     v=v_new,
+    #     h=h,
+    #     g=g,
+    #     scale=scale,
+    #     cu_seqlens=cu_seqlens,
+    # )
     o = chunk_fwd_o(q, k, v_new, h, g, scale)
     # torch.cuda.synchronize()
     # end_time = time.time()

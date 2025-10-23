@@ -4,3 +4,4 @@ from .tl_dconv_step import tilelang_dconv_step
 from .tl_gemv import gemv_silu_l2norm_kernel
 from .tl_fusedrecurrent import fused_recurrent_gated_delta_rule_tl
 from .tl_rmsnorm import tl_fused_rmsnorm
+from .tl_chunked_deltarule_new import chunk_gated_delta_rule_fwd

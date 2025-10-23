@@ -1066,15 +1066,7 @@ class FusedRMSNormGated(nn.Module):
         prenorm: bool = False,
         residual_in_fp32: bool = False
     ) -> torch.Tensor:
-        print("x.shape:", x.shape)
-        print("g.shape:", g.shape)
-        print("self.weight.shape:", self.weight.shape if self.weight is not None else None)
-        print("self.bias.shape:", self.bias.shape if self.bias is not None else None)
-        print("self.activation:", self.activation if self.activation is not None else None)
-        print("residual.shape:", residual.shape if residual is not None else None)
-        print("prenorm:", prenorm if prenorm is not None else None)
-        print("residual_in_fp32:", residual_in_fp32 if residual_in_fp32 is not None else None)
-        print("autotune_interval:", self.autotune_interval if self.autotune_interval is not None else None)
+
         return rms_norm_gated(
             x,
             g,
