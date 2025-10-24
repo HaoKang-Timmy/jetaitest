@@ -37,7 +37,7 @@ from .dynamic_conv import DynamicShortConvolution
 from .configuration_jet_nemotron import JetNemotronConfig
 from .kv_cache import JetNemotronCache
 
-from .jetinfra import gemv_silu_l2norm_kernel, fused_recurrent_gated_delta_rule_tl, tl_fused_rmsnorm, chunk_gated_delta_rule_fwd
+from .jetinfra import gemv_silu_l2norm_kernel, fused_recurrent_gated_delta_rule_tl, tl_fused_rmsnorm, chunk_gated_delta_rule_fwd,fused_linear_silu_l2norm
 
 
 @dataclass
@@ -222,8 +222,10 @@ class JetBlock(nn.Module):
         if mode == 'chunk':
             ### TODO optimize prefilling as well
             
-            q = F.silu(self.q_proj(hidden_states))
-            k = F.silu(self.k_proj(hidden_states))
+                # q = F.silu(self.q_proj(hidden_states))
+                # k = F.silu(self.k_proj(hidden_states))
+            q = fused_linear_silu_l2norm(hidden_states, self.q_proj.weight)
+            k = fused_linear_silu_l2norm(hidden_states, self.k_proj.weight)
             if attention_mask is not None and q_len > 1:
                 q = index_first_axis(rearrange(q, "b s ... -> (b s) ..."), indices).unsqueeze(0)
                 k = index_first_axis(rearrange(k, "b s ... -> (b s) ..."), indices).unsqueeze(0)

@@ -5,13 +5,25 @@ import tilelang.language as T
 import itertools
 import time
 import torch.nn as nn
-
+from torch.nn import functional as F
+dtype_dict = {
+    torch.bfloat16: "bfloat16",
+    torch.float16: "float16",
+    torch.float32: "float32",
+    torch.float8_e4m3fn: "float8_e4m3",
+    torch.float8_e5m2: "float8_e5m2",
+}
 def get_configs():
-    block_M = [32, 64, 128, 256]  
-    block_K = [64, 128, 256] 
-    block_N = [64, 128, 256]  
-    num_stages = [1, 2, 3, 4]  
-    threads = [128]
+    block_M = [64, 128]
+    block_K = [64, 128]
+    block_N = [128]
+    num_stages = [1, 2, 3, 4]
+    threads = [128, 256]
+    # block_M = [64, 128]  
+    # block_K = [64, 128] 
+    # block_N = [64, 128]  
+    # num_stages = [ 3, 4]  
+    # threads = [128, 256]
     _configs = list(itertools.product(block_M, block_K, block_N, num_stages, threads))
     configs = [{
         'block_M': c[0],
@@ -22,38 +34,55 @@ def get_configs():
     } for c in _configs]
     return configs
 
-@autotune(configs=get_configs(), warmup=10, rep=10)
+# @autotune(configs=get_configs(), warmup=10, rep=10)
 @tilelang.jit(
+    out_idx = [-1],
     pass_configs={
         tilelang.PassConfigKey.TL_DISABLE_FAST_MATH: False,
     }
 )
-def _linear_w_silu(
+def _linear_kernel(
     Batch,
     Token,
     Indim,
     outdim,
     dtype,
-    block_M,
-    block_K,
-    block_N,
-    num_stages,
-    threads,
-    reduce_dtype = "float",
-    out_dtype = None,
+    block_M = 64,
+    block_K = 64,
+    block_N = 128,
+    num_stages = 2,
+    threads = 128,
+    reduce_dtype = "float32",
 ):
+    @T.macro
+    def L2Norm_QK(
+        QK: T.FragmentBuffer([block_M, block_N],reduce_dtype),
+    ):
+        squared_reg = T.alloc_fragment([block_M, block_N], reduce_dtype)
+        sum_reg = T.alloc_fragment([block_M], reduce_dtype)
+        
+        
+        for i, j in T.Parallel(block_M, block_N):
+            squared_reg[i, j] = QK[i, j] * QK[i, j]
+        T.reduce_sum(squared_reg, sum_reg, dim=1)
+        # for i in T.Parallel(block_M):
+        #     sum_reg[i] = T.sqrt(sum_reg[i]) + 1e-6
+        
+        
+        # for i, j in T.Parallel(block_M, block_N):
+        #     QK[i, j] = QK[i, j] / sum_reg[i]
+        for i, j in T.Parallel(block_M, block_N):
+            QK[i, j] = QK[i, j] * T.rsqrt(sum_reg[i]) 
     @ T.macro
     def silu(
         buffer: T.FragmentBuffer([block_M, block_N], reduce_dtype),
     ):
         for i, j in T.Parallel(block_M, block_N):
             buffer[i, j] = buffer[i, j] / (1 + T.exp(-buffer[i, j]))
-
     from tilelang.carver.arch import driver
     sm_num = driver.get_num_sms()
-
     @T.prim_func
-    def main_fp16(
+    def main(
         Input: T.Tensor([Batch * Token, Indim], dtype),
         W_T: T.Tensor([outdim, Indim], dtype),
         Output: T.Tensor([Batch * Token, outdim], dtype),
@@ -65,9 +94,11 @@ def _linear_w_silu(
             output_shared = T.alloc_shared((block_M, block_N), dtype)
 
             T.annotate_layout({
+                Input_shared: tilelang.layout.make_swizzled_layout(Input_shared),
+                W_T_shared: tilelang.layout.make_swizzled_layout(W_T_shared),
                 output_shared: tilelang.layout.make_swizzled_layout(output_shared)
             })
-
+            T.disable_warp_group_reg_alloc()
             for bx, by in T.Persistent(
                 [T.ceildiv(Batch * Token, block_M), T.ceildiv(outdim, block_N)], sm_num, block_id):
                 T.clear(output_reg)
@@ -77,229 +108,119 @@ def _linear_w_silu(
                     T.copy(W_T[by * block_N, k * block_K], W_T_shared)
                     T.gemm(Input_shared, W_T_shared, output_reg, transpose_B=True)
     
-                # silu(output_reg)
+                silu(output_reg)
+                L2Norm_QK(output_reg)
                 T.copy(output_reg, output_shared)
                 T.copy(output_shared, Output[bx * block_M, by * block_N])
+        
+    return main
 
-    @T.prim_func
-    def main_fp8(
-        Input: T.Tensor([Batch * Token, Indim], dtype),
-        W_T: T.Tensor([outdim, Indim], dtype),
-        Output: T.Tensor([Batch * Token, outdim], out_dtype),
-    ):
-        with T.Kernel(sm_num, threads=threads) as (block_id):
-            Input_shared = T.alloc_shared((block_M, block_K), dtype)
-            W_T_shared = T.alloc_shared((block_N, block_K), dtype)
-            output_reg = T.alloc_fragment((block_M, block_N), reduce_dtype)
-            output_shared = T.alloc_shared((block_M, block_N), out_dtype)
-
-            T.annotate_layout({
-                output_shared: tilelang.layout.make_swizzled_layout(output_shared)
-            })
-
-            for bx, by in T.Persistent(
-                [T.ceildiv(Batch * Token, block_M), T.ceildiv(outdim, block_N)], sm_num, block_id):
-                T.clear(output_reg)
-
-                for k in T.Pipelined(T.ceildiv(Indim, block_K), num_stages=num_stages):
-                    T.copy(Input[bx * block_M, k * block_K], Input_shared)
-                    T.copy(W_T[by * block_N, k * block_K], W_T_shared)
-                    T.gemm(Input_shared, W_T_shared, output_reg, transpose_B=True)
-    
-                # silu(output_reg)
-                T.copy(output_reg, output_shared)
-                T.copy(output_shared, Output[bx * block_M, by * block_N])
-    
-    if dtype == "float16":
-        return main_fp16
-    elif "float8" in dtype:
-        return main_fp8
-    else:
-        raise ValueError(f"Unsupported dtype: {dtype}")
-def linear_w_silu(input, weight_t, dtype="float16", reduced_dtype="float", out_dtype="float16"):
-    B, Token, D_in = input.shape
-    D_out = weight_t.shape[0]
-    device = input.device
-    kernel = _linear_w_silu(B, Token, D_in, D_out, dtype=dtype, reduce_dtype=reduced_dtype, out_dtype=out_dtype)
-    
-    # Map tilelang dtype string to torch dtype string for output tensor creation
-    if out_dtype == "float8_e4m3":
-        torch_out_dtype_str = "float8_e4m3fn"
-    else:
-        torch_out_dtype_str = out_dtype
-
-    torch_dtype = getattr(torch, torch_out_dtype_str)
-    output = torch.empty(B, Token, D_out, device=device, dtype=torch_dtype)
-    kernel(input.view(B * Token, D_in), weight_t, output.view(B * Token, D_out))
+def fused_linear_silu_l2norm(Input, W_T):
+    B, Token, D_in = Input.shape
+    D_out = W_T.shape[0]
+    dtype = Input.dtype
+    dtype = dtype_dict[dtype]
+    # output = torch.empty(B, Token, D_out).cuda().half()
+    kernel = _linear_kernel(B, Token, D_in, D_out, dtype)
+    output = kernel(Input.view(-1, D_in), W_T)
+    output = output.view(B, Token, D_out)
     return output
 
-
-# def linear_w_mul(
-#     Batch,
-#     Token,
-#     Indim,
-#     outdim,
-#     dtype,
-#     block_M,
-#     block_K,
-#     block_N,
-#     num_stages,
-#     threads,
-#     reduce_dtype = "float",
-#     out_dtype = None,
-# ):
-#     # @ T.macro
-#     # def silu(
-#     #     buffer: T.FragmentBuffer([block_M, block_N], reduce_dtype),
-#     # ):
-#     #     for i, j in T.Parallel(block_M, block_N):
-#     #         buffer[i, j] = buffer[i, j] / (1 + T.exp(-buffer[i, j]))
-
-#     from tilelang.carver.arch import driver
-#     sm_num = driver.get_num_sms()
-
-#     @T.prim_func
-#     def main_fp16(
-#         Input: T.Tensor([Batch * Token, Indim], dtype),
-#         W_T: T.Tensor([outdim, Indim], dtype),
-#         Mask: T.Tensor([Batch * Token], dtype),
-#         Output: T.Tensor([Batch * Token, outdim], dtype),
-#     ):
-#         with T.Kernel(sm_num, threads=threads) as (block_id):
-#             Input_shared = T.alloc_shared((block_M, block_K), dtype)
-#             W_T_shared = T.alloc_shared((block_N, block_K), dtype)
-#             output_reg = T.alloc_fragment((block_M, block_N), reduce_dtype)
-#             output_shared = T.alloc_shared((block_M, block_N), dtype)
-
-#             T.annotate_layout({
-#                 output_shared: tilelang.layout.make_swizzled_layout(output_shared)
-#             })
-
-#             for bx, by in T.Persistent(
-#                 [T.ceildiv(Batch * Token, block_M), T.ceildiv(outdim, block_N)], sm_num, block_id):
-#                 T.clear(output_reg)
-
-#                 for k in T.Pipelined(T.ceildiv(Indim, block_K), num_stages=num_stages):
-#                     T.copy(Input[bx * block_M, k * block_K], Input_shared)
-#                     T.copy(W_T[by * block_N, k * block_K], W_T_shared)
-#                     T.gemm(Input_shared, W_T_shared, output_reg, transpose_B=True)
+def pytorch_impl(Input, W_T):
+    B, Token, D_in = Input.shape
+    D_out = W_T.shape[0]
     
-#                 # silu(output_reg)
-#                 T.copy(output_reg, output_shared)
-#                 T.copy(output_shared, Output[bx * block_M, by * block_N])
-
-#     @T.prim_func
-#     def main_fp8(
-#         Input: T.Tensor([Batch * Token, Indim], dtype),
-#         W_T: T.Tensor([outdim, Indim], dtype),
-#         Output: T.Tensor([Batch * Token, outdim], out_dtype),
-#     ):
-#         with T.Kernel(sm_num, threads=threads) as (block_id):
-#             Input_shared = T.alloc_shared((block_M, block_K), dtype)
-#             W_T_shared = T.alloc_shared((block_N, block_K), dtype)
-#             output_reg = T.alloc_fragment((block_M, block_N), reduce_dtype)
-#             output_shared = T.alloc_shared((block_M, block_N), out_dtype)
-
-#             T.annotate_layout({
-#                 output_shared: tilelang.layout.make_swizzled_layout(output_shared)
-#             })
-
-#             for bx, by in T.Persistent(
-#                 [T.ceildiv(Batch * Token, block_M), T.ceildiv(outdim, block_N)], sm_num, block_id):
-#                 T.clear(output_reg)
-
-#                 for k in T.Pipelined(T.ceildiv(Indim, block_K), num_stages=num_stages):
-#                     T.copy(Input[bx * block_M, k * block_K], Input_shared)
-#                     T.copy(W_T[by * block_N, k * block_K], W_T_shared)
-#                     T.gemm(Input_shared, W_T_shared, output_reg, transpose_B=True)
-    
-#                 # silu(output_reg)
-#                 T.copy(output_reg, output_shared)
-#                 T.copy(output_shared, Output[bx * block_M, by * block_N])
-    
-#     if dtype == "float16":
-#         return main_fp16
-#     elif "float8" in dtype:
-#         return main_fp8
-#     else:
-#         raise ValueError(f"Unsupported dtype: {dtype}")
-
-
+    # output = torch.empty(B, Token, D_out).cuda().half()
+    Input = Input.view(-1, D_in)
+    # output = output.view(-1, D_out)
+    output = torch.matmul(Input, W_T.T)
+    output = output / (1 + torch.exp(-output))
+    output = output.view(B, Token, D_out)
+    return output
 if __name__ == "__main__":
-    # B, Token, D_in, D_out = 1, 1000, 1536, 1152
-    B, Token, D_in, D_out = 1, 4096, 8192, 8192
-
-    # =================
-    # FP16 Benchmarking
-    # =================
-    print("Benchmarking FP16...")
-    Input_fp16 = torch.randn(B, Token, D_in).cuda().half()
-    W_T_fp16 = torch.randn(D_out, D_in).cuda().half()
-
-    # --- Tile-lang implementation ---
-    # Warm up
+    B, Token, D_in, D_out = 40, 1, 1536, 1152
+    Input_fp16 = torch.randn(B, Token, D_in).cuda().bfloat16()
+    W_T_fp16 = torch.randn(D_out, D_in).cuda().bfloat16()
+    W_T_fp16_2 = torch.randn(D_out, D_in).cuda().bfloat16()  # 第二个权重矩阵，模拟k_proj
+    layer_q = nn.Linear(D_in, D_out, bias=False).cuda().bfloat16()
+    layer_k = nn.Linear(D_in, D_out, bias=False).cuda().bfloat16()
+    # 分配一些额外的GPU内存来模拟模型环境
+    dummy_tensors = [torch.randn(100, 1536, 1536).cuda().bfloat16() for _ in range(5)]
+    print(f"GPU memory allocated: {torch.cuda.memory_allocated() / 1e9:.2f} GB")
+    print(f"GPU memory reserved: {torch.cuda.memory_reserved() / 1e9:.2f} GB")
+    
+    # 测试：模拟模型中的调用模式（连续调用两次不同权重）
+    print("\n=== Test 1: 模拟模型中的调用模式 (两次连续调用) ===")
     for _ in range(10):
-        output_tl_fp16 = linear_w_silu(Input_fp16, W_T_fp16, dtype="float16", out_dtype="float16")
+        _ = fused_linear_silu_l2norm(Input_fp16, layer_q.weight)
+        _ = fused_linear_silu_l2norm(Input_fp16, layer_k.weight)
     torch.cuda.synchronize()
-    # Benchmark
+    
     start = time.time()
-    # torch.cuda.profiler.start()
-    for _ in range(10):
-        output_tl_fp16 = linear_w_silu(Input_fp16, W_T_fp16, dtype="float16", out_dtype="float16")
+    for _ in range(20):
+        q = fused_linear_silu_l2norm(Input_fp16, layer_q.weight)
+        k = fused_linear_silu_l2norm(Input_fp16, layer_k.weight)
     torch.cuda.synchronize()
     end = time.time()
-    tl_fp16_time = (end - start) * 1000 / 20
-    # torch.cuda.profiler.stop()
-    print(f"Tilelang FP16 Time taken: {tl_fp16_time:.4f} ms")
-
-    # --- PyTorch implementation ---
-    # Warm up
+    print(f"Time taken tilelang (2 calls): {(end - start) / 20} seconds")
+    # print(f"Time per call: {(end - start) / 40} seconds")
+    
+    # # 测试单次调用
+    # print("\n=== Test 2: 单次调用测试 ===")
     # for _ in range(10):
-    #     output_pt_fp16 = Input_fp16.view(B * Token, D_in) @ W_T_fp16.T
-    #     # output_pt_fp16 = nn.functional.silu(output_pt_fp16)
+    #     fused_linear_silu_l2norm(Input_fp16, layer_q.weight)
     # torch.cuda.synchronize()
-    # # Benchmark
     # start = time.time()
     # for _ in range(20):
-    #     output_pt_fp16 = Input_fp16.view(B * Token, D_in) @ W_T_fp16.T
-    #     # output_pt_fp16 = nn.functional.silu(output_pt_fp16)
+    #     fused_linear_silu_l2norm(Input_fp16, W_T_fp16)
     # torch.cuda.synchronize()
     # end = time.time()
-    # pt_fp16_time = (end - start) * 1000 / 20
-    # print(f"Pytorch FP16 Time taken: {pt_fp16_time:.4f} ms")
-
-    # # --- Correctness Check ---
-    # output_tl_fp16_reshaped = output_tl_fp16.view(B * Token, D_out)
-    # torch.testing.assert_close(output_tl_fp16_reshaped, output_pt_fp16, rtol=1e-2, atol=1e-2)
-    # relative_error_fp16 = torch.mean(torch.abs(output_tl_fp16_reshaped - output_pt_fp16) / (torch.abs(output_pt_fp16) + 1e-6))
-    # print(f"FP16 Average Relative Error: {relative_error_fp16.item():.6f}")
-
-    # # =================
-    # print("\nBenchmarking FP8...")
+    # print(f"Time taken tilelang (single): {(end - start) / 20} seconds")
+    
+    # PyTorch对比
+    print("\n=== Test 3: PyTorch baseline ===")
+    for _ in range(10):
+        # pytorch_impl(Input_fp16, W_T_fp16)
+        _ = F.silu(layer_q(Input_fp16))
+        _ = F.silu(layer_k(Input_fp16))
+        # _ = layer_q(Input_fp16)
+        # _ = layer_k(Input_fp16)
+    torch.cuda.synchronize()
+    start = time.time()
+    for _ in range(20):
+        _ = F.silu(layer_q(Input_fp16))
+        _ = F.silu(layer_k(Input_fp16))
+        # _ = layer_q(Input_fp16)
+        # _ = layer_k(Input_fp16)
+    torch.cuda.synchronize()
+    end = time.time()
+    print(f"Time taken pytorch: {(end - start) / 20} seconds")
+    # pytorch matmul
+    for _ in range(10):
+        _ = F.silu(torch.matmul(Input_fp16, W_T_fp16.T))
+        _ = F.silu(torch.matmul(Input_fp16, W_T_fp16_2.T))
+        # _ = torch.matmul(Input_fp16, W_T_fp16.T)
+        # _ = torch.matmul(Input_fp16, W_T_fp16_2.T)
+    torch.cuda.synchronize()
+    start = time.time()
+    for _ in range(20):
+        _ = F.silu(torch.matmul(Input_fp16, W_T_fp16.T))
+        _ = F.silu(torch.matmul(Input_fp16, W_T_fp16_2.T))
+        # _ = torch.matmul(Input_fp16, W_T_fp16.T)
+        # _ = torch.matmul(Input_fp16, W_T_fp16_2.T)
+    torch.cuda.synchronize()
+    end = time.time()
+    print(f"Time taken pytorch matmul: {(end - start) / 20} seconds")
     # Input_fp8 = torch.randn(B, Token, D_in).cuda().to(torch.float8_e4m3fn)
     # W_T_fp8 = torch.randn(D_out, D_in).cuda().to(torch.float8_e4m3fn)
-
-    # # --- Tile-lang implementation ---
-    # # Warm up
     # for _ in range(10):
-    #     output_tl_fp8 = linear_w_silu_prefill(Input_fp8, W_T_fp8, dtype="float8_e4m3", out_dtype="float8_e4m3")
+    #     fused_linear_silu(Input_fp8, W_T_fp8)
     # torch.cuda.synchronize()
-    # # Benchmark
     # start = time.time()
     # for _ in range(20):
-    #     output_tl_fp8 = linear_w_silu_prefill(Input_fp8, W_T_fp8, dtype="float8_e4m3", out_dtype="float8_e4m3")
+    #     fused_linear_silu(Input_fp8, W_T_fp8)
     # torch.cuda.synchronize()
     # end = time.time()
-    # tl_fp8_time = (end - start) * 1000 / 20
-    # print(f"Tilelang FP8 Time taken: {tl_fp8_time:.4f} ms")
+    # print(f"Time taken: {end - start} seconds")
 
-    # # --- PyTorch FP16 implementation for reference ---
-    # output_pt_ref_for_fp8 = Input_fp8.view(B * Token, D_in).to(torch.float16) @ W_T_fp8.T.to(torch.float16)
-    # output_pt_ref_for_fp8 = nn.functional.silu(output_pt_ref_for_fp8)
 
-    # # --- Correctness Check ---
-    # output_tl_fp8_reshaped = output_tl_fp8.view(B*Token, D_out).to(torch.float16)
-    # # Using a higher tolerance for FP8 vs FP16 comparison
-    # torch.testing.assert_close(output_tl_fp8_reshaped, output_pt_ref_for_fp8, rtol=0.1, atol=0.1)
-    # relative_error_fp8_vs_fp16 = torch.mean(torch.abs(output_tl_fp8_reshaped - output_pt_ref_for_fp8) / (torch.abs(output_pt_ref_for_fp8) + 1e-6))
-    # print(f"FP8 (Tilelang) vs FP16 (PyTorch) Average Relative Error: {relative_error_fp8_vs_fp16.item():.6f}")

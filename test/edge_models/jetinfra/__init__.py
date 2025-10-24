@@ -1,4 +1,4 @@
-from .tl_fusedlinear import linear_w_silu
+from .tl_fusedlinear import fused_linear_silu_l2norm
 from .tl_dconv import tl_dynamic_conv_cache_w_silu
 from .tl_dconv_step import tilelang_dconv_step
 from .tl_gemv import gemv_silu_l2norm_kernel

@@ -685,10 +685,13 @@ def chunk_gated_delta_rule_fwd(
     
     A = A.reshape(1, -1, A.shape[-2], A.shape[-1])
     # print("A shape:", A.shape)
-    A = solve_tril(
+    # A = solve_tril(
+    #     A=A,
+    #     cu_seqlens=cu_seqlens,
+    #     output_dtype=k.dtype
+    # )
+    A = tl_solve_tril(
         A=A,
-        cu_seqlens=cu_seqlens,
-        output_dtype=k.dtype
     )
     A = A.reshape(batch_size, -1, A.shape[-2], A.shape[-1])
     # torch.cuda.synchronize()
