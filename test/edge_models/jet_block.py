@@ -231,32 +231,31 @@ class JetBlock(nn.Module):
                 hidden_states = index_first_axis(rearrange(hidden_states, "b s ... -> (b s) ..."), indices).unsqueeze(0)
             
             q, k = map(lambda x: rearrange(x, '... (h d) -> ... h d', d=self.head_k_dim), (q, k))
-            o, recurrent_state = chunk_gated_delta_rule(
-                q=q,
-                k=k,
-                v=v,
-                g=g,
-                beta=beta,
-                initial_state=recurrent_state,
-                output_final_state=use_cache,
-                cu_seqlens=cu_seqlens,
-                use_qk_l2norm_in_kernel=True,
-                autotune_interval=self.autotune_interval
-            )
-            # scale = k.shape[-1] ** -0.5
-            # _, o, _, recurrent_state = chunk_gated_delta_rule_fwd(
-            #     batch_size=batch_size,
+            # o, recurrent_state = chunk_gated_delta_rule(
             #     q=q,
             #     k=k,
             #     v=v,
             #     g=g,
             #     beta=beta,
-            #     scale=scale,
             #     initial_state=recurrent_state,
             #     output_final_state=use_cache,
             #     cu_seqlens=cu_seqlens,
-
+            #     use_qk_l2norm_in_kernel=True,
+            #     autotune_interval=self.autotune_interval
             # )
+            scale = k.shape[-1] ** -0.5
+            _, o, _, recurrent_state = chunk_gated_delta_rule_fwd(
+                batch_size=batch_size,
+                q=q,
+                k=k,
+                v=v,
+                g=g,
+                beta=beta,
+                scale=scale,
+                initial_state=recurrent_state,
+                output_final_state=use_cache,
+                cu_seqlens=cu_seqlens,
+            )
         elif mode == 'fused_recurrent':
             # q = F.silu(self.q_proj(hidden_states))
             # k = F.silu(self.k_proj(hidden_states))
@@ -291,18 +290,7 @@ class JetBlock(nn.Module):
                 hidden_states = index_first_axis(rearrange(hidden_states, "b s ... -> (b s) ..."), indices).unsqueeze(0)
             
             q, k = map(lambda x: rearrange(x, '... (h d) -> ... h d', d=self.head_k_dim), (q, k))
-            o, recurrent_state = fused_recurrent_gated_delta_rule(
-                q=q,
-                k=k,
-                v=v,
-                g=g,
-                beta=beta,
-                initial_state=recurrent_state,
-                output_final_state=use_cache,
-                cu_seqlens=cu_seqlens,
-                use_qk_l2norm_in_kernel=True
-            )
-            # o, recurrent_state = fused_recurrent_gated_delta_rule_tl(
+            # o, recurrent_state = fused_recurrent_gated_delta_rule(
             #     q=q,
             #     k=k,
             #     v=v,
@@ -313,6 +301,17 @@ class JetBlock(nn.Module):
             #     cu_seqlens=cu_seqlens,
             #     use_qk_l2norm_in_kernel=True
             # )
+            o, recurrent_state = fused_recurrent_gated_delta_rule_tl(
+                q=q,
+                k=k,
+                v=v,
+                g=g,
+                beta=beta,
+                initial_state=recurrent_state,
+                output_final_state=use_cache,
+                cu_seqlens=cu_seqlens,
+                use_qk_l2norm_in_kernel=True
+            )
         else:
             raise NotImplementedError(f"Not supported mode `{mode}`.")
 
@@ -326,8 +325,8 @@ class JetBlock(nn.Module):
 
         g = rearrange(self.g_proj(hidden_states), '... (h d) -> ... h d', d=self.head_v_dim)
 
-        o = self.o_norm(o, g)
-        # o = tl_fused_rmsnorm(o, g, self.o_norm.weight)
+        # o = self.o_norm(o, g)
+        o = tl_fused_rmsnorm(o, g, self.o_norm.weight)
         o = rearrange(o, 'b t h d -> b t (h d)')
         o = self.o_proj(o)
         if attention_mask is not None and q_len > 1:

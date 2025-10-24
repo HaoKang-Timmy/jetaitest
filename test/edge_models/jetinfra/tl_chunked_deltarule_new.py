@@ -16,7 +16,10 @@ from fla.ops.common.chunk_scaled_dot_kkt import chunk_scaled_dot_kkt_fwd
 from fla.ops.gated_delta_rule.wy_fast import prepare_wy_repr_bwd, recompute_w_u_fwd
 from fla.ops.utils import chunk_local_cumsum, solve_tril
 from fla.utils import autocast_custom_bwd, autocast_custom_fwd, input_guard
+from fla.modules.l2norm import l2norm_fwd
 import time
+
+from .tl_trilcompute import tl_solve_tril
 @tilelang.jit(
     out_idx=[-1]
 )
@@ -40,7 +43,7 @@ def tl_chunk_cumsum(
     ):
         with T.Kernel(T.ceildiv(Token, Block_T), B * H, threads=threads) as (bt, bbh):
             bb, bh = bbh // H, bbh % H
-            InputG_shared = T.alloc_shared((Block_T), dtype=input_dtype)
+            InputG_shared = T.alloc_shared((Block_T), dtype=input_dtype, scope="shared")
             InputG_fragment = T.alloc_fragment((Block_T), dtype=output_dtype)
             # unable to use TMA
             # T.copy(InputG[bb, bt * Block_T:(bt + 1) * Block_T, bh], InputG_shared)
@@ -77,7 +80,7 @@ def get_configs():
     } for c in _configs]
     return configs
 # tilelang.disable_cache()
-@autotune(configs=get_configs(), warmup=10, rep=10)
+# @autotune(configs=get_configs(), warmup=10, rep=10)
 @tilelang.jit(out_idx=[-1])
 def tilelang_chunk_scaled_dot_kkt_fwd(
     # task config
@@ -87,13 +90,13 @@ def tilelang_chunk_scaled_dot_kkt_fwd(
     DK,
     chunk_size=64,
     input_dtype="bfloat16",
-    output_dtype="bfloat16",
+    output_dtype="float32",
     accum_dtype="float32",
     # kernel config
     block_S=64,
     block_DK=64,
-    threads=256,
-    num_stages=0,
+    threads=128,
+    num_stages=2,
 ):
     K_shape = (B, S, H, DK)
     Beta_shape = (B, S, H)
@@ -112,14 +115,14 @@ def tilelang_chunk_scaled_dot_kkt_fwd(
         with T.Kernel(T.ceildiv(S, block_S), B * H, threads=threads) as (bs, bbh):
             bb, bh = bbh // H, bbh % H
             # !! Pay attention to the scope of the shared memory: may cause misaligned address when shape is one dimension or the buffer is too small
-            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype )
+            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype, scope="shared")
             K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
             A_shared = T.alloc_shared((block_S, block_S), dtype=output_dtype)
             Beta_K_fragment = T.alloc_fragment((block_S, block_DK), dtype=input_dtype)
             A_fragment = T.alloc_fragment((block_S, block_S), dtype=accum_dtype)
 
             # Tensor used for gated:
-            G_shared = T.alloc_shared((block_S,), dtype=accum_dtype )
+            G_shared = T.alloc_shared((block_S,), dtype=accum_dtype)
             G_diff_local = T.alloc_fragment((block_S, block_S), dtype=accum_dtype)
 
             T.annotate_layout({
@@ -654,6 +657,8 @@ def chunk_gated_delta_rule_fwd(
     output_final_state: bool,
     cu_seqlens: Optional[torch.LongTensor] = None
 ):
+    q = l2norm_fwd(q)
+    k = l2norm_fwd(k)
     q = q.reshape(batch_size, -1, q.shape[-2], q.shape[-1])
     k = k.reshape(batch_size, -1, k.shape[-2], k.shape[-1])
     v = v.reshape(batch_size, -1, v.shape[-2], v.shape[-1])
@@ -664,7 +669,6 @@ def chunk_gated_delta_rule_fwd(
     # g = chunk_local_cumsum(g, chunk_size=64, cu_seqlens=cu_seqlens)
     g = chunk_cumsum(g, chunk_size=64)
     # obtain WY representation. u is actually the new v.
-    start_time = time.time()
 
     # A = chunk_scaled_dot_kkt_fwd(
     #     k=k,
@@ -691,15 +695,15 @@ def chunk_gated_delta_rule_fwd(
     # end_time = time.time()
     # print("solve_tril time:", end_time - start_time)
     # start_time = time.time()
-    # w, u = recompute_w_u_fwd(
-    #     k=k,
-    #     v=v,
-    #     beta=beta,
-    #     A=A,
-    #     g_cumsum=g,
-    #     cu_seqlens=cu_seqlens,
-    # )
-    w, u = tl_recompute_wu_forward(k, v, beta, g, A)
+    w, u = recompute_w_u_fwd(
+        k=k,
+        v=v,
+        beta=beta,
+        A=A,
+        g_cumsum=g,
+        cu_seqlens=cu_seqlens,
+    )
+    # w, u = tl_recompute_wu_forward(k, v, beta, g, A)
     # torch.cuda.synchronize()
     # end_time = time.time()
     # print("recompute_w_u_fwd time:", end_time - start_time)
@@ -709,16 +713,16 @@ def chunk_gated_delta_rule_fwd(
     # print("u shape:", u.shape)
     # print("g shape:", g.shape)
 
-    # h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
-    #     k=k,
-    #     w=w,
-    #     u=u,
-    #     g=g,
-    #     initial_state=initial_state,
-    #     output_final_state=output_final_state,
-    #     cu_seqlens=cu_seqlens,
-    # )
-    h,  v_new, final_state = tilelang_chunk_gated_delta_rule(batch_size, k, w, u, g, output_final_state, chunk_size=64, save_new_value=True)
+    h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
+        k=k,
+        w=w,
+        u=u,
+        g=g,
+        initial_state=initial_state,
+        output_final_state=output_final_state,
+        cu_seqlens=cu_seqlens,
+    )
+    # h,  v_new, final_state = tilelang_chunk_gated_delta_rule(batch_size, k, w, u, g, output_final_state, chunk_size=64, save_new_value=True)
     # print("h shape:", h.shape)
     # print("v_new shape:", v_new.shape)
     # print("final_state shape:", final_state.shape)
@@ -727,16 +731,16 @@ def chunk_gated_delta_rule_fwd(
     # print("chunk_gated_delta_rule_fwd_h time:", end_time - start_time)
     # start_time = time.time()
     # print("v_new shape:", v_new.shape)
-    # o = chunk_fwd_o(
-    #     q=q,
-    #     k=k,
-    #     v=v_new,
-    #     h=h,
-    #     g=g,
-    #     scale=scale,
-    #     cu_seqlens=cu_seqlens,
-    # )
-    o = chunk_fwd_o(q, k, v_new, h, g, scale)
+    o = chunk_fwd_o(
+        q=q,
+        k=k,
+        v=v_new,
+        h=h,
+        g=g,
+        scale=scale,
+        cu_seqlens=cu_seqlens,
+    )
+    # o = chunk_fwd_o(q, k, v_new, h, g, scale)
     # torch.cuda.synchronize()
     # end_time = time.time()
     # print("chunk_fwd_o time:", end_time - start_time)

@@ -72,7 +72,7 @@ def RMSNorm(
             X_reduce_square_fragment[0] = X_reduce_square_fragment[0] * scale
             
             for i in T.Parallel(block_D):
-                X_rms_fragment[i] = X_fragment[i] * W_fragment[i] / (T.sqrt(X_reduce_square_fragment[0] + 1e-6))
+                X_rms_fragment[i] = X_fragment[i]  / (T.sqrt(X_reduce_square_fragment[0] + 1e-5)) * W_fragment[i]
 
             # gated activation, swish supported only
             for i in T.Parallel(block_D):
@@ -101,13 +101,17 @@ if __name__ == "__main__":
     B, S, H, Dim = 1, 1, 12, 256
     datatype = torch.bfloat16
     acc_dtype = torch.float32
-    eps = 1e-6
+    eps = 1e-5
     autotune_interval = 524288
     
     # 准备输入数据
     X = torch.randn(B, S, H, Dim, device='cuda', dtype=datatype)
     G = torch.randn(B, S, H, Dim, device='cuda', dtype=datatype)
     Weight = torch.ones(Dim, device='cuda', dtype=datatype)  # 初始化为1
+    
+    # 保存原始输入的副本用于FLA比较
+    X_orig = X.clone()
+    G_orig = G.clone()
     
     # TileLang kernel 输出
     Y_tl = torch.empty(B, S, H, Dim, device='cuda', dtype=datatype)
@@ -118,59 +122,55 @@ if __name__ == "__main__":
     Y_tl = tl_fused_rmsnorm(X, G, Weight)
     torch.cuda.synchronize()
     
-    # # FLA FusedRMSNormGated
-    # fla_norm = FusedRMSNormGated(
-    #     hidden_size=Dim,
-    #     elementwise_affine=True,
-    #     eps=eps,
-    #     activation='swish',
-    #     device='cuda',
-    #     dtype=datatype,
-    #     autotune_interval=autotune_interval
-    # )
-    # # 设置相同的权重
-    # fla_norm.weight.data = Weight.clone()
+    # FLA FusedRMSNormGated
+    fla_norm = FusedRMSNormGated(
+        hidden_size=Dim,
+        eps=eps,
+        autotune_interval=autotune_interval
+    )
+    # 设置相同的权重
+    fla_norm.weight.data = Weight.clone()
     
-    # # 重塑输入以匹配 FLA 的期望：[B*S*H, Dim]
-    # X_fla = X.reshape(B * S * H, Dim)
-    # G_fla = G.reshape(B * S * H, Dim)
+    # 重塑输入以匹配 FLA 的期望：[B*S*H, Dim] - 使用原始数据！
+    X_fla = X_orig.reshape(B * S * H, Dim)
+    G_fla = G_orig.reshape(B * S * H, Dim)
     
-    # # FLA kernel 输出
-    # Y_fla = fla_norm(X_fla, G_fla, residual=None, prenorm=False, residual_in_fp32=False)
-    # torch.cuda.synchronize()
+    # FLA kernel 输出
+    Y_fla = fla_norm(X_fla, G_fla, residual=None, prenorm=False, residual_in_fp32=False)
+    torch.cuda.synchronize()
     
-    # # 重塑回原始形状
-    # Y_fla = Y_fla.reshape(B, S, H, Dim)
+    # 重塑回原始形状
+    Y_fla = Y_fla.reshape(B, S, H, Dim)
     
-    # # 计算误差
-    # eps_compare = 1e-8
-    # Y_diff = torch.abs(Y_tl.float() - Y_fla.float())
-    # Y_relative_error = Y_diff / (torch.abs(Y_fla.float()) + eps_compare)
+    # 计算误差
+    eps_compare = 1e-8
+    Y_diff = torch.abs(Y_tl.float() - Y_fla.float())
+    Y_relative_error = Y_diff / (torch.abs(Y_fla.float()) + eps_compare)
     
-    # mean_relative_error = Y_relative_error.mean().item()
-    # max_relative_error = Y_relative_error.max().item()
-    # mean_absolute_error = Y_diff.mean().item()
-    # max_absolute_error = Y_diff.max().item()
+    mean_relative_error = Y_relative_error.mean().item()
+    max_relative_error = Y_relative_error.max().item()
+    mean_absolute_error = Y_diff.mean().item()
+    max_absolute_error = Y_diff.max().item()
     
-    # # 打印结果
-    # print("\n" + "="*60)
-    # print("TileLang vs FLA FusedRMSNormGated 误差对比")
-    # print("="*60)
-    # print(f"\n输入形状: X={X.shape}, G={G.shape}, Weight={Weight.shape}")
-    # print(f"输出形状: Y={Y_tl.shape}")
-    # print(f"\n误差统计:")
-    # print(f"  平均相对误差: {mean_relative_error:.6e}")
-    # print(f"  最大相对误差: {max_relative_error:.6e}")
-    # print(f"  平均绝对误差: {mean_absolute_error:.6e}")
-    # print(f"  最大绝对误差: {max_absolute_error:.6e}")
-    # print("\n" + "="*60)
+    # 打印结果
+    print("\n" + "="*60)
+    print("TileLang vs FLA FusedRMSNormGated 误差对比")
+    print("="*60)
+    print(f"\n输入形状: X={X.shape}, G={G.shape}, Weight={Weight.shape}")
+    print(f"输出形状: Y={Y_tl.shape}")
+    print(f"\n误差统计:")
+    print(f"  平均相对误差: {mean_relative_error:.6e}")
+    print(f"  最大相对误差: {max_relative_error:.6e}")
+    print(f"  平均绝对误差: {mean_absolute_error:.6e}")
+    print(f"  最大绝对误差: {max_absolute_error:.6e}")
+    print("\n" + "="*60)
     
-    # # 检查是否匹配（使用合理的阈值）
-    # if max_relative_error < 1e-2:  # bfloat16 精度下 1% 的相对误差是可接受的
-    #     print("✅ 测试通过：TileLang kernel 与 FLA kernel 结果匹配！")
-    # else:
-    #     print("⚠️  警告：误差较大，可能存在实现差异")
-    # print("="*60 + "\n")
+    # 检查是否匹配（使用合理的阈值）
+    if max_relative_error < 1e-2:  # bfloat16 精度下 1% 的相对误差是可接受的
+        print("✅ 测试通过：TileLang kernel 与 FLA kernel 结果匹配！")
+    else:
+        print("⚠️  警告：误差较大，可能存在实现差异")
+    print("="*60 + "\n")
 
             
             
