@@ -1,24 +1,49 @@
-
 import tilelang
 import tilelang.language as T
-from tilelang.autotuner import autotune
-import warnings
-from typing import Optional
+import sys  # noqa: F401
 import itertools
-
-import torch
-from einops import rearrange
-
-# from fla.modules.l2norm import l2norm_bwd, l2norm_fwd
-# from fla.ops.common.chunk_delta_h import chunk_gated_delta_rule_bwd_dhu, chunk_gated_delta_rule_fwd_h
-# from fla.ops.common.chunk_o import chunk_bwd_dqkwg, chunk_bwd_dv_local, chunk_fwd_o
-# from fla.ops.common.chunk_scaled_dot_kkt import chunk_scaled_dot_kkt_fwd
-# from fla.ops.gated_delta_rule.wy_fast import prepare_wy_repr_bwd, recompute_w_u_fwd
-# from fla.ops.utils import chunk_local_cumsum, solve_tril
-# from fla.utils import autocast_custom_bwd, autocast_custom_fwd, input_guard
-# from fla.modules.l2norm import l2norm_fwd
-from . tl_trilcompute import tl_solve_tril
+from tilelang.autotuner import autotune
 import time
+import torch
+from typing import Optional
+from fla.ops.gated_delta_rule.chunk import solve_tril
+try:
+    import fla
+    print(fla.__file__)
+    from fla.ops.common.chunk_delta_h import chunk_gated_delta_rule_fwd_h
+except ImportError:
+    print("fla not found, using tilelang implementation")
+    fla = None
+
+def cdiv(a, b):
+    return (a + b - 1) // b
+
+def prepare_lens(cu_seqlens: torch.LongTensor) -> torch.LongTensor:
+    return cu_seqlens[1:] - cu_seqlens[:-1]
+
+
+def prepare_chunk_indices(
+    cu_seqlens: torch.LongTensor,
+    chunk_size: int
+) -> torch.LongTensor:
+    chunk_lens = cdiv(prepare_lens(cu_seqlens), chunk_size).tolist()
+    indices = torch.cat([torch.arange(n) for n in chunk_lens])
+    chunk_indices = torch.cat([torch.full((n,), i) for i, n in enumerate(chunk_lens)])
+    return torch.stack([chunk_indices, indices], 1).to(cu_seqlens)
+
+
+
+def get_configs():
+    Block_T = [64 ,128, 256, 512]
+    threads = [128, 256]
+    _configs = list(itertools.product(Block_T, threads))
+    configs = [{
+        'Block_T': c[0],
+        'threads': c[1]
+    } for c in _configs]
+    return configs
+# tilelang.disable_cache()
+# @autotune(configs=get_configs(), warmup=10, rep=10)
 @tilelang.jit(
     out_idx=[-1]
 )
@@ -59,11 +84,6 @@ def tl_chunk_cumsum(
                 OutputG[bb, bt * Block_T + i, bh] = InputG_shared[i]
     return kernel
 
-def chunk_cumsum(g, chunk_size = 64):
-    B, Token, H = g.shape
-    kernel = tl_chunk_cumsum(B, Token, H, chunk_size)
-    output = kernel(g)
-    return output
 
 def get_configs():
     block_S = [64]
@@ -114,14 +134,14 @@ def tilelang_chunk_scaled_dot_kkt_fwd(
         with T.Kernel(T.ceildiv(S, block_S), B * H, threads=threads) as (bs, bbh):
             bb, bh = bbh // H, bbh % H
             # !! Pay attention to the scope of the shared memory: may cause misaligned address when shape is one dimension or the buffer is too small
-            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype )
+            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype, scope="shared")
             K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
             A_shared = T.alloc_shared((block_S, block_S), dtype=output_dtype)
             Beta_K_fragment = T.alloc_fragment((block_S, block_DK), dtype=input_dtype)
             A_fragment = T.alloc_fragment((block_S, block_S), dtype=accum_dtype)
 
             # Tensor used for gated:
-            G_shared = T.alloc_shared((block_S,), dtype=accum_dtype )
+            G_shared = T.alloc_shared((block_S,), dtype=accum_dtype, scope="shared")
             G_diff_local = T.alloc_fragment((block_S, block_S), dtype=accum_dtype)
 
             T.annotate_layout({
@@ -168,12 +188,58 @@ def tilelang_chunk_scaled_dot_kkt_fwd(
 
     return kernel
 
-def chunked_scaled_dot_ktt(k, beta, g_cumsum):
-    B, Token, H, DK = k.shape
-    kernel = tilelang_chunk_scaled_dot_kkt_fwd(B, Token, H, DK)
-    output = kernel(k, beta, g_cumsum)
-    return output
+# @tilelang.jit(out_idx=[-1])
+# def solve_tril_16x16(A: torch.Tensor,
+#                 cu_seqlens: Optional[torch.Tensor] = None,
+#                 chunk_indices: Optional[torch.Tensor] = None,
+#                output_dtype: torch.dtype = torch.float):
+#     assert A.shape[-1] in [16, 32, 64]
+#     B, Token, H, BT = A.shape
+#     chunk_indices = prepare_chunk_indices(cu_seqlens, 16) if cu_seqlens is not None else None
+#     NT = len(chunk_indices) if cu_seqlens is not None else cdiv(Token, 16)
+#     @T.prim_func
+#     def kernel(
+#         A: T.Tensor(shape=(B, Token, H, BT), dtype=output_dtype),
+#         Ad: T.Tensor(shape=(B, Token, H, 16), dtype=output_dtype),
+    
+#     ):
+#         with T.Kernel(NT, B * H) as (i_t, i_bh):
+#             i_b, ih = i_bh // H, i_bh % H
+#             i_n, i_t = chunk_indices[i_t, 0], chunk_indices[i_t, 1]
+#             bos, eos = cu_seqlens[i_n], cu_seqlens[i_n + 1]
+#             seq = eos - bos
+#             offset = (i_t * 16) % BT
+#             A_shared = T.alloc_shared((16, 16), dtype=output_dtype)
+#             A_fragment = T.alloc_fragment((16, 16), dtype=output_dtype)
+#             reduce_fragment1 = T.alloc_fragment((16, 16), dtype=output_dtype)
+#             reduce_fragment2 = T.alloc_fragment((16), dtype=output_dtype)
+#             a_shared = T.alloc_shared((16), dtype=output_dtype)
+#             a_fragment = T.alloc_fragment((16), dtype=output_dtype)
+#             T.copy(A[i_b, i_t * 16:(i_t + 1) * 16, ih, offset:offset + 16], A_shared)
+#             T.copy(A_shared, A_fragment)
+#             for i, j in T.Parallel(16, 16):
+#                 A_fragment[i, j] = T.if_then_else(i >j, -A_fragment[i, j], 0)
+#             for i in T.serial(1, T.min(16, seq - i_t * 16)):
+#                 for j in T.Parallel(16):
+#                     a_shared[j] = -A[i_b, i_t * 16 + i, ih, j + offset]
+#                 for j in T.Parallel(16):
+#                     a_fragment[i] = a_shared[j]
+#                 for i, j in T.Parallel(16, 16):
+#                     reduce_fragment1[i, j] = A_fragment[i, j] * a_fragment[i]
+#                 T.reduce_sum(reduce_fragment1, reduce_fragment2, dim=0)
+#                 for j in T.Parallel(16):
+#                     a_fragment[j] = a_fragment[j] + reduce_fragment2[j]
+#                 for j in T.Parallel(16):
+#                     A_fragment[i, j] = a_fragment[j]
+#             for i in T.Parallel(16):
+#                 A_fragment[i, i] = A_fragment[i, i] + 1
+#             T.copy(A_fragment, Ad[i_b, i_t * 16:(i_t + 1) * 16, ih, :])
+            
 
+
+                
+            
+#     return kernel
 def get_configs():
     block_DK = [64, 96, 128]
     block_DV = [64, 128, 256]
@@ -228,10 +294,10 @@ def tilelang_recompute_w_u_fwd(
     ):
         with T.Kernel(T.ceildiv(S, block_S), B * H, threads=threads) as (bs, bbh):
             bb, bh = bbh // H, bbh % H
-            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype )
+            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype, scope="shared")
             K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
             V_shared = T.alloc_shared((block_S, block_DV), dtype=input_dtype)
-            G_shared = T.alloc_shared((block_S,), dtype=gate_dtype )
+            G_shared = T.alloc_shared((block_S,), dtype=gate_dtype, scope="shared")
             A_shared = T.alloc_shared((block_S, block_S), dtype=output_dtype)
             W_fragment = T.alloc_fragment((block_S, block_DK), dtype=accum_dtype)
             U_fragment = T.alloc_fragment((block_S, block_DV), dtype=accum_dtype)
@@ -285,24 +351,6 @@ def tilelang_recompute_w_u_fwd(
                                 i_k * block_DK:(i_k + 1) * block_DK])
 
     return kernel
-
-def  tl_recompute_wu_forward(
-    k: torch.Tensor,
-    v: torch.Tensor,
-    beta: torch.Tensor,
-    g_cumsum: torch.Tensor,
-    A: torch.Tensor,
-):
-    B, Token, H, K, V = *k.shape, v.shape[-1]
-    kernel = tilelang_recompute_w_u_fwd(B, Token, H, K, V,chunk_size=64,
-    input_dtype = "bfloat16",
-    output_dtype = "bfloat16",
-    gate_dtype = "float32",
-    accum_dtype = "float32",
-    )
-    w, u  = kernel(k, v, beta, g_cumsum, A)
-    return w, u
-
 @tilelang.jit(out_idx=[-3, -2, -1])
 def tilelang_chunk_gated_delta_rule_fwd_h(
     # task config
@@ -455,35 +503,6 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
 
     return kernel
 
-def tilelang_chunk_gated_delta_rule(
-    batch_size: int,
-    k: torch.Tensor,
-    w: torch.Tensor,
-    u: torch.Tensor,
-    g: Optional[torch.Tensor] = None,
-    initial_state: Optional[torch.Tensor] = None,
-    output_final_state: bool = True,
-    chunk_size: int = 64,  # SY: remove this argument and force chunk size 64?
-    save_new_value: bool = True,
-
-):
-    B, Token, H, K, V = *k.shape, u.shape[-1]
-
-    kernel = tilelang_chunk_gated_delta_rule_fwd_h(B, Token, H, K, V,
-        input_dtype = "bfloat16",
-        output_dtype = "bfloat16",
-        accum_dtype = "float32",
-        gate_dtype = "float32",
-        state_dtype = "float32",
-        chunk_size = 64,
-        use_g = g is not None,
-        # use_initial_state = initial_state is not None,
-        store_final_state = output_final_state,
-        save_new_value = save_new_value,
-    )
-    h, final_state, v_new, = kernel(k, w, u, g)
-    
-    return h, v_new, final_state
 
 def get_configs():
     block_DK = [32, 64, 128]
@@ -522,15 +541,15 @@ def tilelang_chunk_fwd_o(
     block_S=64,
     block_DK=64,
     block_DV=64,
-    threads=128,
-    num_stages=1,
+    threads=256,
+    num_stages=0,
 ):
     assert chunk_size == block_S, "chunk_size must be equal to block_S"
     BS = chunk_size
     Q_shape = (B, S, H, DK)
     K_shape = (B, S, H, DK)
     V_shape = (B, S, H, DV)
-    H_shape = (B, (S + block_S - 1) // BS, H, DK, DV)
+    H_shape = (B, S // BS, H, DK, DV)
     G_shape = (B, S, H)
     O_shape = (B, S, H, DV)
 
@@ -555,7 +574,7 @@ def tilelang_chunk_fwd_o(
             O_shared = T.alloc_shared((block_S, block_DV), dtype=output_dtype)
             A_fragment = T.alloc_fragment((block_S, block_S), dtype=accum_dtype)
             O_fragment = T.alloc_fragment((block_S, block_DV), dtype=accum_dtype)
-            G_shared = T.alloc_shared((block_S,), dtype=gate_dtype )
+            G_shared = T.alloc_shared((block_S,), dtype=gate_dtype, scope="shared")
             G_diff_local = T.alloc_fragment((block_S, block_S), dtype=gate_dtype)
 
             T.annotate_layout({
@@ -618,6 +637,65 @@ def tilelang_chunk_fwd_o(
 
     return kernel
 
+
+def chunk_cumsum(g, chunk_size = 64):
+    B, Token, H = g.shape
+    kernel = tl_chunk_cumsum(B, Token, H, chunk_size)
+    output = kernel(g)
+    return output
+
+def chunked_scaled_dot_ktt(k, beta, g_cumsum):
+    B, Token, H, DK = k.shape
+    kernel = tilelang_chunk_scaled_dot_kkt_fwd(B, Token, H, DK)
+    output = kernel(k, beta, g_cumsum)
+    return output
+
+def  tl_recompute_wu_forward(
+    k: torch.Tensor,
+    v: torch.Tensor,
+    beta: torch.Tensor,
+    g_cumsum: torch.Tensor,
+    A: torch.Tensor,
+):
+    B, Token, H, K, V = *k.shape, v.shape[-1]
+    kernel = tilelang_recompute_w_u_fwd(B, Token, H, K, V,chunk_size=64,
+    input_dtype = "bfloat16",
+    output_dtype = "bfloat16",
+    gate_dtype = "float32",
+    accum_dtype = "float32",
+    )
+    w, u  = kernel(k, v, beta, g_cumsum, A)
+    return w, u
+
+def tilelang_chunk_gated_delta_rule(
+    k: torch.Tensor,
+    w: torch.Tensor,
+    u: torch.Tensor,
+    g: Optional[torch.Tensor] = None,
+    initial_state: Optional[torch.Tensor] = None,
+    output_final_state: bool = False,
+    chunk_size: int = 64,  # SY: remove this argument and force chunk size 64?
+    save_new_value: bool = True,
+
+):
+    B, Token, H, K, V = *k.shape, u.shape[-1]
+
+    kernel = tilelang_chunk_gated_delta_rule_fwd_h(B, Token, H, K, V,
+        input_dtype = "bfloat16",
+        output_dtype = "bfloat16",
+        accum_dtype = "float32",
+        gate_dtype = "float32",
+        state_dtype = "float32",
+        chunk_size = 64,
+        use_g = g is not None,
+        # use_initial_state = initial_state is not None,
+        store_final_state = output_final_state,
+        save_new_value = save_new_value,
+    )
+    h, final_state, v_new, = kernel(k, w, u, g)
+
+    return h, v_new, final_state
+
 def chunk_fwd_o(
     q: torch.Tensor,
     k: torch.Tensor,
@@ -643,9 +721,7 @@ def chunk_fwd_o(
 
     output = kernel(q, k, v, h, g)
     return output
-
-def chunk_gated_delta_rule_fwd(
-    batch_size: int,
+def tl_chunk_gated_delta_rule(
     q: torch.Tensor,
     k: torch.Tensor,
     v: torch.Tensor,
@@ -656,94 +732,60 @@ def chunk_gated_delta_rule_fwd(
     output_final_state: bool,
     cu_seqlens: Optional[torch.LongTensor] = None
 ):
-    # q = l2norm_fwd(q)
-    # k = l2norm_fwd(k)
-    q = q.reshape(batch_size, -1, q.shape[-2], q.shape[-1])
-    k = k.reshape(batch_size, -1, k.shape[-2], k.shape[-1])
-    v = v.reshape(batch_size, -1, v.shape[-2], v.shape[-1])
-    g = g.reshape(batch_size, -1, g.shape[-1])
-    beta = beta.reshape(batch_size, -1, beta.shape[-1])
-    # initial_state = initial_state.reshape(batch_size, -1, initial_state.shape[-2], initial_state.shape[-1])
-
-    # g = chunk_local_cumsum(g, chunk_size=64, cu_seqlens=cu_seqlens)
     g = chunk_cumsum(g, chunk_size=64)
-    # obtain WY representation. u is actually the new v.
-    start_time = time.time()
-
-    # A = chunk_scaled_dot_kkt_fwd(
-    #     k=k,
-    #     beta=beta,
-    #     g_cumsum=g,
-    #     cu_seqlens=cu_seqlens,
-    #     output_dtype=torch.float32
-    # )
+    nan_count = torch.isnan(g).sum()
+    print("g nan_count:", nan_count)
     A = chunked_scaled_dot_ktt(k, beta, g)
-    # torch.cuda.synchronize()
-    # end_time = time.time()
-    # print("chunk_scaled_dot_kkt_fwd time:", end_time - start_time)
-    # start_time = time.time()
-    
-    A = A.reshape(1, -1, A.shape[-2], A.shape[-1])
-    # print("A shape:", A.shape)
-    # A = solve_tril(
-    #     A=A,
-    #     cu_seqlens=cu_seqlens,
-    #     output_dtype=k.dtype
-    # )
-    A = tl_solve_tril(A)
-    A = A.reshape(batch_size, -1, A.shape[-2], A.shape[-1])
-    # torch.cuda.synchronize()
-    # end_time = time.time()
-    # print("solve_tril time:", end_time - start_time)
-    # start_time = time.time()
-    # w, u = recompute_w_u_fwd(
-    #     k=k,
-    #     v=v,
-    #     beta=beta,
-    #     A=A,
-    #     g_cumsum=g,
-    #     cu_seqlens=cu_seqlens,
-    # )
+    nan_count = torch.isnan(A).sum()
+    print("A nan_count:", nan_count)
+    A = solve_tril(A, cu_seqlens, output_dtype=k.dtype)
+    nan_count = torch.isnan(A).sum()
+    print("A nan_count:", nan_count)
     w, u = tl_recompute_wu_forward(k, v, beta, g, A)
-    # torch.cuda.synchronize()
-    # end_time = time.time()
-    # print("recompute_w_u_fwd time:", end_time - start_time)
-    # start_time = time.time()
-    # print("k shape:", k.shape)
-    # print("w shape:", w.shape)
-    # print("u shape:", u.shape)
-    # print("g shape:", g.shape)
+    nan_count = torch.isnan(w).sum()
+    print("w nan_count:", nan_count)
+    nan_count = torch.isnan(u).sum()
+    print("u nan_count:", nan_count)
+    print("k shape:", k.shape)
+    print("w shape:", w.shape)
+    print("u shape:", u.shape)
+    print("g shape:", g.shape)
+    h, v_new, final_state = chunk_gated_delta_rule_fwd_h(k, w, u, g, None,
+                                                                     True, 64,
+                                                                     True)
+    # h, v_new, final_state = tilelang_chunk_gated_delta_rule(k, w, u, g, initial_state, output_final_state)
+    nan_count = torch.isnan(h).sum()
+    print("h nan_count:", nan_count)
+    nan_count = torch.isnan(v_new).sum()
+    print("v_new nan_count:", nan_count)
+    nan_count = torch.isnan(final_state).sum()
+    print("final_state nan_count:", nan_count)
+    output = chunk_fwd_o(q, k, v_new, h, g, scale, cu_seqlens)
+    nan_count = torch.isnan(output).sum()
+    print("output nan_count:", nan_count)
+    return output, final_state
 
-    # h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
-    #     k=k,
-    #     w=w,
-    #     u=u,
-    #     g=g,
-    #     initial_state=initial_state,
-    #     output_final_state=output_final_state,
-    #     cu_seqlens=cu_seqlens,
-    # )
-    h,  v_new, final_state = tilelang_chunk_gated_delta_rule(batch_size, k, w, u, g, output_final_state, chunk_size=64, save_new_value=True)
-    # print("h shape:", h.shape)
-    # print("v_new shape:", v_new.shape)
-    # print("final_state shape:", final_state.shape)
-    # torch.cuda.synchronize()
-    # end_time = time.time()
-    # print("chunk_gated_delta_rule_fwd_h time:", end_time - start_time)
-    # start_time = time.time()
-    # print("v_new shape:", v_new.shape)
-    # o = chunk_fwd_o(
-    #     q=q,
-    #     k=k,
-    #     v=v_new,
-    #     h=h,
-    #     g=g,
-    #     scale=scale,
-    #     cu_seqlens=cu_seqlens,
-    # )
-    o = chunk_fwd_o(q, k, v_new, h, g, scale)
-    # torch.cuda.synchronize()
-    # end_time = time.time()
-    # print("chunk_fwd_o time:", end_time - start_time)
-    o = o.reshape(1, -1, o.shape[-2], o.shape[-1])
-    return g, o, A, final_state
+
+if __name__ == "__main__":
+    # kernel = tilelang_chunk_scaled_matmul_fwd(1, 1024, 12, 96)
+    # kernel = tilelang_chunk_scaled_dot_kkt_fwd(2, 1024, 12, 96)
+    # 修改维度：DK 和 DV 从 96 改为 128，避免 warp_m=24 的布局推断错误
+    q = torch.randn(1, 2048, 12, 96, dtype=torch.bfloat16).cuda()
+    k = torch.randn(1, 2048, 12, 96, dtype=torch.bfloat16).cuda()
+    v = torch.randn(1, 2048, 12, 256, dtype=torch.bfloat16).cuda()
+    beta = torch.randn(1, 2048, 12, dtype=torch.bfloat16).cuda()
+    g = torch.randn(1, 2048, 12, dtype=torch.float32).cuda()
+    scale = 0.102
+    initial_state = None
+    output_final_state = True
+    cu_seqlens = torch.tensor([0, 1024, 2048]).cuda().to(torch.int32)
+    output = tl_chunk_gated_delta_rule(q, k, v, g, beta, scale, initial_state, output_final_state, cu_seqlens)
+    # output = kernel(k, beta, g)
+    # print(output)
+    # kernel1 = tilelang_chunk_scaled_matmul_fwd(1, 1024, 12, 96)
+    # output1 = kernel1(k, beta, g)
+    # print(output1)
+
+    # g = torch.randn(1, 32768, 32, dtype=torch.bfloat16).cuda()
+    # output = chunk_cumsum(g)
+    # print(output)

@@ -20,7 +20,7 @@ import random
 import numpy as np
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from server_models import JetNemotronForCausalLM, JetNemotronConfig
+from edge_models import JetNemotronForCausalLM, JetNemotronConfig
 
 def main():
     parser = argparse.ArgumentParser(description="Generate text using local Jet-Nemotron")

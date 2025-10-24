@@ -42,7 +42,7 @@ def tl_chunk_cumsum(
     ):
         with T.Kernel(T.ceildiv(Token, Block_T), B * H, threads=threads) as (bt, bbh):
             bb, bh = bbh // H, bbh % H
-            InputG_shared = T.alloc_shared((Block_T), dtype=input_dtype)
+            InputG_shared = T.alloc_shared((Block_T), dtype=input_dtype, scope="shared")
             InputG_fragment = T.alloc_fragment((Block_T), dtype=output_dtype)
             # unable to use TMA
             # T.copy(InputG[bb, bt * Block_T:(bt + 1) * Block_T, bh], InputG_shared)
@@ -114,7 +114,7 @@ def tilelang_chunk_scaled_dot_kkt_fwd(
         with T.Kernel(T.ceildiv(S, block_S), B * H, threads=threads) as (bs, bbh):
             bb, bh = bbh // H, bbh % H
             # !! Pay attention to the scope of the shared memory: may cause misaligned address when shape is one dimension or the buffer is too small
-            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype )
+            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype)
             K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
             A_shared = T.alloc_shared((block_S, block_S), dtype=output_dtype)
             Beta_K_fragment = T.alloc_fragment((block_S, block_DK), dtype=input_dtype)
