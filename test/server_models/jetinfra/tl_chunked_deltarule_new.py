@@ -655,8 +655,8 @@ def chunk_gated_delta_rule_fwd(
     output_final_state: bool,
     cu_seqlens: Optional[torch.LongTensor] = None
 ):
-    q = l2norm_fwd(q)
-    k = l2norm_fwd(k)
+    # q = l2norm_fwd(q)
+    # k = l2norm_fwd(k)
     q = q.reshape(batch_size, -1, q.shape[-2], q.shape[-1])
     k = k.reshape(batch_size, -1, k.shape[-2], k.shape[-1])
     v = v.reshape(batch_size, -1, v.shape[-2], v.shape[-1])
