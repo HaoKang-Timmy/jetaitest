@@ -27,7 +27,7 @@ def get_configs():
     } for c in _configs]
     return configs
 #### TODO Fp8 loading, load multiple heads to enlarge block size, tensore core process instead of cuda core. We need to put norm in matmul.
-@autotune(configs=get_configs(), warmup=10, rep=10)
+# @autotune(configs=get_configs(), warmup=10, rep=10)
 @tilelang.jit(
     out_idx = [-1],
 )
@@ -43,7 +43,7 @@ def fused_recurrent(
     dtype = "bfloat16",
     accum_dtype = "float32",
     block_K=128, 
-    block_V=128, 
+    block_V=32, 
     num_stages=3, 
 
     threads=256

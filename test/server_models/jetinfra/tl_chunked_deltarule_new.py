@@ -16,6 +16,7 @@ from fla.ops.common.chunk_scaled_dot_kkt import chunk_scaled_dot_kkt_fwd
 from fla.ops.gated_delta_rule.wy_fast import prepare_wy_repr_bwd, recompute_w_u_fwd
 from fla.ops.utils import chunk_local_cumsum, solve_tril
 from fla.utils import autocast_custom_bwd, autocast_custom_fwd, input_guard
+from fla.modules.l2norm import l2norm_fwd
 import time
 @tilelang.jit(
     out_idx=[-1]
@@ -654,6 +655,8 @@ def chunk_gated_delta_rule_fwd(
     output_final_state: bool,
     cu_seqlens: Optional[torch.LongTensor] = None
 ):
+    q = l2norm_fwd(q)
+    k = l2norm_fwd(k)
     q = q.reshape(batch_size, -1, q.shape[-2], q.shape[-1])
     k = k.reshape(batch_size, -1, k.shape[-2], k.shape[-1])
     v = v.reshape(batch_size, -1, v.shape[-2], v.shape[-1])

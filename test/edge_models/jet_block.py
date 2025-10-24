@@ -29,8 +29,8 @@ from einops import rearrange
 
 from fla.layers.utils import get_unpad_data, index_first_axis, pad_input
 from fla.modules import FusedRMSNormGated
-# from fla.ops.gated_delta_rule import (chunk_gated_delta_rule,
-#                                       fused_recurrent_gated_delta_rule)
+from fla.ops.gated_delta_rule import (chunk_gated_delta_rule,
+                                      fused_recurrent_gated_delta_rule)
 
 
 from .dynamic_conv import DynamicShortConvolution
@@ -231,32 +231,32 @@ class JetBlock(nn.Module):
                 hidden_states = index_first_axis(rearrange(hidden_states, "b s ... -> (b s) ..."), indices).unsqueeze(0)
             
             q, k = map(lambda x: rearrange(x, '... (h d) -> ... h d', d=self.head_k_dim), (q, k))
-            # o, recurrent_state = chunk_gated_delta_rule(
-            #     q=q,
-            #     k=k,
-            #     v=v,
-            #     g=g,
-            #     beta=beta,
-            #     initial_state=recurrent_state,
-            #     output_final_state=use_cache,
-            #     cu_seqlens=cu_seqlens,
-            #     use_qk_l2norm_in_kernel=True,
-            #     autotune_interval=self.autotune_interval
-            # )
-            scale = k.shape[-1] ** -0.5
-            _, o, _, recurrent_state = chunk_gated_delta_rule_fwd(
-                batch_size=batch_size,
+            o, recurrent_state = chunk_gated_delta_rule(
                 q=q,
                 k=k,
                 v=v,
                 g=g,
                 beta=beta,
-                scale=scale,
                 initial_state=recurrent_state,
                 output_final_state=use_cache,
                 cu_seqlens=cu_seqlens,
-
+                use_qk_l2norm_in_kernel=True,
+                autotune_interval=self.autotune_interval
             )
+            # scale = k.shape[-1] ** -0.5
+            # _, o, _, recurrent_state = chunk_gated_delta_rule_fwd(
+            #     batch_size=batch_size,
+            #     q=q,
+            #     k=k,
+            #     v=v,
+            #     g=g,
+            #     beta=beta,
+            #     scale=scale,
+            #     initial_state=recurrent_state,
+            #     output_final_state=use_cache,
+            #     cu_seqlens=cu_seqlens,
+
+            # )
         elif mode == 'fused_recurrent':
             # q = F.silu(self.q_proj(hidden_states))
             # k = F.silu(self.k_proj(hidden_states))

@@ -109,7 +109,7 @@ def _linear_kernel(
                     T.gemm(Input_shared, W_T_shared, output_reg, transpose_B=True)
     
                 silu(output_reg)
-                L2Norm_QK(output_reg)
+                # L2Norm_QK(output_reg)
                 T.copy(output_reg, output_shared)
                 T.copy(output_shared, Output[bx * block_M, by * block_N])
         
