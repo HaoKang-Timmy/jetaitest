@@ -19,7 +19,307 @@ from fla.utils import autocast_custom_bwd, autocast_custom_fwd, input_guard
 from fla.modules.l2norm import l2norm_fwd
 import time
 
-from .tl_trilcompute import tl_solve_tril
+
+@tilelang.jit()
+def solve_tril_16x16(        
+    B: int,
+    Token: int,
+    H: int,
+    BT: int,
+    NT: int,
+    input_dtype = "float32",
+    accum_dtype = "float32",
+    output_dtype = "float32",
+    ):
+    assert BT in [16, 32, 64]
+    # B, Token, H, BT = A.shape
+    # chunk_indices = prepare_chunk_indices(cu_seqlens, 16) if cu_seqlens is not None else None
+    # NT = len(chunk_indices) if cu_seqlens is not None else cdiv(Token, 16)
+    @T.prim_func
+    def main(
+        A: T.Tensor([B, Token, H, BT], input_dtype),
+        Ad: T.Tensor([B, Token, H, 16], output_dtype),
+    
+    ):
+        with T.Kernel(NT, B * H) as (i_t, i_bh):
+            i_b, ih = i_bh // H, i_bh % H
+            # i_n, i_tc = chunk_indices[i_t, 0], chunk_indices[i_t, 1]
+            # bos, eos = cu_seqlens[i_n], cu_seqlens[i_n + 1]
+            # seq = eos - bos
+            offset = (i_t * 16) % BT
+            # offset = i_t * 16
+            
+
+            A_shared = T.alloc_shared((16, 16), dtype=accum_dtype, scope="shared")
+            # A_fragment = T.alloc_fragment((16, 16), dtype=accum_dtype)
+            reduce_fragment1 = T.alloc_fragment((16, 16), dtype=accum_dtype)
+            reduce_fragment2 = T.alloc_fragment((16), dtype=accum_dtype)
+            a_shared = T.alloc_shared((16), dtype=accum_dtype, scope="shared")
+            a_fragment = T.alloc_fragment((16), dtype=accum_dtype)
+
+            T.copy(A[i_b, i_t * 16:(i_t + 1) * 16, ih, offset:offset + 16], A_shared)
+            # T.copy(A_shared, A_fragment)
+            for i, j in T.Parallel(16, 16):
+                A_shared[i, j] = T.if_then_else(i >j, -A_shared[i, j], 0)
+                
+            for i in T.serial(1, T.min(16, Token - i_t * 16)):
+                T.copy(A[i_b, i_t * 16 + i, ih, offset:offset + 16], a_shared)
+                T.copy(a_shared, a_fragment)
+                for j in T.Parallel(16):
+                    a_fragment[j] = -a_fragment[j]
+                # for j in T.Parallel(16):
+                #     a_fragment[j] = A[i_b, i_t * 16 + i, ih, offset:offset + j]
+                for ii, j in T.Parallel(16, 16):
+                    reduce_fragment1[ii, j] = A_shared[ii, j] * a_fragment[ii]
+                T.reduce_sum(reduce_fragment1, reduce_fragment2, dim = 0)
+                for j in T.Parallel(16):
+                    a_fragment[j] = a_fragment[j] + reduce_fragment2[j]
+                for j in T.Parallel(16):
+                    A_shared[i, j] = a_fragment[j]
+
+            # T.copy(A_fragment, A_shared)
+            for i in T.Parallel(16):
+                A_shared[i, i] = A_shared[i, i] + 1.0
+            
+            T.copy(A_shared, Ad[i_b, i_t * 16:(i_t + 1) * 16, ih, :])
+    return main
+
+@tilelang.jit(
+pass_configs={
+        tilelang.PassConfigKey.TL_DISABLE_TMA_LOWER: True,
+        tilelang.PassConfigKey.TL_DISABLE_WARP_SPECIALIZED: True
+    })
+def tl_merge_16x16_to_64x64_inverse_kernel(
+    B: int,
+    Token: int,
+    H: int,
+    BT: int,
+    NT: int,
+    input_dtype = "float32",
+    accum_dtype = "float32",
+    output_dtype = "bfloat16",
+):
+
+    @T.macro
+    def gemm_inverse(
+        mat_a: T.SharedBuffer([16, 16], input_dtype),
+        mat_b: T.SharedBuffer([16, 16], input_dtype),
+        mat_c: T.SharedBuffer([16, 16], input_dtype),
+        tmp_reg1: T.FragmentBuffer([16, 16], accum_dtype),
+        tmp_reg2: T.FragmentBuffer([16, 16], accum_dtype),
+        tmp_shared: T.SharedBuffer([16, 16], input_dtype),
+        out_shared: T.SharedBuffer([16, 16], input_dtype),
+    ):
+        # tmp_reg1 = mat_a @ mat_b
+        T.clear(tmp_reg1)
+        T.gemm(mat_a, mat_b, tmp_reg1, transpose_B=False)
+        # Write back to shared memory to break layout dependency (manual copy)
+        for i, j in T.Parallel(16, 16):
+            tmp_shared[i, j] = tmp_reg1[i, j]
+        # tmp_reg2 = tmp_shared @ mat_c = (mat_a @ mat_b) @ mat_c
+        T.clear(tmp_reg2)
+        T.gemm(tmp_shared, mat_c, tmp_reg2, transpose_B=False)
+        # out_shared = -(mat_a @ mat_b @ mat_c)
+        for i, j in T.Parallel(16, 16):
+            tmp_reg2[i, j] = -tmp_reg2[i, j] 
+        T.copy(tmp_reg2, out_shared)
+    @T.macro
+    def multigemm1(
+        mat_a: T.SharedBuffer([16, 16], input_dtype),
+        mat_b: T.SharedBuffer([16, 16], input_dtype),
+        mat_c: T.SharedBuffer([16, 16], input_dtype),
+        mat_d: T.SharedBuffer([16, 16], input_dtype),
+        mat_e: T.SharedBuffer([16, 16], input_dtype),
+        tmp_reg1: T.FragmentBuffer([16, 16], accum_dtype),
+        tmp_reg2: T.FragmentBuffer([16, 16], accum_dtype),
+        tmp_shared: T.SharedBuffer([16, 16], input_dtype),
+        out_shared: T.SharedBuffer([16, 16], input_dtype),
+    ):
+        T.clear(tmp_reg1)
+        T.gemm(mat_a, mat_b, tmp_reg1, transpose_B=False)
+        T.gemm(mat_c, mat_d, tmp_reg1, transpose_B=False)
+        # Write back to shared memory to break layout dependency (manual copy)
+        for i, j in T.Parallel(16, 16):
+            tmp_shared[i, j] = tmp_reg1[i, j]
+        T.clear(tmp_reg2)
+        T.gemm(mat_e, tmp_shared, tmp_reg2, transpose_B=False)
+        for i, j in T.Parallel(16, 16):
+            tmp_reg2[i, j] = -tmp_reg2[i, j] 
+        T.copy(tmp_reg2, out_shared)
+    
+    @T.macro
+    def multigemm2(
+        mat_a: T.SharedBuffer([16, 16], input_dtype),
+        mat_b: T.SharedBuffer([16, 16], input_dtype),
+        mat_c: T.SharedBuffer([16, 16], input_dtype),
+        mat_d: T.SharedBuffer([16, 16], input_dtype),
+        mat_e: T.SharedBuffer([16, 16], input_dtype),
+        mat_f: T.SharedBuffer([16, 16], input_dtype),
+        mat_g: T.SharedBuffer([16, 16], input_dtype),
+        tmp_reg1: T.FragmentBuffer([16, 16], accum_dtype),
+        tmp_reg2: T.FragmentBuffer([16, 16], accum_dtype),
+        tmp_shared: T.SharedBuffer([16, 16], input_dtype),
+        out_shared: T.SharedBuffer([16, 16], input_dtype),
+    ):
+        T.clear(tmp_reg1)
+        T.gemm(mat_a, mat_b, tmp_reg1, transpose_B=False)
+        T.gemm(mat_c, mat_d, tmp_reg1, transpose_B=False)
+        T.gemm(mat_e, mat_f, tmp_reg1, transpose_B=False)
+        # Write back to shared memory to break layout dependency (manual copy)
+        for i, j in T.Parallel(16, 16):
+            tmp_shared[i, j] = tmp_reg1[i, j]
+        T.clear(tmp_reg2)
+        T.gemm(mat_g, tmp_shared, tmp_reg2, transpose_B=False)
+        for i, j in T.Parallel(16, 16):
+            tmp_reg2[i, j] = -tmp_reg2[i, j] 
+        T.copy(tmp_reg2, out_shared)
+    @T.prim_func
+    def main(
+        A: T.Tensor([B, Token, H, BT], input_dtype),
+        Ad: T.Tensor([B, Token, H, 16], input_dtype),
+        Ai: T.Tensor([B, Token, H, 64], output_dtype),
+    ):
+        with T.Kernel(NT, B * H,threads=32) as (i_t, i_bh):
+            i_b, ih = i_bh // H, i_bh % H
+            
+            # Allocate shared memory for all blocks
+            A_21_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            A_32_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            A_31_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            A_43_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            A_42_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            A_41_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+
+            Ad_11_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            Ad_22_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            Ad_33_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            Ad_44_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            Ad_21_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            Ad_32_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            Ad_43_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            Ad_31_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            Ad_42_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            Ad_41_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            
+            # Temporary shared buffers for intermediate results
+            gemm_inv_tmp_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            multigemm1_tmp_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            multigemm2_tmp_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            
+            # Fragment buffers for gemm_inverse macro
+            gemm_inv_reg1 = T.alloc_fragment((16, 16), dtype=accum_dtype)
+            gemm_inv_reg2 = T.alloc_fragment((16, 16), dtype=accum_dtype)
+            
+            # Fragment buffers for multigemm1 macro
+            multigemm1_reg1 = T.alloc_fragment((16, 16), dtype=accum_dtype)
+            multigemm1_reg2 = T.alloc_fragment((16, 16), dtype=accum_dtype)
+            
+            # Fragment buffers for multigemm2 macro
+            multigemm2_reg1 = T.alloc_fragment((16, 16), dtype=accum_dtype)
+            multigemm2_reg2 = T.alloc_fragment((16, 16), dtype=accum_dtype)
+            # Load blocks from A tensor
+            # p_A_21: (i_t * 64 + 16, 0), shape (16, 16) - rows [i_t*64+16:i_t*64+32], cols [0:16]
+            T.copy(A[i_b, i_t * 64 + 16:i_t * 64 + 32, ih, 0:16], A_21_shared)
+            
+            # p_A_32: (i_t * 64 + 32, 16), shape (16, 16) - rows [i_t*64+32:i_t*64+48], cols [16:32]
+            T.copy(A[i_b, i_t * 64 + 32:i_t * 64 + 48, ih, 16:32], A_32_shared)
+            
+            # p_A_31: (i_t * 64 + 32, 0), shape (16, 16) - rows [i_t*64+32:i_t*64+48], cols [0:16]
+            T.copy(A[i_b, i_t * 64 + 32:i_t * 64 + 48, ih, 0:16], A_31_shared)
+            
+            # p_A_43: (i_t * 64 + 48, 32), shape (16, 16) - rows [i_t*64+48:i_t*64+64], cols [32:48]
+            T.copy(A[i_b, i_t * 64 + 48:i_t * 64 + 64, ih, 32:48], A_43_shared)
+            
+            # p_A_42: (i_t * 64 + 48, 16), shape (16, 16) - rows [i_t*64+48:i_t*64+64], cols [16:32]
+            T.copy(A[i_b, i_t * 64 + 48:i_t * 64 + 64, ih, 16:32], A_42_shared)
+            
+            # p_A_41: (i_t * 64 + 48, 0), shape (16, 16) - rows [i_t*64+48:i_t*64+64], cols [0:16]
+            T.copy(A[i_b, i_t * 64 + 48:i_t * 64 + 64, ih, 0:16], A_41_shared)
+            
+            # Load blocks from Ad tensor (diagonal blocks)
+            # p_Ad_11: (i_t * 64, 0), shape (16, 16) - rows [i_t*64:i_t*64+16], cols [0:16]
+            T.copy(Ad[i_b, i_t * 64:i_t * 64 + 16, ih, 0:16], Ad_11_shared)
+            
+            # p_Ad_22: (i_t * 64 + 16, 0), shape (16, 16) - rows [i_t*64+16:i_t*64+32], cols [0:16]
+            T.copy(Ad[i_b, i_t * 64 + 16:i_t * 64 + 32, ih, 0:16], Ad_22_shared)
+            
+            # p_Ad_33: (i_t * 64 + 32, 0), shape (16, 16) - rows [i_t*64+32:i_t*64+48], cols [0:16]
+            T.copy(Ad[i_b, i_t * 64 + 32:i_t * 64 + 48, ih, 0:16], Ad_33_shared)
+            
+            # p_Ad_44: (i_t * 64 + 48, 0), shape (16, 16) - rows [i_t*64+48:i_t*64+64], cols [0:16]
+            T.copy(Ad[i_b, i_t * 64 + 48:i_t * 64 + 64, ih, 0:16], Ad_44_shared)
+
+            # Ai_21 = -(Ai_22 @ A_21 @ Ai_11)
+            gemm_inverse(Ad_22_shared, A_21_shared, Ad_11_shared, gemm_inv_reg1, gemm_inv_reg2, gemm_inv_tmp_shared, Ad_21_shared)
+            # Ai_32 = -(Ai_33 @ A_32 @ Ai_22)
+            gemm_inverse(Ad_33_shared, A_32_shared, Ad_22_shared, gemm_inv_reg1, gemm_inv_reg2, gemm_inv_tmp_shared, Ad_32_shared)
+            # Ai_43 = -(Ai_44 @ A_43 @ Ai_33)
+            gemm_inverse(Ad_44_shared, A_43_shared, Ad_33_shared, gemm_inv_reg1, gemm_inv_reg2, gemm_inv_tmp_shared, Ad_43_shared)
+
+            multigemm1(A_31_shared, Ad_11_shared, A_32_shared, Ad_21_shared, Ad_33_shared, multigemm1_reg1, multigemm1_reg2, multigemm1_tmp_shared, Ad_31_shared)
+
+            multigemm1(A_42_shared, Ad_22_shared, A_43_shared, Ad_32_shared, Ad_44_shared, multigemm1_reg1, multigemm1_reg2, multigemm1_tmp_shared, Ad_42_shared)
+
+            multigemm2(A_41_shared, Ad_11_shared, A_42_shared, Ad_21_shared, A_43_shared, Ad_31_shared, Ad_44_shared, multigemm2_reg1, multigemm2_reg2, multigemm2_tmp_shared, Ad_41_shared)
+
+            # Store results back to Ai tensor
+            # p_Ai_11: (i_t * 64, 0), shape (16, 16) - rows [i_t*64:i_t*64+16], cols [0:16]
+            T.copy(Ad_11_shared, Ai[i_b, i_t * 64:i_t * 64 + 16, ih, 0:16])
+            
+            # p_Ai_22: (i_t * 64 + 16, 16), shape (16, 16) - rows [i_t*64+16:i_t*64+32], cols [16:32]
+            T.copy(Ad_22_shared, Ai[i_b, i_t * 64 + 16:i_t * 64 + 32, ih, 16:32])
+            
+            # p_Ai_33: (i_t * 64 + 32, 32), shape (16, 16) - rows [i_t*64+32:i_t*64+48], cols [32:48]
+            T.copy(Ad_33_shared, Ai[i_b, i_t * 64 + 32:i_t * 64 + 48, ih, 32:48])
+            
+            # p_Ai_44: (i_t * 64 + 48, 48), shape (16, 16) - rows [i_t*64+48:i_t*64+64], cols [48:64]
+            T.copy(Ad_44_shared, Ai[i_b, i_t * 64 + 48:i_t * 64 + 64, ih, 48:64])
+            
+            # p_Ai_21: (i_t * 64 + 16, 0), shape (16, 16) - rows [i_t*64+16:i_t*64+32], cols [0:16]
+            T.copy(Ad_21_shared, Ai[i_b, i_t * 64 + 16:i_t * 64 + 32, ih, 0:16])
+            
+            # p_Ai_31: (i_t * 64 + 32, 0), shape (16, 16) - rows [i_t*64+32:i_t*64+48], cols [0:16]
+            T.copy(Ad_31_shared, Ai[i_b, i_t * 64 + 32:i_t * 64 + 48, ih, 0:16])
+            
+            # p_Ai_32: (i_t * 64 + 32, 16), shape (16, 16) - rows [i_t*64+32:i_t*64+48], cols [16:32]
+            T.copy(Ad_32_shared, Ai[i_b, i_t * 64 + 32:i_t * 64 + 48, ih, 16:32])
+            
+            # p_Ai_41: (i_t * 64 + 48, 0), shape (16, 16) - rows [i_t*64+48:i_t*64+64], cols [0:16]
+            T.copy(Ad_41_shared, Ai[i_b, i_t * 64 + 48:i_t * 64 + 64, ih, 0:16])
+            
+            # p_Ai_42: (i_t * 64 + 48, 16), shape (16, 16) - rows [i_t*64+48:i_t*64+64], cols [16:32]
+            T.copy(Ad_42_shared, Ai[i_b, i_t * 64 + 48:i_t * 64 + 64, ih, 16:32])
+            
+            # p_Ai_43: (i_t * 64 + 48, 32), shape (16, 16) - rows [i_t*64+48:i_t*64+64], cols [32:48]
+            T.copy(Ad_43_shared, Ai[i_b, i_t * 64 + 48:i_t * 64 + 64, ih, 32:48])
+    
+    return main
+
+def tl_solve_tril(
+    A: torch.Tensor,
+    output_dtype: torch.dtype = torch.float,
+    NT1: int = 16,
+    NT2: int = 64,
+)-> torch.Tensor:
+    assert A.shape[-1] in [16, 32, 64]
+    B, T, H, BT = A.shape
+    Ad = torch.empty(B, T, H, NT1, device=A.device, dtype= torch.float)
+    kernel_solve_tril = solve_tril_16x16(B, T, H, BT, NT1)
+    kernel_solve_tril(A, Ad)
+    Ai = torch.zeros(B, T, H, NT2, device=A.device, dtype= torch.bfloat16)
+    kernel_merge_16x16_to_64x64_inverse = tl_merge_16x16_to_64x64_inverse_kernel(B, T, H, BT, NT2)
+
+    kernel_merge_16x16_to_64x64_inverse(A, Ad, Ai)
+    return Ai
+
+def check_tensors_and_compute_errors(t1, names=None):
+
+    has_nan_1 = torch.isnan(t1).any().item()
+    has_inf_1 = torch.isinf(t1).any().item()
+    # print(f"{names} has_inf_1: {has_inf_1}")
+    print(f"{names} has_nan_1: {has_nan_1}")
+   
+
 @tilelang.jit(
     out_idx=[-1]
 )
@@ -302,9 +602,14 @@ def  tl_recompute_wu_forward(
     accum_dtype = "float32",
     )
     w, u  = kernel(k, v, beta, g_cumsum, A)
-    return w, u
+    return w, u 
 
-@tilelang.jit(out_idx=[-3, -2, -1])
+@tilelang.jit(
+    pass_configs={
+        tilelang.PassConfigKey.TL_DISABLE_TMA_LOWER: True,
+        tilelang.PassConfigKey.TL_DISABLE_WARP_SPECIALIZED: True
+    }
+)
 def tilelang_chunk_gated_delta_rule_fwd_h(
     # task config
     B,
@@ -325,7 +630,7 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
     # kernel config
     block_DK=128,
     block_DV=32,
-    threads=256,
+    threads=128,
     num_stages=2,
 ):
     block_S = chunk_size
@@ -348,15 +653,16 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
             G: T.Tensor(G_shape, dtype=gate_dtype),
             # initial_state: T.Tensor(initial_state_shape, dtype=input_dtype),
             h: T.Tensor(h_shape, dtype=output_dtype),
-            final_state: T.Tensor(final_state_shape, dtype=state_dtype),
+            
             V_new: T.Tensor(V_shape, dtype=output_dtype),
+            final_state: T.Tensor(final_state_shape, dtype=state_dtype),
     ):
         with T.Kernel(T.ceildiv(DV, block_DV), B * H, threads=threads) as (bv, bbh):
             bb, bh = bbh // H, bbh % H
 
             # b_h_shared = T.alloc_shared((DK, block_DV), dtype=input_dtype)
             # b_h_fragment = T.alloc_fragment((DK, block_DV), dtype=accum_dtype)
-            b_h_shared = T.alloc_shared((block_DK, block_DV), dtype=input_dtype)
+            b_h_shared = T.alloc_shared((block_DK, block_DV), dtype=output_dtype)
             b_h_fragment = T.alloc_fragment((block_DK, block_DV), dtype=accum_dtype)
 
             U_shared = T.alloc_shared((block_S, block_DV), dtype=input_dtype)
@@ -390,29 +696,31 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
             T.copy(b_h_fragment, b_h_shared)
 
             for i_s in T.Pipelined(T.ceildiv(S, block_S), num_stages=num_stages):
+            # for i_s in T.serial(T.ceildiv(S, block_S)):
                 # Store previous result to the hidden tensor, like the epilogue
                 T.copy(b_h_shared[0:DK, 0:block_DV], h[bb, i_s, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
-                # for i, j in T.Parallel(DK, block_DV):
-                #     h[bb, i_s, bh, i, bv * block_DV + j] = b_h_shared[i, j]
-
-                # Recurrence
-                # T.copy(W[bb, i_s * block_S:(i_s + 1) * block_S, bh, 0:DK], W_shared)
+                s_shift = T.min(block_S, S - i_s * block_S)
+                d_shift = T.min(block_DK, DK)
                 for i, j in T.Parallel(block_S, block_DK):
-                    # with T.If(i_s * block_S + i < S and j < block_DK):
-                    #     with T.Then():
-                    #         W_shared[i, j] = W[bb, i_s * block_S + i, bh, j]
-                    #     with T.Else():
-                    #         W_shared[i, j] = 0
-                    W_shared[i, j] = W[bb, i_s * block_S + i, bh, j]
+                    with T.If(i < s_shift and j < d_shift):
+                        with T.Then():
+                            W_shared[i, j] = W[bb, i_s * block_S + i, bh, j]
+                        with T.Else():
+                            W_shared[i, j] = 0.0
                 
                 T.gemm(W_shared, b_h_shared, V_new_fragment, clear_accum=True)
+
                 # U - W * S
                 T.copy(
                     U[bb, i_s * block_S:(i_s + 1) * block_S, bh, bv * block_DV:(bv + 1) * block_DV],
                     U_shared)
                 T.copy(U_shared, U_fragment)
                 for i_s2, i_v in T.Parallel(block_S, block_DV):
-                    V_new_fragment[i_s2, i_v] = -V_new_fragment[i_s2, i_v] + U_fragment[i_s2, i_v]
+                    with T.If(i_s2 < s_shift):
+                        with T.Then():
+                            V_new_fragment[i_s2, i_v] = -V_new_fragment[i_s2, i_v] + U_fragment[i_s2, i_v]
+                        with T.Else():
+                            V_new_fragment[i_s2, i_v] = 0.0
 
                 # Save V_new
                 if save_new_value:
@@ -421,21 +729,32 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
                         V_new_shared, V_new[bb, i_s * block_S:(i_s + 1) * block_S, bh,
                                             bv * block_DV:(bv + 1) * block_DV])
 
-                # T.copy(K[bb, i_s * block_S:(i_s + 1) * block_S, bh, 0:DK], K_shared[0:block_S, 0:DK])
                 for i, j in T.Parallel(block_S, DK):
-                    K_shared[i, j] = K[bb, i_s * block_S + i, bh, j]
+                    with T.If(i < s_shift and j < d_shift):
+                        with T.Then():
+                            K_shared[i, j] = K[bb, i_s * block_S + i, bh, j]
+                        with T.Else():
+                            K_shared[i, j] = 0.0
                 # use_g
                 if use_g:
                     last_idx = T.min((i_s + 1) * block_S, S) - 1
                     G_last_local[0] = G[bb, last_idx, bh]
                     for i_s2, i_v in T.Parallel(block_S, block_DV):
-                        G_shared[i_s2, i_v] = G[bb, i_s * block_S + i_s2, bh]
+                        with T.If(i_s2 < s_shift):
+                            with T.Then():
+                                G_shared[i_s2, i_v] = G[bb, i_s * block_S + i_s2, bh]
+                            with T.Else():
+                                G_shared[i_s2, i_v] = 0.0
                     T.copy(G_shared, G_fragment)
                     for i_s2, i_v in T.Parallel(block_S, block_DV):
-                        with T.If(G_last_local[0] - G_fragment[i_s2, i_v] <= 0):
+                        with T.If(i_s2 < s_shift):
                             with T.Then():
-                                V_new_fragment[i_s2, i_v] = V_new_fragment[i_s2, i_v] * T.exp(
-                                    G_last_local[0] - G_fragment[i_s2, i_v])
+                                with T.If(G_last_local[0] - G_fragment[i_s2, i_v] <= 0):
+                                    with T.Then():
+                                        V_new_fragment[i_s2, i_v] = V_new_fragment[i_s2, i_v] * T.exp(
+                                            G_last_local[0] - G_fragment[i_s2, i_v])
+                                    with T.Else():
+                                        V_new_fragment[i_s2, i_v] = 0
                             with T.Else():
                                 V_new_fragment[i_s2, i_v] = 0
                     G_last_local[0] = T.exp(G_last_local[0])
@@ -451,8 +770,7 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
             # Save final state
             if store_final_state:
                 T.copy(b_h_fragment[0:DK, 0:block_DV], final_state[bb, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
-                # for i, j in T.Parallel(DK, block_DV):
-                #     b_h_fragment[i, j] = final_state[bb, bh, i, bv * block_DV + j]
+
 
     return kernel
 
@@ -469,7 +787,9 @@ def tilelang_chunk_gated_delta_rule(
 
 ):
     B, Token, H, K, V = *k.shape, u.shape[-1]
-
+    h = k.new_empty(B, (Token + chunk_size - 1) // chunk_size, H, K, V)
+    final_state = k.new_empty(B, H, K, V, dtype=torch.float32) if output_final_state else None
+    v_new = torch.empty_like(u) if save_new_value else None
     kernel = tilelang_chunk_gated_delta_rule_fwd_h(B, Token, H, K, V,
         input_dtype = "bfloat16",
         output_dtype = "bfloat16",
@@ -482,7 +802,7 @@ def tilelang_chunk_gated_delta_rule(
         store_final_state = output_final_state,
         save_new_value = save_new_value,
     )
-    h, final_state, v_new, = kernel(k, w, u, g)
+    kernel(k, w, u, g, h, v_new, final_state)
     
     return h, v_new, final_state
 
@@ -698,34 +1018,73 @@ def chunk_gated_delta_rule_fwd(
     # end_time = time.time()
     # print("solve_tril time:", end_time - start_time)
     # start_time = time.time()
-    w, u = recompute_w_u_fwd(
-        k=k,
-        v=v,
-        beta=beta,
-        A=A,
-        g_cumsum=g,
-        cu_seqlens=cu_seqlens,
-    )
-    # w, u = tl_recompute_wu_forward(k, v, beta, g, A)
-    # torch.cuda.synchronize()
-    # end_time = time.time()
-    # print("recompute_w_u_fwd time:", end_time - start_time)
-    # start_time = time.time()
-    # print("k shape:", k.shape)
-    # print("w shape:", w.shape)
-    # print("u shape:", u.shape)
-    # print("g shape:", g.shape)
+    # w, u = recompute_w_u_fwd(
+    #     k=k,
+    #     v=v,
+    #     beta=beta,
+    #     A=A,
+    #     g_cumsum=g,
+    #     cu_seqlens=cu_seqlens,
+    # )
+    w, u = tl_recompute_wu_forward(k, v, beta, g, A)
 
-    h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
-        k=k,
-        w=w,
-        u=u,
-        g=g,
-        initial_state=initial_state,
-        output_final_state=output_final_state,
-        cu_seqlens=cu_seqlens,
-    )
+
+    # 保存输入的副本，避免被第一个函数修改
+    # k_copy = k.clone()
+    # w_copy = w.clone()
+    # u_copy = u.clone()
+    # g_copy = g.clone()
+    
+    # h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
+    #     k=k_copy,
+    #     w=w_copy,
+    #     u=u_copy,
+    #     g=g_copy,
+    #     initial_state=initial_state,
+    #     output_final_state=output_final_state,
+    #     cu_seqlens=cu_seqlens,
+    # )
+    check_tensors_and_compute_errors(k,"ktest")
+    check_tensors_and_compute_errors(w,"wtest")
+    check_tensors_and_compute_errors(u,"utest")
+    check_tensors_and_compute_errors(g,"gtest")
+    k_cpu = k.cpu()
+    w_cpu = w.cpu()
+    u_cpu = u.cpu()
+    g_cpu = g.cpu()
+    torch.save(k_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/k.pt")
+    torch.save(w_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/w.pt")
+    torch.save(u_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/u.pt")
+    torch.save(g_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/g.pt")
+    
+    h,  v_new, final_state = tilelang_chunk_gated_delta_rule(batch_size, k, w, u, g, output_final_state, chunk_size=64, save_new_value=True)
+    h_cpu = h.cpu()
+    v_new_cpu = v_new.cpu()
+    final_state_cpu = final_state.cpu()
+    check_tensors_and_compute_errors(h,"htest")
+    check_tensors_and_compute_errors(v_new,"v_newtest")
+    check_tensors_and_compute_errors(final_state,"final_statetest")
+    torch.save(h_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/h.pt")
+    torch.save(v_new_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/v_new.pt")
+    torch.save(final_state_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/final_state.pt")
+    print("saved h, v_new, final_state")
+    while True:
+        pass
     # h,  v_new, final_state = tilelang_chunk_gated_delta_rule(batch_size, k, w, u, g, output_final_state, chunk_size=64, save_new_value=True)
+    
+    # h_abs_rel_error = torch.mean(torch.abs(h - h_triton) / (torch.abs(h_triton) + 1e-8)).item()
+    # h_mean_rel_error = torch.mean((h - h_triton) / (torch.abs(h_triton) + 1e-8)).item()
+    # print(f"h - 平均绝对相对误差: {h_abs_rel_error:.6e}, 平均相对误差: {h_mean_rel_error:.6e}")
+    
+    # # v_new的误差
+    # v_new_abs_rel_error = torch.mean(torch.abs(v_new - v_new_triton) / (torch.abs(v_new_triton) + 1e-8)).item()
+    # v_new_mean_rel_error = torch.mean((v_new - v_new_triton) / (torch.abs(v_new_triton) + 1e-8)).item()
+    # print(f"v_new - 平均绝对相对误差: {v_new_abs_rel_error:.6e}, 平均相对误差: {v_new_mean_rel_error:.6e}")
+    
+    # # final_state的误差
+    # final_state_abs_rel_error = torch.mean(torch.abs(final_state - final_state_triton) / (torch.abs(final_state_triton) + 1e-8)).item()
+    # final_state_mean_rel_error = torch.mean((final_state - final_state_triton) / (torch.abs(final_state_triton) + 1e-8)).item()
+    # print(f"final_state - 平均绝对相对误差: {final_state_abs_rel_error:.6e}, 平均相对误差: {final_state_mean_rel_error:.6e}")
     # print("h shape:", h.shape)
     # print("v_new shape:", v_new.shape)
     # print("final_state shape:", final_state.shape)
@@ -734,18 +1093,19 @@ def chunk_gated_delta_rule_fwd(
     # print("chunk_gated_delta_rule_fwd_h time:", end_time - start_time)
     # start_time = time.time()
     # print("v_new shape:", v_new.shape)
-    o = chunk_fwd_o(
-        q=q,
-        k=k,
-        v=v_new,
-        h=h,
-        g=g,
-        scale=scale,
-        cu_seqlens=cu_seqlens,
-    )
-    # o = chunk_fwd_o(q, k, v_new, h, g, scale)
+    # o = chunk_fwd_o(
+    #     q=q,
+    #     k=k,
+    #     v=v_new,
+    #     h=h,
+    #     g=g,
+    #     scale=scale,
+    #     cu_seqlens=cu_seqlens,
+    # )
+    o = chunk_fwd_o(q, k, v_new, h, g, scale)
     # torch.cuda.synchronize()
     # end_time = time.time()
     # print("chunk_fwd_o time:", end_time - start_time)
     o = o.reshape(1, -1, o.shape[-2], o.shape[-1])
+    # print("o", o)
     return g, o, A, final_state

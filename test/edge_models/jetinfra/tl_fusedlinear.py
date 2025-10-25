@@ -38,7 +38,8 @@ def get_configs():
 @tilelang.jit(
     out_idx = [-1],
     pass_configs={
-        tilelang.PassConfigKey.TL_DISABLE_FAST_MATH: False,
+        tilelang.PassConfigKey.TL_DISABLE_TMA_LOWER: True,
+        tilelang.PassConfigKey.TL_DISABLE_WARP_SPECIALIZED: True
     }
 )
 def _linear_kernel(
@@ -88,10 +89,10 @@ def _linear_kernel(
         Output: T.Tensor([Batch * Token, outdim], dtype),
     ):
         with T.Kernel(sm_num, threads=threads) as (block_id):
-            Input_shared = T.alloc_shared((block_M, block_K), dtype)
-            W_T_shared = T.alloc_shared((block_N, block_K), dtype)
+            Input_shared = T.alloc_shared((block_M, block_K), dtype, scope="shared")
+            W_T_shared = T.alloc_shared((block_N, block_K), dtype, scope="shared")
             output_reg = T.alloc_fragment((block_M, block_N), reduce_dtype)
-            output_shared = T.alloc_shared((block_M, block_N), dtype)
+            output_shared = T.alloc_shared((block_M, block_N), dtype, scope="shared")
 
             T.annotate_layout({
                 Input_shared: tilelang.layout.make_swizzled_layout(Input_shared),

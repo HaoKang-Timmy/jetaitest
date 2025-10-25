@@ -26,7 +26,9 @@ def main():
     parser = argparse.ArgumentParser(description="Generate text using local Jet-Nemotron")
     parser.add_argument("--model_path", type=str, default="jet-ai/Jet-Nemotron-2B", 
                        help="Path to the model weights")
-    parser.add_argument("--input_text", type=str, default="Hi, My name is Timmy. I am currently a 3rd year PhD student in Computer Science at Stanford University. I am interested in natural language processing and machine learning. How about you? Do you like to travel? Or do you like to read books? What is your favorite book? What is your favorite travel destination?",
+    # parser.add_argument("--input_text", type=str, default="Hi, My name is Timmy. I am currently a 3rd year PhD student in Computer Science at Stanford University. I am interested in natural language processing and machine learning. How about you? Do you like to travel? Or do you like to read books? What is your favorite book? What is your favorite travel destination? Please",
+    #                    help="Input text for generation")
+    parser.add_argument("--input_text", type=str, default="Hi, My name is Timmy. I am currently a 3rd year PhD student in Computer Science at Stanford University. I am interested in natural language processing and machine learning. How about you? Do you like to travel? Or do you like to read books? What is your favorite book? What is your favorite travel destination? Hi, My name is Timmy. I am currently a 3rd year PhD student in Computer Science at Stanford University. I am interested in natural language processing and machine learning. How about you? Do you like to travel? Or do you like to read books? What is your favorite book? What is your favorite travel destination? Please",
                        help="Input text for generation")
     # parser.add_argument("--input_text", type=str, default="Hi, My name is Timmy.",
                     #    help="Input text for generation")
