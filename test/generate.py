@@ -56,6 +56,12 @@ def main():
     # 设置确定性行为（可能会影响性能）
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+    
+    # 禁用torch.compile和CUDA graphs
+    # torch._dynamo.config.suppress_errors = True
+    # torch._dynamo.config.disable = True
+    # os.environ["TORCH_COMPILE_DISABLE"] = "1"
+    # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"  # 禁用异步执行，间接禁用CUDA graphs
 
     # 初始化tokenizer
     tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)

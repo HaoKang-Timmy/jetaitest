@@ -50,11 +50,11 @@ def solve_tril_16x16(
             # offset = i_t * 16
             
 
-            A_shared = T.alloc_shared((16, 16), dtype=accum_dtype, scope="shared")
+            A_shared = T.alloc_shared((16, 16), dtype=accum_dtype)
             # A_fragment = T.alloc_fragment((16, 16), dtype=accum_dtype)
             reduce_fragment1 = T.alloc_fragment((16, 16), dtype=accum_dtype)
             reduce_fragment2 = T.alloc_fragment((16), dtype=accum_dtype)
-            a_shared = T.alloc_shared((16), dtype=accum_dtype, scope="shared")
+            a_shared = T.alloc_shared((16), dtype=accum_dtype)
             a_fragment = T.alloc_fragment((16), dtype=accum_dtype)
 
             T.copy(A[i_b, i_t * 16:(i_t + 1) * 16, ih, offset:offset + 16], A_shared)
@@ -183,28 +183,28 @@ def tl_merge_16x16_to_64x64_inverse_kernel(
             i_b, ih = i_bh // H, i_bh % H
             
             # Allocate shared memory for all blocks
-            A_21_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            A_32_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            A_31_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            A_43_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            A_42_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            A_41_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            A_21_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            A_32_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            A_31_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            A_43_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            A_42_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            A_41_shared = T.alloc_shared((16, 16), dtype=input_dtype)
 
-            Ad_11_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_22_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_33_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_44_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_21_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_32_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_43_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_31_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_42_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_41_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            Ad_11_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_22_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_33_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_44_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_21_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_32_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_43_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_31_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_42_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_41_shared = T.alloc_shared((16, 16), dtype=input_dtype)
             
             # Temporary shared buffers for intermediate results
-            gemm_inv_tmp_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            multigemm1_tmp_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            multigemm2_tmp_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            gemm_inv_tmp_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            multigemm1_tmp_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            multigemm2_tmp_shared = T.alloc_shared((16, 16), dtype=input_dtype)
             
             # Fragment buffers for gemm_inverse macro
             gemm_inv_reg1 = T.alloc_fragment((16, 16), dtype=accum_dtype)
@@ -343,7 +343,7 @@ def tl_chunk_cumsum(
     ):
         with T.Kernel(T.ceildiv(Token, Block_T), B * H, threads=threads) as (bt, bbh):
             bb, bh = bbh // H, bbh % H
-            InputG_shared = T.alloc_shared((Block_T), dtype=input_dtype, scope="shared")
+            InputG_shared = T.alloc_shared((Block_T), dtype=input_dtype)
             InputG_fragment = T.alloc_fragment((Block_T), dtype=output_dtype)
             # unable to use TMA
             # T.copy(InputG[bb, bt * Block_T:(bt + 1) * Block_T, bh], InputG_shared)
@@ -415,7 +415,7 @@ def tilelang_chunk_scaled_dot_kkt_fwd(
         with T.Kernel(T.ceildiv(S, block_S), B * H, threads=threads) as (bs, bbh):
             bb, bh = bbh // H, bbh % H
             # !! Pay attention to the scope of the shared memory: may cause misaligned address when shape is one dimension or the buffer is too small
-            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype, scope="shared")
+            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype)
             K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
             A_shared = T.alloc_shared((block_S, block_S), dtype=output_dtype)
             Beta_K_fragment = T.alloc_fragment((block_S, block_DK), dtype=input_dtype)
@@ -1030,46 +1030,45 @@ def chunk_gated_delta_rule_fwd(
 
 
     # 保存输入的副本，避免被第一个函数修改
-    # k_copy = k.clone()
-    # w_copy = w.clone()
-    # u_copy = u.clone()
-    # g_copy = g.clone()
+    k_copy = k.clone()
+    w_copy = w.clone()
+    u_copy = u.clone()
+    g_copy = g.clone()
     
-    # h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
-    #     k=k_copy,
-    #     w=w_copy,
-    #     u=u_copy,
-    #     g=g_copy,
-    #     initial_state=initial_state,
-    #     output_final_state=output_final_state,
-    #     cu_seqlens=cu_seqlens,
-    # )
+    h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
+        k=k_copy,
+        w=w_copy,
+        u=u_copy,
+        g=g_copy,
+        initial_state=initial_state,
+        output_final_state=output_final_state,
+        cu_seqlens=cu_seqlens,
+    )
     check_tensors_and_compute_errors(k,"ktest")
     check_tensors_and_compute_errors(w,"wtest")
     check_tensors_and_compute_errors(u,"utest")
     check_tensors_and_compute_errors(g,"gtest")
-    k_cpu = k.cpu()
-    w_cpu = w.cpu()
-    u_cpu = u.cpu()
-    g_cpu = g.cpu()
-    torch.save(k_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/k.pt")
-    torch.save(w_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/w.pt")
-    torch.save(u_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/u.pt")
-    torch.save(g_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/g.pt")
-    
+    # k_cpu = k.cpu()
+    # w_cpu = w.cpu()
+    # u_cpu = u.cpu()
+    # g_cpu = g.cpu()
+    # torch.save(k_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/k.pt")
+    # torch.save(w_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/w.pt")
+    # torch.save(u_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/u.pt")
+    # torch.save(g_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/g.pt")
+    torch.cuda.synchronize()
     h,  v_new, final_state = tilelang_chunk_gated_delta_rule(batch_size, k, w, u, g, output_final_state, chunk_size=64, save_new_value=True)
+    torch.cuda.synchronize()
     h_cpu = h.cpu()
     v_new_cpu = v_new.cpu()
     final_state_cpu = final_state.cpu()
     check_tensors_and_compute_errors(h,"htest")
     check_tensors_and_compute_errors(v_new,"v_newtest")
     check_tensors_and_compute_errors(final_state,"final_statetest")
-    torch.save(h_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/h.pt")
-    torch.save(v_new_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/v_new.pt")
-    torch.save(final_state_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/final_state.pt")
-    print("saved h, v_new, final_state")
-    while True:
-        pass
+    # torch.save(h_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/h.pt")
+    # torch.save(v_new_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/v_new.pt")
+    # torch.save(final_state_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/final_state.pt")
+\
     # h,  v_new, final_state = tilelang_chunk_gated_delta_rule(batch_size, k, w, u, g, output_final_state, chunk_size=64, save_new_value=True)
     
     # h_abs_rel_error = torch.mean(torch.abs(h - h_triton) / (torch.abs(h_triton) + 1e-8)).item()
