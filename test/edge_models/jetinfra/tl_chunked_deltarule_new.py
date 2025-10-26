@@ -631,13 +631,13 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
     block_DK=128,
     block_DV=32,
     threads=128,
-    num_stages=2,
+    num_stages=1,
 ):
     block_S = chunk_size
     BS = (S + block_S - 1) // block_S
 
     K_shape = (B, S, H, DK)
-    V_shape = (B, S, H, DV)
+    V_shape = (B, S, H, DV) # B = 1, H = 100/ 1000 DK = 96 DV = 256
     W_shape = (B, S, H, DK)
     U_shape = (B, S, H, DV)
     G_shape = (B, S, H)
@@ -698,37 +698,41 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
             for i_s in T.Pipelined(T.ceildiv(S, block_S), num_stages=num_stages):
             # for i_s in T.serial(T.ceildiv(S, block_S)):
                 # Store previous result to the hidden tensor, like the epilogue
+                T.tvm_storage_sync("shared")
                 T.copy(b_h_shared[0:DK, 0:block_DV], h[bb, i_s, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
                 s_shift = T.min(block_S, S - i_s * block_S)
                 d_shift = T.min(block_DK, DK)
+                T.tvm_storage_sync("shared")
                 for i, j in T.Parallel(block_S, block_DK):
                     with T.If(i < s_shift and j < d_shift):
                         with T.Then():
                             W_shared[i, j] = W[bb, i_s * block_S + i, bh, j]
                         with T.Else():
                             W_shared[i, j] = 0.0
-                
+                T.tvm_storage_sync("shared")
                 T.gemm(W_shared, b_h_shared, V_new_fragment, clear_accum=True)
-
+                T.tvm_storage_sync("shared")
                 # U - W * S
                 T.copy(
                     U[bb, i_s * block_S:(i_s + 1) * block_S, bh, bv * block_DV:(bv + 1) * block_DV],
                     U_shared)
+                T.tvm_storage_sync("shared")
                 T.copy(U_shared, U_fragment)
+                T.tvm_storage_sync("shared")
                 for i_s2, i_v in T.Parallel(block_S, block_DV):
                     with T.If(i_s2 < s_shift):
                         with T.Then():
                             V_new_fragment[i_s2, i_v] = -V_new_fragment[i_s2, i_v] + U_fragment[i_s2, i_v]
                         with T.Else():
                             V_new_fragment[i_s2, i_v] = 0.0
-
+                T.tvm_storage_sync("shared")
                 # Save V_new
                 if save_new_value:
                     T.copy(V_new_fragment, dst=V_new_shared)
                     T.copy(
                         V_new_shared, V_new[bb, i_s * block_S:(i_s + 1) * block_S, bh,
                                             bv * block_DV:(bv + 1) * block_DV])
-
+                T.tvm_storage_sync("shared")
                 for i, j in T.Parallel(block_S, DK):
                     with T.If(i < s_shift and j < d_shift):
                         with T.Then():
@@ -736,6 +740,7 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
                         with T.Else():
                             K_shared[i, j] = 0.0
                 # use_g
+                T.tvm_storage_sync("shared")
                 if use_g:
                     last_idx = T.min((i_s + 1) * block_S, S) - 1
                     G_last_local[0] = G[bb, last_idx, bh]
@@ -745,7 +750,9 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
                                 G_shared[i_s2, i_v] = G[bb, i_s * block_S + i_s2, bh]
                             with T.Else():
                                 G_shared[i_s2, i_v] = 0.0
+                    T.tvm_storage_sync("shared")
                     T.copy(G_shared, G_fragment)
+                    T.tvm_storage_sync("shared")
                     for i_s2, i_v in T.Parallel(block_S, block_DV):
                         with T.If(i_s2 < s_shift):
                             with T.Then():
@@ -757,19 +764,25 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
                                         V_new_fragment[i_s2, i_v] = 0
                             with T.Else():
                                 V_new_fragment[i_s2, i_v] = 0
+                    T.tvm_storage_sync("shared")
                     G_last_local[0] = T.exp(G_last_local[0])
+                    T.tvm_storage_sync("shared")
                     for i_k, i_v in T.Parallel(DK, block_DV):
                         b_h_fragment[i_k, i_v] *= G_last_local[0]
-
+                    T.tvm_storage_sync("shared")
                 # Update intermediate results
+                T.tvm_storage_sync("shared")
                 T.copy(V_new_fragment, V_new_shared)
+                T.tvm_storage_sync("shared")
                 T.gemm(K_shared, V_new_shared, b_h_fragment, transpose_A=True)
-
+                T.tvm_storage_sync("shared")
                 T.copy(b_h_fragment, b_h_shared)
-
+                T.tvm_storage_sync("shared")
             # Save final state
             if store_final_state:
+                T.tvm_storage_sync("shared")
                 T.copy(b_h_fragment[0:DK, 0:block_DV], final_state[bb, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
+                T.tvm_storage_sync("shared")
 
 
     return kernel
@@ -791,8 +804,8 @@ def tilelang_chunk_gated_delta_rule(
     final_state = k.new_empty(B, H, K, V, dtype=torch.float32) if output_final_state else None
     v_new = torch.empty_like(u) if save_new_value else None
     kernel = tilelang_chunk_gated_delta_rule_fwd_h(B, Token, H, K, V,
-        input_dtype = "bfloat16",
-        output_dtype = "bfloat16",
+        input_dtype = "float32",
+        output_dtype = "float32",
         accum_dtype = "float32",
         gate_dtype = "float32",
         state_dtype = "float32",
@@ -805,6 +818,8 @@ def tilelang_chunk_gated_delta_rule(
     kernel(k, w, u, g, h, v_new, final_state)
     
     return h, v_new, final_state
+
+
 
 def get_configs():
     block_DK = [32, 64, 128]
@@ -1035,15 +1050,15 @@ def chunk_gated_delta_rule_fwd(
     u_copy = u.clone()
     g_copy = g.clone()
     
-    h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
-        k=k_copy,
-        w=w_copy,
-        u=u_copy,
-        g=g_copy,
-        initial_state=initial_state,
-        output_final_state=output_final_state,
-        cu_seqlens=cu_seqlens,
-    )
+    # h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
+    #     k=k_copy,
+    #     w=w_copy,
+    #     u=u_copy,
+    #     g=g_copy,
+    #     initial_state=initial_state,
+    #     output_final_state=output_final_state,
+    #     cu_seqlens=cu_seqlens,
+    # )
     check_tensors_and_compute_errors(k,"ktest")
     check_tensors_and_compute_errors(w,"wtest")
     check_tensors_and_compute_errors(u,"utest")
@@ -1057,18 +1072,30 @@ def chunk_gated_delta_rule_fwd(
     # torch.save(u_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/u.pt")
     # torch.save(g_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/g.pt")
     torch.cuda.synchronize()
+    k = k.to(torch.float32)
+    w = w.to(torch.float32)
+    u = u.to(torch.float32)
+    g = g.to(torch.float32)
     h,  v_new, final_state = tilelang_chunk_gated_delta_rule(batch_size, k, w, u, g, output_final_state, chunk_size=64, save_new_value=True)
+    # h,  v_new, final_state = tilelang_chunk_gated_delta_rule_split(batch_size, k, w, u, g, output_final_state, chunk_size=64)
     torch.cuda.synchronize()
-    h_cpu = h.cpu()
-    v_new_cpu = v_new.cpu()
-    final_state_cpu = final_state.cpu()
+    # h_cpu = h.cpu()
+    # v_new_cpu = v_new.cpu()
+    # final_state_cpu = final_state.cpu()
+    k = k.to(torch.bfloat16)
+    h = h.to(torch.bfloat16)
+    v_new = v_new.to(torch.bfloat16)
+
     check_tensors_and_compute_errors(h,"htest")
     check_tensors_and_compute_errors(v_new,"v_newtest")
     check_tensors_and_compute_errors(final_state,"final_statetest")
-    # torch.save(h_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/h.pt")
-    # torch.save(v_new_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/v_new.pt")
-    # torch.save(final_state_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/final_state.pt")
-\
+    # torch.save(h_cpu, "/home/haokang/jetlmrelated/jetaitest/test/edge_models/jetinfra/testfile/h.pt")
+    # torch.save(v_new_cpu, "/home/haokang/jetlmrelated/jetaitest/test/edge_models/jetinfra/testfile/v_new.pt")
+    # torch.save(final_state_cpu, "/home/haokang/jetlmrelated/jetaitest/test/edge_models/jetinfra/testfile/final_state.pt")
+    # torch.cuda.synchronize()
+    # print("store finished")
+    # while True:
+    #     pass
     # h,  v_new, final_state = tilelang_chunk_gated_delta_rule(batch_size, k, w, u, g, output_final_state, chunk_size=64, save_new_value=True)
     
     # h_abs_rel_error = torch.mean(torch.abs(h - h_triton) / (torch.abs(h_triton) + 1e-8)).item()
