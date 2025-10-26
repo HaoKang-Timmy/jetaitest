@@ -488,7 +488,7 @@ def get_configs():
         'num_stages': c[3]
     } for c in _configs]
     return configs
-@autotune(configs=get_configs(), warmup=10, rep=10)
+# @autotune(configs=get_configs(), warmup=10, rep=10)
 @tilelang.jit(out_idx=[-2, -1])
 def tilelang_recompute_w_u_fwd(
     # task config
@@ -506,8 +506,8 @@ def tilelang_recompute_w_u_fwd(
     block_S=64,
     block_DK=64,
     block_DV=64,
-    threads=256,
-    num_stages=0,
+    threads=128,
+    num_stages=2,
 ):
     K_shape = (B, S, H, DK)
     V_shape = (B, S, H, DV)
@@ -629,7 +629,7 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
     save_new_value=True,
     # kernel config
     block_DK=128,
-    block_DV=32,
+    block_DV=16,
     threads=128,
     num_stages=1,
 ):
@@ -698,41 +698,41 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
             for i_s in T.Pipelined(T.ceildiv(S, block_S), num_stages=num_stages):
             # for i_s in T.serial(T.ceildiv(S, block_S)):
                 # Store previous result to the hidden tensor, like the epilogue
-                T.tvm_storage_sync("shared")
+                
                 T.copy(b_h_shared[0:DK, 0:block_DV], h[bb, i_s, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
                 s_shift = T.min(block_S, S - i_s * block_S)
                 d_shift = T.min(block_DK, DK)
-                T.tvm_storage_sync("shared")
+                
                 for i, j in T.Parallel(block_S, block_DK):
                     with T.If(i < s_shift and j < d_shift):
                         with T.Then():
                             W_shared[i, j] = W[bb, i_s * block_S + i, bh, j]
                         with T.Else():
                             W_shared[i, j] = 0.0
-                T.tvm_storage_sync("shared")
+                
                 T.gemm(W_shared, b_h_shared, V_new_fragment, clear_accum=True)
-                T.tvm_storage_sync("shared")
+                
                 # U - W * S
                 T.copy(
                     U[bb, i_s * block_S:(i_s + 1) * block_S, bh, bv * block_DV:(bv + 1) * block_DV],
                     U_shared)
-                T.tvm_storage_sync("shared")
+                
                 T.copy(U_shared, U_fragment)
-                T.tvm_storage_sync("shared")
+                
                 for i_s2, i_v in T.Parallel(block_S, block_DV):
                     with T.If(i_s2 < s_shift):
                         with T.Then():
                             V_new_fragment[i_s2, i_v] = -V_new_fragment[i_s2, i_v] + U_fragment[i_s2, i_v]
                         with T.Else():
                             V_new_fragment[i_s2, i_v] = 0.0
-                T.tvm_storage_sync("shared")
+                
                 # Save V_new
                 if save_new_value:
                     T.copy(V_new_fragment, dst=V_new_shared)
                     T.copy(
                         V_new_shared, V_new[bb, i_s * block_S:(i_s + 1) * block_S, bh,
                                             bv * block_DV:(bv + 1) * block_DV])
-                T.tvm_storage_sync("shared")
+                
                 for i, j in T.Parallel(block_S, DK):
                     with T.If(i < s_shift and j < d_shift):
                         with T.Then():
@@ -740,7 +740,7 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
                         with T.Else():
                             K_shared[i, j] = 0.0
                 # use_g
-                T.tvm_storage_sync("shared")
+                
                 if use_g:
                     last_idx = T.min((i_s + 1) * block_S, S) - 1
                     G_last_local[0] = G[bb, last_idx, bh]
@@ -750,9 +750,9 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
                                 G_shared[i_s2, i_v] = G[bb, i_s * block_S + i_s2, bh]
                             with T.Else():
                                 G_shared[i_s2, i_v] = 0.0
-                    T.tvm_storage_sync("shared")
+                    
                     T.copy(G_shared, G_fragment)
-                    T.tvm_storage_sync("shared")
+                    
                     for i_s2, i_v in T.Parallel(block_S, block_DV):
                         with T.If(i_s2 < s_shift):
                             with T.Then():
@@ -764,25 +764,25 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
                                         V_new_fragment[i_s2, i_v] = 0
                             with T.Else():
                                 V_new_fragment[i_s2, i_v] = 0
-                    T.tvm_storage_sync("shared")
+                    
                     G_last_local[0] = T.exp(G_last_local[0])
-                    T.tvm_storage_sync("shared")
+                    
                     for i_k, i_v in T.Parallel(DK, block_DV):
                         b_h_fragment[i_k, i_v] *= G_last_local[0]
-                    T.tvm_storage_sync("shared")
+                    
                 # Update intermediate results
-                T.tvm_storage_sync("shared")
+                
                 T.copy(V_new_fragment, V_new_shared)
-                T.tvm_storage_sync("shared")
+                
                 T.gemm(K_shared, V_new_shared, b_h_fragment, transpose_A=True)
-                T.tvm_storage_sync("shared")
+                
                 T.copy(b_h_fragment, b_h_shared)
-                T.tvm_storage_sync("shared")
+                
             # Save final state
             if store_final_state:
-                T.tvm_storage_sync("shared")
+                
                 T.copy(b_h_fragment[0:DK, 0:block_DV], final_state[bb, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
-                T.tvm_storage_sync("shared")
+                
 
 
     return kernel
@@ -834,7 +834,7 @@ def get_configs():
         'num_stages': c[3]
     } for c in _configs]
     return configs
-@autotune(configs=get_configs(), warmup=10, rep=10)
+# @autotune(configs=get_configs(), warmup=10, rep=10)
 @tilelang.jit(out_idx=[-1],
 pass_configs={
         tilelang.PassConfigKey.TL_DISABLE_TMA_LOWER: True,
