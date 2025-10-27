@@ -47,7 +47,7 @@ def _linear_kernel(
     Token,
     Indim,
     outdim,
-    dtype,
+    dtype = "float32",
     block_M = 64,
     block_K = 64,
     block_N = 128,
