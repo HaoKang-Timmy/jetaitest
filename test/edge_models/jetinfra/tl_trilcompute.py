@@ -55,11 +55,11 @@ def solve_tril_16x16(
             # offset = i_t * 16
             
 
-            A_shared = T.alloc_shared((16, 16), dtype=accum_dtype, scope="shared")
+            A_shared = T.alloc_shared((16, 16), dtype=accum_dtype)
             # A_fragment = T.alloc_fragment((16, 16), dtype=accum_dtype)
             reduce_fragment1 = T.alloc_fragment((16, 16), dtype=accum_dtype)
             reduce_fragment2 = T.alloc_fragment((16), dtype=accum_dtype)
-            a_shared = T.alloc_shared((16), dtype=accum_dtype, scope="shared")
+            a_shared = T.alloc_shared((16), dtype=accum_dtype)
             a_fragment = T.alloc_fragment((16), dtype=accum_dtype)
 
             T.copy(A[i_b, i_t * 16:(i_t + 1) * 16, ih, offset:offset + 16], A_shared)
@@ -188,28 +188,28 @@ def tl_merge_16x16_to_64x64_inverse_kernel(
             i_b, ih = i_bh // H, i_bh % H
             
             # Allocate shared memory for all blocks
-            A_21_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            A_32_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            A_31_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            A_43_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            A_42_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            A_41_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            A_21_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            A_32_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            A_31_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            A_43_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            A_42_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            A_41_shared = T.alloc_shared((16, 16), dtype=input_dtype)
 
-            Ad_11_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_22_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_33_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_44_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_21_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_32_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_43_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_31_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_42_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            Ad_41_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            Ad_11_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_22_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_33_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_44_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_21_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_32_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_43_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_31_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_42_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            Ad_41_shared = T.alloc_shared((16, 16), dtype=input_dtype)
             
             # Temporary shared buffers for intermediate results
-            gemm_inv_tmp_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            multigemm1_tmp_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
-            multigemm2_tmp_shared = T.alloc_shared((16, 16), dtype=input_dtype, scope="shared")
+            gemm_inv_tmp_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            multigemm1_tmp_shared = T.alloc_shared((16, 16), dtype=input_dtype)
+            multigemm2_tmp_shared = T.alloc_shared((16, 16), dtype=input_dtype)
             
             # Fragment buffers for gemm_inverse macro
             gemm_inv_reg1 = T.alloc_fragment((16, 16), dtype=accum_dtype)

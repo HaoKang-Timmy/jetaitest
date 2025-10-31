@@ -60,7 +60,7 @@ def splitk_gemv_vectorized_silu_l2norm(
             tk = tx % reduce_threads
             A_local = T.alloc_local((TILE_K,), dtype)
             B_local = T.alloc_local((TILE_K,), dtype)
-            C_shared = T.alloc_shared((BLOCK_N,), accum_dtype, scope="shared")
+            C_shared = T.alloc_shared((BLOCK_N,), accum_dtype)
             C_accum = T.alloc_local((1,), accum_dtype)
             C_squared = T.alloc_fragment((BLOCK_N,), accum_dtype)
             sum_reg = T.alloc_fragment([1], accum_dtype)

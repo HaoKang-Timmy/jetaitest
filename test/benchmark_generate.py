@@ -32,11 +32,11 @@ def main():
     parser = argparse.ArgumentParser(description="Benchmark Jet-Nemotron with random tokens")
     parser.add_argument("--model_path", type=str, default="jet-ai/Jet-Nemotron-2B", 
                        help="Path to the model weights")
-    parser.add_argument("--batch_size", type=int, default=20,
+    parser.add_argument("--batch_size", type=int, default=1,
                        help="Batch size for generation")
-    parser.add_argument("--input_len", type=int, default=4000,
+    parser.add_argument("--input_len", type=int, default=100000,
                        help="Input sequence length")
-    parser.add_argument("--max_new_tokens", type=int, default=5,
+    parser.add_argument("--max_new_tokens", type=int, default=3,
                        help="Number of tokens to generate")
     parser.add_argument("--num_runs", type=int, default=1,
                        help="Number of runs for averaging performance")

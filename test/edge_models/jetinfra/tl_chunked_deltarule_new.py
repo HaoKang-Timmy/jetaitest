@@ -15,8 +15,6 @@ from fla.ops.common.chunk_o import chunk_bwd_dqkwg, chunk_bwd_dv_local, chunk_fw
 from fla.ops.common.chunk_scaled_dot_kkt import chunk_scaled_dot_kkt_fwd
 from fla.ops.gated_delta_rule.wy_fast import prepare_wy_repr_bwd, recompute_w_u_fwd
 from fla.ops.utils import chunk_local_cumsum, solve_tril
-from fla.utils import autocast_custom_bwd, autocast_custom_fwd, input_guard
-from fla.modules.l2norm import l2norm_fwd
 import time
 
 
@@ -39,7 +37,7 @@ def solve_tril_16x16(
     # chunk_indices = prepare_chunk_indices(cu_seqlens, 16) if cu_seqlens is not None else None
     # NT = len(chunk_indices) if cu_seqlens is not None else cdiv(Token, 16)
     @T.prim_func
-    def main(
+    def solve_tril_16x16_kernel(
         A: T.Tensor([B, Token, H, BT], input_dtype),
         Ad: T.Tensor([B, Token, H, 16], output_dtype),
     
@@ -85,7 +83,7 @@ def solve_tril_16x16(
                 A_shared[i, i] = A_shared[i, i] + 1.0
             
             T.copy(A_shared, Ad[i_b, i_t * 16:(i_t + 1) * 16, ih, :])
-    return main
+    return solve_tril_16x16_kernel
 
 @tilelang.jit(
 pass_configs={
@@ -403,15 +401,21 @@ def tl_solve_tril(
     kernel_solve_tril = solve_tril_16x16(B, T, H, BT, NT1)
     kernel_solve_tril(A, Ad)
     check_tensors_and_compute_errors(Ad,"Adafter tl solve tril")
-    # check_tensors_and_compute_errors(A,"Aafter tl solve tril")
-    # Ai = torch.zeros(B, T, H, NT2, device=A.device, dtype= torch.float)
-    # kernel_merge_16x16_to_64x64_inverse = tl_merge_16x16_to_64x64_inverse_kernel(B, T, H, BT, NT2)
+    check_tensors_and_compute_errors(A,"Aafter tl solve tril")
+    Ai = torch.zeros(B, T, H, NT2, device=A.device, dtype= torch.float)
+    kernel_merge_16x16_to_64x64_inverse = tl_merge_16x16_to_64x64_inverse_kernel(B, T, H, BT, NT2)
     
     # check_tensors_and_compute_errors(Ai,"Aibefore tl merge 16x16 to 64x64 inverse")
     check_tensors_and_compute_errors(A,"Abefore tl merge 16x16 to 64x64 inverse")
     check_tensors_and_compute_errors(Ad,"Adbefore tl merge 16x16 to 64x64 inverse")
-    Ai = tl_merge_16x16_to_64x64_inverse_pytorch(A, Ad)
-    # kernel_merge_16x16_to_64x64_inverse(A, Ad, Ai)
+    # Ai = tl_merge_16x16_to_64x64_inverse_pytorch(A, Ad)
+    kernel_merge_16x16_to_64x64_inverse(A, Ad, Ai)
+    if  torch.isnan(Ai).any().item():
+        print(Ai)
+        # save Ai to file, 记录时间戳
+        timestamp = time.strftime("%Y%m%d%H%M%S", time.localtime())
+        torch.save(Ai, f"Ai_{timestamp}.pt")
+        assert False
     check_tensors_and_compute_errors(Ai,"Aiafter tl merge 16x16 to 64x64 inverse")
     check_tensors_and_compute_errors(A,"Aafter tl merge 16x16 to 64x64 inverse")
     check_tensors_and_compute_errors(Ad,"Adafter tl merge 16x16 to 64x64 inverse")
@@ -899,7 +903,7 @@ def tilelang_chunk_gated_delta_rule_fwd_h(
             # Save final state
             if store_final_state:
                 
-                T.copy(b_h_fragment[0:DK, 0:block_DV], final_state[bb, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
+                T.copy(b_h_shared[0:DK, 0:block_DV], final_state[bb, bh, 0:DK, bv * block_DV:(bv + 1) * block_DV])
                 
 
 
@@ -958,7 +962,7 @@ pass_configs={
         tilelang.PassConfigKey.TL_DISABLE_TMA_LOWER: True,
         tilelang.PassConfigKey.TL_DISABLE_WARP_SPECIALIZED: True
     },target="cuda -arch=sm_80")
-def tilelang_chunk_fwd_o(
+def tilelang_chunk_fwd_o_kernel(
     # task config
     B,
     S,
@@ -1072,7 +1076,7 @@ def tilelang_chunk_fwd_o(
 
     return kernel
 
-def chunk_fwd_o(
+def tilelang_chunk_fwd_o(
     q: torch.Tensor,
     k: torch.Tensor,
     v: torch.Tensor,
@@ -1083,7 +1087,7 @@ def chunk_fwd_o(
     chunk_size: int = 64
 ):
     B, Token, H, K, V = *q.shape, v.shape[-1]
-    kernel = tilelang_chunk_fwd_o(
+    kernel = tilelang_chunk_fwd_o_kernel(
         B, Token, H, K, V,
         input_dtype = "float32",
         output_dtype = "float32",
@@ -1110,8 +1114,8 @@ def chunk_gated_delta_rule_fwd(
     output_final_state: bool,
     cu_seqlens: Optional[torch.LongTensor] = None
 ):
-    # q = l2norm_fwd(q)
-    # k = l2norm_fwd(k)
+    q = l2norm_fwd(q)
+    k = l2norm_fwd(k)
     
     q = q.reshape(batch_size, -1, q.shape[-2], q.shape[-1]).to(torch.float32)
     k = k.reshape(batch_size, -1, k.shape[-2], k.shape[-1]).to(torch.float32)
@@ -1122,8 +1126,6 @@ def chunk_gated_delta_rule_fwd(
 
     # g = chunk_local_cumsum(g, chunk_size=64, cu_seqlens=cu_seqlens)
     g = chunk_cumsum(g, chunk_size=64)
-    check_tensors_and_compute_errors(g,"gafter chunk cumsum")
-    # obtain WY representation. u is actually the new v.
 
     # A = chunk_scaled_dot_kkt_fwd(
     #     k=k,
@@ -1133,14 +1135,13 @@ def chunk_gated_delta_rule_fwd(
     #     output_dtype=torch.float32
     # )
     A = chunked_scaled_dot_ktt(k, beta, g)
-    check_tensors_and_compute_errors(A,"Aafter chunk scaled dot ktt")
     # torch.cuda.synchronize()
     # end_time = time.time()
     # print("chunk_scaled_dot_kkt_fwd time:", end_time - start_time)
     # start_time = time.time()
     
     A = A.reshape(1, -1, A.shape[-2], A.shape[-1])
-    # print("A shape:", A.shape)
+    print("A shape:", A.shape)
     # A = solve_tril(
     #     A=A,
     #     cu_seqlens=cu_seqlens,
@@ -1168,20 +1169,8 @@ def chunk_gated_delta_rule_fwd(
     # check_tensors_and_compute_errors(u,"uafter tl recompute wu forward")
 
     # 保存输入的副本，避免被第一个函数修改
-    # k_copy = k.clone()
-    # w_copy = w.clone()
-    # u_copy = u.clone()
-    # g_copy = g.clone()
-    
-    # h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
-    #     k=k_copy,
-    #     w=w_copy,
-    #     u=u_copy,
-    #     g=g_copy,
-    #     initial_state=initial_state,
-    #     output_final_state=output_final_state,
-    #     cu_seqlens=cu_seqlens,
-    # )
+
+
     check_tensors_and_compute_errors(k,"ktest")
     check_tensors_and_compute_errors(w,"wtest")
     check_tensors_and_compute_errors(u,"utest")
@@ -1194,17 +1183,28 @@ def chunk_gated_delta_rule_fwd(
     # torch.save(w_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/w.pt")
     # torch.save(u_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/u.pt")
     # torch.save(g_cpu, "/storage/home/hcoda1/6/hkang342/p-tkrishna3-0/jetaitest/test/edge_models/jetinfra/testfile/g.pt")
-    torch.cuda.synchronize()
-    # k = k.to(torch.float32)
-    # w = w.to(torch.float32)
-    # u = u.to(torch.float32)
-    # g = g.to(torch.float32)
-    k = torch.randn(k.shape).to(k.device).to(torch.float32)
-    w = torch.randn(w.shape).to(w.device).to(torch.float32)
-    u = torch.randn(u.shape).to(u.device).to(torch.float32)
-    g = torch.randn(g.shape).to(g.device).to(torch.float32)
+    # torch.cuda.synchronize()
+    # # k = k.to(torch.float32)
+    # # w = w.to(torch.float32)
+    # # u = u.to(torch.float32)
+    # # g = g.to(torch.float32)
+    # k = torch.randn(k.shape).to(k.device).to(torch.float32)
+    # w = torch.randn(w.shape).to(w.device).to(torch.float32)
+    # u = torch.randn(u.shape).to(u.device).to(torch.float32)
+    # g = torch.randn(g.shape).to(g.device).to(torch.float32)
+    # tilelang.disable_cache()
+    # h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
+    #     k=k,
+    #     w=w,
+    #     u=u,
+    #     g=g,
+    #     initial_state=initial_state,
+    #     output_final_state=output_final_state,
+    #     cu_seqlens=cu_seqlens
+    # )
     h,  v_new, final_state = tilelang_chunk_gated_delta_rule(batch_size, k, w, u, g, output_final_state, chunk_size=64, save_new_value=True)
-   
+    # tilelang.enable_cache()
+
     torch.cuda.synchronize()
     # h_cpu = h.cpu()
     # v_new_cpu = v_new.cpu()
@@ -1213,7 +1213,46 @@ def chunk_gated_delta_rule_fwd(
     # h = h.to(torch.bfloat16)
     # v_new = v_new.to(torch.bfloat16)
 
-    check_tensors_and_compute_errors(h,"htest")
+    # Triton Ref
+    # k_copy = k.clone()
+    # w_copy = w.clone()
+    # u_copy = u.clone()
+    # g_copy = g.clone()
+    
+    # triton_h, triton_v_new, triton_final_state = chunk_gated_delta_rule_fwd_h(
+    #     k=k_copy,
+    #     w=w_copy,
+    #     u=u_copy,
+    #     g=g_copy,
+    #     initial_state=initial_state,
+    #     output_final_state=output_final_state,
+    #     cu_seqlens=cu_seqlens,
+    # )
+    # check_tensors_and_compute_errors(h,"htest")
+    # check_tensors_and_compute_errors(triton_h,"triton_htest")
+    
+    # # deterministic test for h
+    # for i in range(10):
+    #     # triton_h_, triton_v_new_, triton_final_state_ = chunk_gated_delta_rule_fwd_h(
+    #     #     k=k_copy,`
+    #     #     w=w_copy,
+    #     #     u=u_copy,
+    #     #     g=g_copy,
+    #     #     initial_state=initial_state,
+    #     #     output_final_state=output_final_state,
+    #     #     cu_seqlens=cu_seqlens,
+    #     # )
+    #     # assert torch.equal(triton_h_, triton_h)
+    #     h_,  v_new_, final_state_ = tilelang_chunk_gated_delta_rule(batch_size, k, w, u, g, output_final_state, chunk_size=64, save_new_value=True)
+    #     assert torch.equal(h_, h)
+    #     print(f"deterministic test for h {i} passed")
+    #     check_tensors_and_compute_errors(h, "htest")
+
+    # torch.testing.assert_close(h, triton_h)
+    # torch.testing.assert_close(v_new, triton_v_new)
+    # torch.testing.assert_close(final_state, triton_final_state)
+    
+    # exit()
     check_tensors_and_compute_errors(v_new,"v_newtest")
     check_tensors_and_compute_errors(final_state,"final_statetest")
     # torch.save(h_cpu, "/home/haokang/jetlmrelated/jetaitest/test/edge_models/jetinfra/testfile/h.pt")
@@ -1256,7 +1295,7 @@ def chunk_gated_delta_rule_fwd(
     #     cu_seqlens=cu_seqlens,
     # )
 
-    # o = chunk_fwd_o(q, k, v_new, h, g, scale)
+    o = tilelang_chunk_fwd_o(q, k, v_new, h, g, scale)
     # check_tensors_and_compute_errors(o,"oafter chunk fwd o")
     # torch.cuda.synchronize()
     # end_time = time.time()

@@ -83,13 +83,13 @@ def fused_recurrent(
             id_b = bz // Head_V
             id_hv = bz % Head_V
             id_h = id_hv // (Head_V // Head)
-            Q_shared = T.alloc_shared([block_K], dtype, scope="shared")
+            Q_shared = T.alloc_shared([block_K], dtype)
             Q_fragment = T.alloc_fragment([block_K], dtype)
-            K_shared = T.alloc_shared([block_K], dtype, scope="shared")
-            V_shared = T.alloc_shared([block_V], dtype, scope="shared")
+            K_shared = T.alloc_shared([block_K], dtype)
+            V_shared = T.alloc_shared([block_V], dtype)
             V_fragment = T.alloc_fragment([block_V], dtype)
-            h0_shared = T.alloc_shared([block_K, block_V], accum_dtype, scope="shared")
-            o_shared = T.alloc_shared([block_V], dtype, scope="shared")
+            h0_shared = T.alloc_shared([block_K, block_V], accum_dtype)
+            o_shared = T.alloc_shared([block_V], dtype)
             
             h0_fragment = T.alloc_fragment([block_K, block_V], accum_dtype)
             K_fragment = T.alloc_fragment([block_K], accum_dtype)

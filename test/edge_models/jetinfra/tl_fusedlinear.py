@@ -89,10 +89,10 @@ def _linear_kernel(
         Output: T.Tensor([Batch * Token, outdim], dtype),
     ):
         with T.Kernel(sm_num, threads=threads) as (block_id):
-            Input_shared = T.alloc_shared((block_M, block_K), dtype, scope="shared")
-            W_T_shared = T.alloc_shared((block_N, block_K), dtype, scope="shared")
+            Input_shared = T.alloc_shared((block_M, block_K), dtype)
+            W_T_shared = T.alloc_shared((block_N, block_K), dtype)
             output_reg = T.alloc_fragment((block_M, block_N), reduce_dtype)
-            output_shared = T.alloc_shared((block_M, block_N), dtype, scope="shared")
+            output_shared = T.alloc_shared((block_M, block_N), dtype)
 
             T.annotate_layout({
                 Input_shared: tilelang.layout.make_swizzled_layout(Input_shared),

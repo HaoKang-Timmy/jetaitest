@@ -147,7 +147,6 @@ class DynamicShortConvolution(nn.Module):
         implementation = self.implementation
         if implementation == "triton" and not self.training:
             implementation = "triton_cache"
-
         # during the decoding phase, we assume the batch is composed of sequences of length 1
         if cache is not None and B * T == N:
             assert T == 1

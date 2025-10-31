@@ -44,10 +44,10 @@ def RMSNorm(
         with T.Kernel(B * Head, S, T.ceildiv(Dim, block_D), threads=threads) as (id_bh, id_s, id_d):
             id_b = id_bh // Head
             id_h = id_bh % Head
-            X_shared = T.alloc_shared([block_D], dtype, scope="shared")
-            G_shared = T.alloc_shared([block_D], dtype, scope="shared")
-            W_shared = T.alloc_shared([block_D], dtype, scope="shared")
-            Y_shared = T.alloc_shared([block_D], dtype, scope="shared")
+            X_shared = T.alloc_shared([block_D], dtype)
+            G_shared = T.alloc_shared([block_D], dtype)
+            W_shared = T.alloc_shared([block_D], dtype)
+            Y_shared = T.alloc_shared([block_D], dtype)
 
             X_fragment = T.alloc_fragment([block_D], accum_dtype)
             X_rms_fragment = T.alloc_fragment([block_D], accum_dtype)

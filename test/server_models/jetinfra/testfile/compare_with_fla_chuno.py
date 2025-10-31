@@ -125,7 +125,7 @@ def tilelang_chunk_fwd_o(
             O_shared = T.alloc_shared((block_S, block_DV), dtype=output_dtype)
             A_fragment = T.alloc_fragment((block_S, block_S), dtype=accum_dtype)
             O_fragment = T.alloc_fragment((block_S, block_DV), dtype=accum_dtype)
-            G_shared = T.alloc_shared((block_S,), dtype=gate_dtype, scope="shared")
+            G_shared = T.alloc_shared((block_S,), dtype=gate_dtype)
             G_diff_local = T.alloc_fragment((block_S, block_S), dtype=gate_dtype)
 
             T.annotate_layout({

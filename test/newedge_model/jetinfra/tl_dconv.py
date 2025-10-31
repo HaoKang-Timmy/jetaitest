@@ -49,9 +49,9 @@ def _dconv_fwd_kernel(
         # Cache: T.Tensor([Batch * Token, T_cache], dtype),
     ):
         with T.Kernel(Batch * Token, T.ceildiv(Indim, block_D), threads=threads) as (bx, by):
-            Kernel_shared = T.alloc_shared([Kernel_size, block_D], dtype, scope="shared")
-            Input_shared = T.alloc_shared([Kernel_size, block_D], dtype, scope="shared")
-            Output_shared = T.alloc_shared([block_D], dtype, scope="shared")
+            Kernel_shared = T.alloc_shared([Kernel_size, block_D], dtype)
+            Input_shared = T.alloc_shared([Kernel_size, block_D], dtype)
+            Output_shared = T.alloc_shared([block_D], dtype)
             Input_reg = T.alloc_fragment([Kernel_size, block_D], reduce_type)
             Output_reg = T.alloc_fragment([Kernel_size, block_D], reduce_type)
             Output_reduced = T.alloc_fragment([block_D], reduce_type)

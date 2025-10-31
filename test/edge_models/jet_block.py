@@ -162,6 +162,9 @@ class JetBlock(nn.Module):
         use_cache: Optional[bool] = False,
         **kwargs
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[JetNemotronCache]]:
+        # Print layer index during forward for debugging
+        # if self.layer_idx is not None:
+            # print(f"JetBlock forward 层数: {self.layer_idx}")
         if attention_mask is not None:
             # print("attn mask shape:", attention_mask.shape)
             if len(attention_mask.shape) > 2:
@@ -240,39 +243,40 @@ class JetBlock(nn.Module):
                 hidden_states = index_first_axis(rearrange(hidden_states, "b s ... -> (b s) ..."), indices).unsqueeze(0)
             
             q, k = map(lambda x: rearrange(x, '... (h d) -> ... h d', d=self.head_k_dim), (q, k))
-            o, recurrent_state = chunk_gated_delta_rule(
-                q=q,
-                k=k,
-                v=v,
-                g=g,
-                beta=beta,
-                initial_state=recurrent_state,
-                output_final_state=use_cache,
-                cu_seqlens=cu_seqlens,
-                use_qk_l2norm_in_kernel=True,
-                autotune_interval=self.autotune_interval
-            )
-            scale = k.shape[-1] ** -0.5
-            check_tensors_and_compute_errors(q,"qbefore chunk gated delta rule")
-            check_tensors_and_compute_errors(k,"kbefore chunk gated delta rule")
-            check_tensors_and_compute_errors(v,"vbefore chunk gated delta rule")
-            check_tensors_and_compute_errors(g,"gbefore chunk gated delta rule")
-            check_tensors_and_compute_errors(beta,"betabefore chunk gated delta rule")
-           
-            # _, o, _, recurrent_state = chunk_gated_delta_rule_fwd(
-            #     batch_size=batch_size,
+            # o, recurrent_state = chunk_gated_delta_rule(
             #     q=q,
             #     k=k,
             #     v=v,
             #     g=g,
             #     beta=beta,
-            #     scale=scale,
             #     initial_state=recurrent_state,
             #     output_final_state=use_cache,
             #     cu_seqlens=cu_seqlens,
+            #     use_qk_l2norm_in_kernel=True,
+            #     autotune_interval=self.autotune_interval
             # )
+            scale = k.shape[-1] ** -0.5
+            # check_tensors_and_compute_errors(q,"qbefore chunk gated delta rule")
+            # check_tensors_and_compute_errors(k,"kbefore chunk gated delta rule")
+            # check_tensors_and_compute_errors(v,"vbefore chunk gated delta rule")
+            # check_tensors_and_compute_errors(g,"gbefore chunk gated delta rule")
+            # check_tensors_and_compute_errors(beta,"betabefore chunk gated delta rule")
+           
+            _, o, _, recurrent_state = chunk_gated_delta_rule_fwd(
+                batch_size=batch_size,
+                q=q,
+                k=k,
+                v=v,
+                g=g,
+                beta=beta,
+                scale=scale,
+                initial_state=recurrent_state,
+                output_final_state=use_cache,
+                cu_seqlens=cu_seqlens,
+            )
             check_tensors_and_compute_errors(o,"oafter chunk gated delta rule")
             check_tensors_and_compute_errors(recurrent_state,"recurrent_stateafter chunk gated delta rule")
+            # exit()
         elif mode == 'fused_recurrent':
             # q = F.silu(self.q_proj(hidden_states))
             # k = F.silu(self.k_proj(hidden_states))
@@ -345,9 +349,9 @@ class JetBlock(nn.Module):
 
         g = rearrange(self.g_proj(hidden_states), '... (h d) -> ... h d', d=self.head_v_dim)
 
-        # o = self.o_norm(o, g)
+        o = self.o_norm(o, g)
 
-        o = tl_fused_rmsnorm(o, g, self.o_norm.weight)
+        # o = tl_fused_rmsnorm(o, g, self.o_norm.weight)
 
         o = rearrange(o, 'b t h d -> b t (h d)')
         o = self.o_proj(o)

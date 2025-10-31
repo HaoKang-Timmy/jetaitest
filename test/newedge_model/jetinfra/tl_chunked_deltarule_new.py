@@ -42,7 +42,7 @@ def tl_chunk_cumsum(
     ):
         with T.Kernel(T.ceildiv(Token, Block_T), B * H, threads=threads) as (bt, bbh):
             bb, bh = bbh // H, bbh % H
-            InputG_shared = T.alloc_shared((Block_T), dtype=input_dtype, scope="shared")
+            InputG_shared = T.alloc_shared((Block_T), dtype=input_dtype)
             InputG_fragment = T.alloc_fragment((Block_T), dtype=output_dtype)
             # unable to use TMA
             # T.copy(InputG[bb, bt * Block_T:(bt + 1) * Block_T, bh], InputG_shared)

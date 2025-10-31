@@ -42,6 +42,7 @@ from transformers.utils import (
     replace_return_docstrings,
 )
 from transformers.utils.deprecation import deprecate_kwarg
+import time
 
 
 from .configuration_jet_nemotron import JetNemotronConfig
@@ -231,6 +232,7 @@ class JetNemotronAttention(nn.Module):
         cache_position: Optional[torch.LongTensor] = None,
         **kwargs: Unpack[FlashAttentionKwargs],
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+
         input_shape = hidden_states.shape[:-1]
         hidden_shape = (*input_shape, -1, self.head_dim)
 
@@ -358,7 +360,8 @@ class JetNemotronDecoderLayer(nn.Module):
             )
             
             self.self_attn = EFFICIENT_ATTENTION_CLASSES[config.layer_types[layer_idx]](config, config.layer_types[layer_idx], layer_idx)
-
+        self.config = config
+        self.layer_idx = layer_idx
         self.mlp = JetNemotronMLP(config)
         self.input_layernorm = JetNemotronRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = JetNemotronRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
@@ -376,7 +379,8 @@ class JetNemotronDecoderLayer(nn.Module):
         **kwargs,
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         residual = hidden_states
-
+        torch.cuda.synchronize()
+        start = time.time()
         hidden_states = self.input_layernorm(hidden_states)
         
         # Self Attention
@@ -403,7 +407,9 @@ class JetNemotronDecoderLayer(nn.Module):
 
         if output_attentions:
             outputs += (self_attn_weights,)
-
+        torch.cuda.synchronize()
+        end = time.time()
+        # print(f"{self.config.layer_types[self.layer_idx]}Attention time: {end - start}")
         return outputs
 
 

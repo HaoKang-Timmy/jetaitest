@@ -134,14 +134,14 @@ def tilelang_chunk_scaled_dot_kkt_fwd(
         with T.Kernel(T.ceildiv(S, block_S), B * H, threads=threads) as (bs, bbh):
             bb, bh = bbh // H, bbh % H
             # !! Pay attention to the scope of the shared memory: may cause misaligned address when shape is one dimension or the buffer is too small
-            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype, scope="shared")
+            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype)
             K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
             A_shared = T.alloc_shared((block_S, block_S), dtype=output_dtype)
             Beta_K_fragment = T.alloc_fragment((block_S, block_DK), dtype=input_dtype)
             A_fragment = T.alloc_fragment((block_S, block_S), dtype=accum_dtype)
 
             # Tensor used for gated:
-            G_shared = T.alloc_shared((block_S,), dtype=accum_dtype, scope="shared")
+            G_shared = T.alloc_shared((block_S,), dtype=accum_dtype)
             G_diff_local = T.alloc_fragment((block_S, block_S), dtype=accum_dtype)
 
             T.annotate_layout({
@@ -294,10 +294,10 @@ def tilelang_recompute_w_u_fwd(
     ):
         with T.Kernel(T.ceildiv(S, block_S), B * H, threads=threads) as (bs, bbh):
             bb, bh = bbh // H, bbh % H
-            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype, scope="shared")
+            Beta_shared = T.alloc_shared((block_S,), dtype=input_dtype)
             K_shared = T.alloc_shared((block_S, block_DK), dtype=input_dtype)
             V_shared = T.alloc_shared((block_S, block_DV), dtype=input_dtype)
-            G_shared = T.alloc_shared((block_S,), dtype=gate_dtype, scope="shared")
+            G_shared = T.alloc_shared((block_S,), dtype=gate_dtype)
             A_shared = T.alloc_shared((block_S, block_S), dtype=output_dtype)
             W_fragment = T.alloc_fragment((block_S, block_DK), dtype=accum_dtype)
             U_fragment = T.alloc_fragment((block_S, block_DV), dtype=accum_dtype)
@@ -574,7 +574,7 @@ def tilelang_chunk_fwd_o(
             O_shared = T.alloc_shared((block_S, block_DV), dtype=output_dtype)
             A_fragment = T.alloc_fragment((block_S, block_S), dtype=accum_dtype)
             O_fragment = T.alloc_fragment((block_S, block_DV), dtype=accum_dtype)
-            G_shared = T.alloc_shared((block_S,), dtype=gate_dtype, scope="shared")
+            G_shared = T.alloc_shared((block_S,), dtype=gate_dtype)
             G_diff_local = T.alloc_fragment((block_S, block_S), dtype=gate_dtype)
 
             T.annotate_layout({

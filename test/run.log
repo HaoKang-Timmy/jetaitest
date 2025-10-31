@@ -1,0 +1,973 @@
+/home/haokang/miniconda3/envs/new_kernel/lib/python3.12/site-packages/torch/cuda/__init__.py:283: UserWarning: 
+    Found GPU0 NVIDIA GB10 which is of cuda capability 12.1.
+    Minimum and Maximum cuda capability supported by this version of PyTorch is
+    (8.0) - (12.0)
+    
+  warnings.warn(
+The attention mask and the pad token id were not set. As a consequence, you may observe unexpected behavior. Please pass your input's `attention_mask` to obtain reliable results.
+Setting `pad_token_id` to `eos_token_id`:151643 for open-end generation.
+The attention mask is not set and cannot be inferred from input because pad token is same as eos token. As a consequence, you may observe unexpected behavior. Please pass your input's `attention_mask` to obtain reliable results.
+2025-10-30 07:26:49  [TileLang:tilelang.env:WARNING]: Loading tilelang libs from dev root: /home/haokang/tilelang/build
+Loading weights from HuggingFace model: jet-ai/Jet-Nemotron-2B
+JetBlock forward 层数: 0
+2025-10-30 07:27:09  [TileLang:tilelang.jit.kernel:INFO]: TileLang begins to compile kernel `main_fp16_prefill` with `out_idx=[-1]`
+2025-10-30 07:27:13  [TileLang:tilelang.jit.kernel:INFO]: TileLang completes to compile kernel `main_fp16_prefill`
+qbefore chunk gated delta rule has_nan_1: False
+kbefore chunk gated delta rule has_nan_1: False
+vbefore chunk gated delta rule has_nan_1: False
+gbefore chunk gated delta rule has_nan_1: False
+betabefore chunk gated delta rule has_nan_1: False
+gafter chunk cumsum has_nan_1: False
+Aafter chunk scaled dot ktt has_nan_1: False
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: False
+wafter tl recompute wu forward has_nan_1: False
+ktest has_nan_1: False
+wtest has_nan_1: False
+utest has_nan_1: False
+gtest has_nan_1: False
+v_newtest has_nan_1: False
+final_statetest has_nan_1: False
+oafter chunk gated delta rule has_nan_1: False
+recurrent_stateafter chunk gated delta rule has_nan_1: False
+jetAttention time: 17.035125017166138
+JetBlock forward 层数: 1
+qbefore chunk gated delta rule has_nan_1: False
+kbefore chunk gated delta rule has_nan_1: False
+vbefore chunk gated delta rule has_nan_1: False
+gbefore chunk gated delta rule has_nan_1: False
+betabefore chunk gated delta rule has_nan_1: False
+gafter chunk cumsum has_nan_1: False
+Aafter chunk scaled dot ktt has_nan_1: False
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: False
+wafter tl recompute wu forward has_nan_1: False
+ktest has_nan_1: False
+wtest has_nan_1: False
+utest has_nan_1: False
+gtest has_nan_1: False
+v_newtest has_nan_1: False
+final_statetest has_nan_1: False
+oafter chunk gated delta rule has_nan_1: False
+recurrent_stateafter chunk gated delta rule has_nan_1: False
+jetAttention time: 0.029746294021606445
+JetBlock forward 层数: 2
+qbefore chunk gated delta rule has_nan_1: False
+kbefore chunk gated delta rule has_nan_1: False
+vbefore chunk gated delta rule has_nan_1: False
+gbefore chunk gated delta rule has_nan_1: False
+betabefore chunk gated delta rule has_nan_1: False
+gafter chunk cumsum has_nan_1: False
+Aafter chunk scaled dot ktt has_nan_1: False
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: False
+wafter tl recompute wu forward has_nan_1: False
+ktest has_nan_1: False
+wtest has_nan_1: False
+utest has_nan_1: False
+gtest has_nan_1: False
+v_newtest has_nan_1: False
+final_statetest has_nan_1: False
+oafter chunk gated delta rule has_nan_1: False
+recurrent_stateafter chunk gated delta rule has_nan_1: False
+jetAttention time: 0.0063571929931640625
+JetBlock forward 层数: 3
+qbefore chunk gated delta rule has_nan_1: False
+kbefore chunk gated delta rule has_nan_1: False
+vbefore chunk gated delta rule has_nan_1: False
+gbefore chunk gated delta rule has_nan_1: False
+betabefore chunk gated delta rule has_nan_1: False
+gafter chunk cumsum has_nan_1: False
+Aafter chunk scaled dot ktt has_nan_1: False
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: False
+wafter tl recompute wu forward has_nan_1: False
+ktest has_nan_1: False
+wtest has_nan_1: False
+utest has_nan_1: False
+gtest has_nan_1: False
+v_newtest has_nan_1: False
+final_statetest has_nan_1: False
+oafter chunk gated delta rule has_nan_1: False
+recurrent_stateafter chunk gated delta rule has_nan_1: False
+jetAttention time: 0.006782054901123047
+JetBlock forward 层数: 4
+qbefore chunk gated delta rule has_nan_1: False
+kbefore chunk gated delta rule has_nan_1: False
+vbefore chunk gated delta rule has_nan_1: False
+gbefore chunk gated delta rule has_nan_1: False
+betabefore chunk gated delta rule has_nan_1: False
+gafter chunk cumsum has_nan_1: False
+Aafter chunk scaled dot ktt has_nan_1: False
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: False
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: False
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.005998849868774414
+JetBlock forward 层数: 5
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.006411552429199219
+JetBlock forward 层数: 6
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.007146120071411133
+JetBlock forward 层数: 7
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.015261173248291016
+JetBlock forward 层数: 8
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.010507345199584961
+JetBlock forward 层数: 9
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.008597135543823242
+JetBlock forward 层数: 10
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.030955791473388672
+JetBlock forward 层数: 11
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.05196642875671387
+JetBlock forward 层数: 12
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.01584792137145996
+JetBlock forward 层数: 13
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.008626699447631836
+attnAttention time: 0.00915837287902832
+JetBlock forward 层数: 15
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.010144233703613281
+JetBlock forward 层数: 16
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.020834684371948242
+JetBlock forward 层数: 17
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.038118839263916016
+JetBlock forward 层数: 18
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.02213740348815918
+attnAttention time: 0.0071604251861572266
+swaAttention time: 0.01642632484436035
+swaAttention time: 0.013069868087768555
+JetBlock forward 层数: 22
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.026128292083740234
+JetBlock forward 层数: 23
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.019720792770385742
+JetBlock forward 层数: 24
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.04083442687988281
+JetBlock forward 层数: 25
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.031246423721313477
+JetBlock forward 层数: 26
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.01993846893310547
+JetBlock forward 层数: 27
+qbefore chunk gated delta rule has_nan_1: True
+kbefore chunk gated delta rule has_nan_1: True
+vbefore chunk gated delta rule has_nan_1: True
+gbefore chunk gated delta rule has_nan_1: True
+betabefore chunk gated delta rule has_nan_1: True
+gafter chunk cumsum has_nan_1: True
+Aafter chunk scaled dot ktt has_nan_1: True
+A shape: torch.Size([1, 135, 12, 64])
+Aafter tl solve tril has_nan_1: True
+wafter tl recompute wu forward has_nan_1: True
+ktest has_nan_1: True
+wtest has_nan_1: True
+utest has_nan_1: True
+gtest has_nan_1: True
+v_newtest has_nan_1: True
+final_statetest has_nan_1: True
+oafter chunk gated delta rule has_nan_1: True
+recurrent_stateafter chunk gated delta rule has_nan_1: True
+jetAttention time: 0.026119709014892578
+JetBlock forward 层数: 0
+2025-10-30 07:27:26  [TileLang:tilelang.jit.kernel:INFO]: TileLang begins to compile kernel `main_fp16_prefill` with `out_idx=[-1]`
+2025-10-30 07:27:30  [TileLang:tilelang.jit.kernel:INFO]: TileLang completes to compile kernel `main_fp16_prefill`
+2025-10-30 07:27:30  [TileLang:tilelang.jit.kernel:INFO]: TileLang begins to compile kernel `main` with `out_idx=None`
+2025-10-30 07:27:34  [TileLang:tilelang.jit.kernel:INFO]: TileLang completes to compile kernel `main`
+jetAttention time: 7.420121908187866
+JetBlock forward 层数: 1
+jetAttention time: 0.0036094188690185547
+JetBlock forward 层数: 2
+jetAttention time: 0.003940582275390625
+JetBlock forward 层数: 3
+jetAttention time: 0.0025680065155029297
+JetBlock forward 层数: 4
+jetAttention time: 0.00232696533203125
+JetBlock forward 层数: 5
+jetAttention time: 0.002010822296142578
+JetBlock forward 层数: 6
+jetAttention time: 0.0023169517517089844
+JetBlock forward 层数: 7
+jetAttention time: 0.0022530555725097656
+JetBlock forward 层数: 8
+jetAttention time: 0.002307891845703125
+JetBlock forward 层数: 9
+jetAttention time: 0.002168893814086914
+JetBlock forward 层数: 10
+jetAttention time: 0.0020999908447265625
+JetBlock forward 层数: 11
+jetAttention time: 0.001958131790161133
+JetBlock forward 层数: 12
+jetAttention time: 0.0021486282348632812
+JetBlock forward 层数: 13
+jetAttention time: 0.0022504329681396484
+attnAttention time: 0.0014939308166503906
+JetBlock forward 层数: 15
+jetAttention time: 0.0034291744232177734
+JetBlock forward 层数: 16
+jetAttention time: 0.016077518463134766
+JetBlock forward 层数: 17
+jetAttention time: 0.007271528244018555
+JetBlock forward 层数: 18
+jetAttention time: 0.006536722183227539
+attnAttention time: 0.0024585723876953125
+swaAttention time: 0.002686738967895508
+swaAttention time: 0.012588977813720703
+JetBlock forward 层数: 22
+jetAttention time: 0.008285284042358398
+JetBlock forward 层数: 23
+jetAttention time: 0.014300346374511719
+JetBlock forward 层数: 24
+jetAttention time: 0.013157844543457031
+JetBlock forward 层数: 25
+jetAttention time: 0.002536296844482422
+JetBlock forward 层数: 26
+jetAttention time: 0.00197601318359375
+JetBlock forward 层数: 27
+jetAttention time: 0.0020055770874023438
+JetBlock forward 层数: 0
+jetAttention time: 0.003017902374267578
+JetBlock forward 层数: 1
+jetAttention time: 0.009819746017456055
+JetBlock forward 层数: 2
+jetAttention time: 0.0021479129791259766
+JetBlock forward 层数: 3
+jetAttention time: 0.002242565155029297
+JetBlock forward 层数: 4
+jetAttention time: 0.002094745635986328
+JetBlock forward 层数: 5
+jetAttention time: 0.002354860305786133
+JetBlock forward 层数: 6
+jetAttention time: 0.0026705265045166016
+JetBlock forward 层数: 7
+jetAttention time: 0.002731800079345703
+JetBlock forward 层数: 8
+jetAttention time: 0.002143383026123047
+JetBlock forward 层数: 9
+jetAttention time: 0.0018317699432373047
+JetBlock forward 层数: 10
+jetAttention time: 0.0018627643585205078
+JetBlock forward 层数: 11
+jetAttention time: 0.002887248992919922
+JetBlock forward 层数: 12
+jetAttention time: 0.015854597091674805
+JetBlock forward 层数: 13
+jetAttention time: 0.01977705955505371
+attnAttention time: 0.014297723770141602
+JetBlock forward 层数: 15
+jetAttention time: 0.006722927093505859
+JetBlock forward 层数: 16
+jetAttention time: 0.005019664764404297
+JetBlock forward 层数: 17
+jetAttention time: 0.007778644561767578
+JetBlock forward 层数: 18
+jetAttention time: 0.009117364883422852
+attnAttention time: 0.010222911834716797
+swaAttention time: 0.005684614181518555
+swaAttention time: 0.007987022399902344
+JetBlock forward 层数: 22
+jetAttention time: 0.011820316314697266
+JetBlock forward 层数: 23
+jetAttention time: 0.010788202285766602
+JetBlock forward 层数: 24
+jetAttention time: 0.005745649337768555
+JetBlock forward 层数: 25
+jetAttention time: 0.005857706069946289
+JetBlock forward 层数: 26
+jetAttention time: 0.0061740875244140625
+JetBlock forward 层数: 27
+jetAttention time: 0.010406017303466797
+JetBlock forward 层数: 0
+jetAttention time: 0.00702667236328125
+JetBlock forward 层数: 1
+jetAttention time: 0.016259431838989258
+JetBlock forward 层数: 2
+jetAttention time: 0.01611161231994629
+JetBlock forward 层数: 3
+jetAttention time: 0.014081716537475586
+JetBlock forward 层数: 4
+jetAttention time: 0.015000343322753906
+JetBlock forward 层数: 5
+jetAttention time: 0.01677846908569336
+JetBlock forward 层数: 6
+jetAttention time: 0.007028102874755859
+JetBlock forward 层数: 7
+jetAttention time: 0.008707284927368164
+JetBlock forward 层数: 8
+jetAttention time: 0.006036281585693359
+JetBlock forward 层数: 9
+jetAttention time: 0.013049602508544922
+JetBlock forward 层数: 10
+jetAttention time: 0.013458251953125
+JetBlock forward 层数: 11
+jetAttention time: 0.008662223815917969
+JetBlock forward 层数: 12
+jetAttention time: 0.011399030685424805
+JetBlock forward 层数: 13
+jetAttention time: 0.010852813720703125
+attnAttention time: 0.007703304290771484
+JetBlock forward 层数: 15
+jetAttention time: 0.015023469924926758
+JetBlock forward 层数: 16
+jetAttention time: 0.014701128005981445
+JetBlock forward 层数: 17
+jetAttention time: 0.0082550048828125
+JetBlock forward 层数: 18
+jetAttention time: 0.0162656307220459
+attnAttention time: 0.004397869110107422
+swaAttention time: 0.0048296451568603516
+swaAttention time: 0.0052106380462646484
+JetBlock forward 层数: 22
+jetAttention time: 0.013895750045776367
+JetBlock forward 层数: 23
+jetAttention time: 0.011137962341308594
+JetBlock forward 层数: 24
+jetAttention time: 0.01552724838256836
+JetBlock forward 层数: 25
+jetAttention time: 0.010126352310180664
+JetBlock forward 层数: 26
+jetAttention time: 0.006937265396118164
+JetBlock forward 层数: 27
+jetAttention time: 0.011676788330078125
+JetBlock forward 层数: 0
+jetAttention time: 0.008797645568847656
+JetBlock forward 层数: 1
+jetAttention time: 0.013356685638427734
+JetBlock forward 层数: 2
+jetAttention time: 0.011233091354370117
+JetBlock forward 层数: 3
+jetAttention time: 0.01319122314453125
+JetBlock forward 层数: 4
+jetAttention time: 0.012466669082641602
+JetBlock forward 层数: 5
+jetAttention time: 0.010937690734863281
+JetBlock forward 层数: 6
+jetAttention time: 0.007870912551879883
+JetBlock forward 层数: 7
+jetAttention time: 0.013193368911743164
+JetBlock forward 层数: 8
+jetAttention time: 0.014907121658325195
+JetBlock forward 层数: 9
+jetAttention time: 0.013425350189208984
+JetBlock forward 层数: 10
+jetAttention time: 0.006857872009277344
+JetBlock forward 层数: 11
+jetAttention time: 0.005409717559814453
+JetBlock forward 层数: 12
+jetAttention time: 0.008475542068481445
+JetBlock forward 层数: 13
+jetAttention time: 0.015992164611816406
+attnAttention time: 0.01271367073059082
+JetBlock forward 层数: 15
+jetAttention time: 0.006949663162231445
+JetBlock forward 层数: 16
+jetAttention time: 0.01514434814453125
+JetBlock forward 层数: 17
+jetAttention time: 0.010185718536376953
+JetBlock forward 层数: 18
+jetAttention time: 0.014256715774536133
+attnAttention time: 0.006860256195068359
+swaAttention time: 0.0062367916107177734
+swaAttention time: 0.011043548583984375
+JetBlock forward 层数: 22
+jetAttention time: 0.009385347366333008
+JetBlock forward 层数: 23
+jetAttention time: 0.015281200408935547
+JetBlock forward 层数: 24
+jetAttention time: 0.007947921752929688
+JetBlock forward 层数: 25
+jetAttention time: 0.00732111930847168
+JetBlock forward 层数: 26
+jetAttention time: 0.02264118194580078
+JetBlock forward 层数: 27
+jetAttention time: 0.012830257415771484
+JetBlock forward 层数: 0
+jetAttention time: 0.008914947509765625
+JetBlock forward 层数: 1
+jetAttention time: 0.016006946563720703
+JetBlock forward 层数: 2
+jetAttention time: 0.009808778762817383
+JetBlock forward 层数: 3
+jetAttention time: 0.00686335563659668
+JetBlock forward 层数: 4
+jetAttention time: 0.012173175811767578
+JetBlock forward 层数: 5
+jetAttention time: 0.01003265380859375
+JetBlock forward 层数: 6
+jetAttention time: 0.010244607925415039
+JetBlock forward 层数: 7
+jetAttention time: 0.01069951057434082
+JetBlock forward 层数: 8
+jetAttention time: 0.013817548751831055
+JetBlock forward 层数: 9
+jetAttention time: 0.007558107376098633
+JetBlock forward 层数: 10
+jetAttention time: 0.00825953483581543
+JetBlock forward 层数: 11
+jetAttention time: 0.009586811065673828
+JetBlock forward 层数: 12
+jetAttention time: 0.012071371078491211
+JetBlock forward 层数: 13
+jetAttention time: 0.005006074905395508
+attnAttention time: 0.004355192184448242
+JetBlock forward 层数: 15
+jetAttention time: 0.009559392929077148
+JetBlock forward 层数: 16
+jetAttention time: 0.019319772720336914
+JetBlock forward 层数: 17
+jetAttention time: 0.02098393440246582
+JetBlock forward 层数: 18
+jetAttention time: 0.009407758712768555
+attnAttention time: 0.0035619735717773438
+swaAttention time: 0.005110502243041992
+swaAttention time: 0.010103940963745117
+JetBlock forward 层数: 22
+jetAttention time: 0.012195348739624023
+JetBlock forward 层数: 23
+jetAttention time: 0.00677180290222168
+JetBlock forward 层数: 24
+jetAttention time: 0.0050084590911865234
+JetBlock forward 层数: 25
+jetAttention time: 0.005053997039794922
+JetBlock forward 层数: 26
+jetAttention time: 0.014174938201904297
+JetBlock forward 层数: 27
+jetAttention time: 0.01068115234375
+JetBlock forward 层数: 0
+jetAttention time: 0.015251636505126953
+JetBlock forward 层数: 1
+jetAttention time: 0.008138179779052734
+JetBlock forward 层数: 2
+jetAttention time: 0.008058547973632812
+JetBlock forward 层数: 3
+jetAttention time: 0.009911537170410156
+JetBlock forward 层数: 4
+jetAttention time: 0.00787806510925293
+JetBlock forward 层数: 5
+jetAttention time: 0.0087738037109375
+JetBlock forward 层数: 6
+jetAttention time: 0.005373716354370117
+JetBlock forward 层数: 7
+jetAttention time: 0.009207963943481445
+JetBlock forward 层数: 8
+jetAttention time: 0.010994195938110352
+JetBlock forward 层数: 9
+jetAttention time: 0.009579896926879883
+JetBlock forward 层数: 10
+jetAttention time: 0.01824045181274414
+JetBlock forward 层数: 11
+jetAttention time: 0.011120319366455078
+JetBlock forward 层数: 12
+jetAttention time: 0.009547233581542969
+JetBlock forward 层数: 13
+jetAttention time: 0.00822138786315918
+attnAttention time: 0.0041806697845458984
+JetBlock forward 层数: 15
+jetAttention time: 0.006871461868286133
+JetBlock forward 层数: 16
+jetAttention time: 0.0053861141204833984
+JetBlock forward 层数: 17
+jetAttention time: 0.005143642425537109
+JetBlock forward 层数: 18
+jetAttention time: 0.005192756652832031
+attnAttention time: 0.004414081573486328
+swaAttention time: 0.010853290557861328
+swaAttention time: 0.005537748336791992
+JetBlock forward 层数: 22
+jetAttention time: 0.005561351776123047
+JetBlock forward 层数: 23
+jetAttention time: 0.005117893218994141
+JetBlock forward 层数: 24
+jetAttention time: 0.007561206817626953
+JetBlock forward 层数: 25
+jetAttention time: 0.011849641799926758
+JetBlock forward 层数: 26
+jetAttention time: 0.008469581604003906
+JetBlock forward 层数: 27
+jetAttention time: 0.0068852901458740234
+JetBlock forward 层数: 0
+jetAttention time: 0.016932010650634766
+JetBlock forward 层数: 1
+jetAttention time: 0.0071563720703125
+JetBlock forward 层数: 2
+jetAttention time: 0.010024309158325195
+JetBlock forward 层数: 3
+jetAttention time: 0.010752439498901367
+JetBlock forward 层数: 4
+jetAttention time: 0.00950479507446289
+JetBlock forward 层数: 5
+jetAttention time: 0.006879568099975586
+JetBlock forward 层数: 6
+jetAttention time: 0.012396574020385742
+JetBlock forward 层数: 7
+jetAttention time: 0.013170957565307617
+JetBlock forward 层数: 8
+jetAttention time: 0.011275529861450195
+JetBlock forward 层数: 9
+jetAttention time: 0.006735801696777344
+JetBlock forward 层数: 10
+jetAttention time: 0.0052525997161865234
+JetBlock forward 层数: 11
+jetAttention time: 0.0065534114837646484
+JetBlock forward 层数: 12
+jetAttention time: 0.005044698715209961
+JetBlock forward 层数: 13
+jetAttention time: 0.00699162483215332
+attnAttention time: 0.01196432113647461
+JetBlock forward 层数: 15
+jetAttention time: 0.011802196502685547
+JetBlock forward 层数: 16
+jetAttention time: 0.008582353591918945
+JetBlock forward 层数: 17
+jetAttention time: 0.012914896011352539
+JetBlock forward 层数: 18
+jetAttention time: 0.006484031677246094
+attnAttention time: 0.003875732421875
+swaAttention time: 0.003906965255737305
+swaAttention time: 0.00426483154296875
+JetBlock forward 层数: 22
+jetAttention time: 0.00847005844116211
+JetBlock forward 层数: 23
+jetAttention time: 0.0119476318359375
+JetBlock forward 层数: 24
+jetAttention time: 0.00492548942565918
+JetBlock forward 层数: 25
+jetAttention time: 0.010267257690429688
+JetBlock forward 层数: 26
+jetAttention time: 0.012746810913085938
+JetBlock forward 层数: 27
+jetAttention time: 0.011137247085571289
+JetBlock forward 层数: 0
+jetAttention time: 0.020154476165771484
+JetBlock forward 层数: 1
+jetAttention time: 0.017375946044921875
+JetBlock forward 层数: 2
+jetAttention time: 0.009743452072143555
+JetBlock forward 层数: 3
+jetAttention time: 0.021045207977294922
+JetBlock forward 层数: 4
+jetAttention time: 0.01385354995727539
+JetBlock forward 层数: 5
+jetAttention time: 0.011165380477905273
+JetBlock forward 层数: 6
+jetAttention time: 0.014978885650634766
+JetBlock forward 层数: 7
+jetAttention time: 0.01681351661682129
+JetBlock forward 层数: 8
+jetAttention time: 0.011287450790405273
+JetBlock forward 层数: 9
+jetAttention time: 0.018492937088012695
+JetBlock forward 层数: 10
+jetAttention time: 0.017604351043701172
+JetBlock forward 层数: 11
+jetAttention time: 0.02115345001220703
+JetBlock forward 层数: 12
+jetAttention time: 0.016726970672607422
+JetBlock forward 层数: 13
+jetAttention time: 0.017760276794433594
+attnAttention time: 0.011937856674194336
+JetBlock forward 层数: 15
+jetAttention time: 0.018164873123168945
+JetBlock forward 层数: 16
+jetAttention time: 0.018583297729492188
+JetBlock forward 层数: 17
+jetAttention time: 0.015610694885253906
+JetBlock forward 层数: 18
+jetAttention time: 0.017563819885253906
+attnAttention time: 0.00989842414855957
+swaAttention time: 0.012142419815063477
+swaAttention time: 0.0069217681884765625
+JetBlock forward 层数: 22
+jetAttention time: 0.01434469223022461
+JetBlock forward 层数: 23
+jetAttention time: 0.02235126495361328
+JetBlock forward 层数: 24
+jetAttention time: 0.01704692840576172
+JetBlock forward 层数: 25
+jetAttention time: 0.013786554336547852
+JetBlock forward 层数: 26
+jetAttention time: 0.012778997421264648
+JetBlock forward 层数: 27
+jetAttention time: 0.014641761779785156
+JetBlock forward 层数: 0
+jetAttention time: 0.016397953033447266
+JetBlock forward 层数: 1
+jetAttention time: 0.015009164810180664
+JetBlock forward 层数: 2
+jetAttention time: 0.019757747650146484
+JetBlock forward 层数: 3
+jetAttention time: 0.016885995864868164
+JetBlock forward 层数: 4
+jetAttention time: 0.019483327865600586
+JetBlock forward 层数: 5
+jetAttention time: 0.015456199645996094
+JetBlock forward 层数: 6
+jetAttention time: 0.01760268211364746
+JetBlock forward 层数: 7
+jetAttention time: 0.02011251449584961
+JetBlock forward 层数: 8
+jetAttention time: 0.020694255828857422
+JetBlock forward 层数: 9
+jetAttention time: 0.01925969123840332
+JetBlock forward 层数: 10
+jetAttention time: 0.01490163803100586
+JetBlock forward 层数: 11
+jetAttention time: 0.019799232482910156
+JetBlock forward 层数: 12
+jetAttention time: 0.015546560287475586
+JetBlock forward 层数: 13
+jetAttention time: 0.015168190002441406
+attnAttention time: 0.009130716323852539
+JetBlock forward 层数: 15
+jetAttention time: 0.014651775360107422
+JetBlock forward 层数: 16
+jetAttention time: 0.015198707580566406
+JetBlock forward 层数: 17
+jetAttention time: 0.009414196014404297
+JetBlock forward 层数: 18
+jetAttention time: 0.021854877471923828
+attnAttention time: 0.011311531066894531
+swaAttention time: 0.014109373092651367
+swaAttention time: 0.009885787963867188
+JetBlock forward 层数: 22
+jetAttention time: 0.013849735260009766
+JetBlock forward 层数: 23
+jetAttention time: 0.016075849533081055
+JetBlock forward 层数: 24
+jetAttention time: 0.010876893997192383
+JetBlock forward 层数: 25
+jetAttention time: 0.01101064682006836
+JetBlock forward 层数: 26
+jetAttention time: 0.017682552337646484
+JetBlock forward 层数: 27
+jetAttention time: 0.01235342025756836
+
+Input: Hi, My name is Timmy. I am currently a 3rd year PhD student in Computer Science at Stanford University. I am interested in natural language processing and machine learning. How about you? Do you like to travel? Or do you like to read books? What is your favorite book? What is your favorite travel destination? Hi, My name is Timmy. I am currently a 3rd year PhD student in Computer Science at Stanford University. I am interested in natural language processing and machine learning. How about you? Do you like to travel? Or do you like to read books? What is your favorite book? What is your favorite travel destination? Please
+
+Output: Hi, My name is Timmy. I am currently a 3rd year PhD student in Computer Science at Stanford University. I am interested in natural language processing and machine learning. How about you? Do you like to travel? Or do you like to read books? What is your favorite book? What is your favorite travel destination? Hi, My name is Timmy. I am currently a 3rd year PhD student in Computer Science at Stanford University. I am interested in natural language processing and machine learning. How about you? Do you like to travel? Or do you like to read books? What is your favorite book? What is your favorite travel destination? Please!!!!!!!!!!
