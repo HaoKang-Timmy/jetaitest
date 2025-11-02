@@ -1,0 +1,33 @@
+{%- if messages[0].role == "system" -%}
+	{{- "<|im_start|>system\n" + messages[0].content + "<|im_end|>\n" -}}
+{%- endif -%}
+{%- for message in messages -%}
+	{%- if message.content is string -%}
+		{%- set content = message.content -%}
+	{%- else -%}
+		{%- set content = "" -%}
+	{%- endif -%}
+	{%- if message.role == "user" or message.role == "system" and not loop.first -%}
+		{{- "<|im_start|>" + message.role + "\n" + content + "<|im_end|>" + "\n" -}}
+	{%- elif message.role == "assistant" -%}
+		{%- set reasoning_content = "" -%}
+		{%- if message.reasoning_content is string -%}
+			{%- set reasoning_content = message.reasoning_content -%}
+		{%- elif "</think>" in content -%}
+			{%- set reasoning_content = content.split("</think>")[0].rstrip("\n").split("<think>")[-1].lstrip("\n") -%}
+			{%- set content = content.split("</think>")[-1].lstrip("\n") -%}
+		{%- endif -%}
+		{{- "<|im_start|>" + message.role + "\n" -}}
+		{%- if reasoning_content -%}
+			{{- "<think>\n" + reasoning_content.strip("\n") + "\n</think>\n\n" -}}
+		{%- endif -%}
+		{{- content.lstrip("\n") -}}
+		{{- "<|im_end|>\n" -}}
+	{%- endif -%}
+{%- endfor -%}
+{%- if add_generation_prompt -%}
+	{{- "<|im_start|>assistant\n" -}}
+	{%- if enable_thinking is defined and enable_thinking is false -%}
+		{{- "<think>\n\n</think>\n\n" -}}
+	{%- endif -%}
+{%- endif -%}

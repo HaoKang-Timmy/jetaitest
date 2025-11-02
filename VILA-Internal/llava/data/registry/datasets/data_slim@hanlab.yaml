@@ -1,0 +1,113 @@
+---
+# infer
+sharegpt4v_sft_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/sharegpt4v/jason-filter-sharegpt4v_mix665k_cap23k_coco-ap9k_lcs3k_sam9k_div2k.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/llava-data/instruction-tuning
+
+captioning_image-paragraph-captioning_train_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/captioning_image-paragraph-captioning_train/data.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/vflan/captioning_image-paragraph-captioning_train/images
+    no_system_prompt: true
+
+captioning_msrvtt_train_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/captioning_msrvtt_train/data.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/vflan/captioning_msrvtt_train/images
+    no_system_prompt: true
+
+captioning_textcap_train_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/captioning_textcap_train/data.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/vflan/captioning_textcap_train/images
+    no_system_prompt: true
+
+generation_visual-dialog_train_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/generation_visual-dialog_train/data.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/vflan/generation_visual-dialog_train/images
+    no_system_prompt: true
+
+reasoning_clevr_train_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/reasoning_clevr_train/data.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/vflan/reasoning_clevr_train/images
+    no_system_prompt: true
+
+reasoning_nlvr_train_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/reasoning_nlvr_train/data.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/vflan/reasoning_nlvr_train/images
+    no_system_prompt: true
+
+reasoning_visual-mrc_train_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/reasoning_visual-mrc_train/data.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/vflan/reasoning_visual-mrc_train/images
+    no_system_prompt: true
+
+text_flan_1m_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/text_flan_1m/data.json
+    no_system_prompt: true
+
+vqa_activitynet-qa_train_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_activitynet-qa_train/data.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_activitynet-qa_train/images
+    no_system_prompt: true
+
+vqa_docvqa_train_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_docvqa_train/data.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_docvqa_train/images
+    no_system_prompt: true
+
+vqa_gqa_train_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_gqa_train/data.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_gqa_train/images
+    no_system_prompt: true
+
+vqa_ivqa_train_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_ivqa_train/data.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_ivqa_train/images
+    no_system_prompt: true
+
+vqa_msrvtt-qa_train_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_msrvtt-qa_train/data.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_msrvtt-qa_train/images
+    no_system_prompt: true
+
+vqa_msvd-qa_train_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_msvd-qa_train/data.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_msvd-qa_train/images
+    no_system_prompt: true
+
+vqa_ocr-vqa_train_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_ocr-vqa_train/data.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_ocr-vqa_train/images
+    no_system_prompt: true
+
+vqa_st-vqa_train_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_st-vqa_train/data.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_st-vqa_train/images
+    no_system_prompt: true
+
+vqa_viquae_train_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_viquae_train/data.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_viquae_train/images
+    no_system_prompt: true
+
+vqa_vqa-v2_train_infer:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_vqa-v2_train/data.json
+    media_dir: /home/yuxian/VILA-Internal/downstream_data/vflan/vqa_vqa-v2_train/images
+    no_system_prompt: true

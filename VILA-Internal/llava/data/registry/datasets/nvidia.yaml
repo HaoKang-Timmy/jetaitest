@@ -1,0 +1,94 @@
+---
+dummy:
+    _target_: llava.data.DummyDataset
+    num_instances: 10000
+    comments: dummy dataset for testing
+
+cinepile:
+    video_dir: /lustre/fsw/portfolios/nvr/users/xiuli/cinepile/yt_videos
+    
+thinking/unichart:
+    _target_: llava.data.LLaVADataset
+    data_path: hf-datasets://Efficient-Large-Model/thinking_data/unichart/instances.json
+    media_dir: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/vila-sft/unichart-qa-data/images
+    comments: thinking data for unichart, relabeled by Gemini 2.0 exp thinking
+    system_prompt: A conversation between User and Assistant. The user asks a question, and the Assistant solves it. The assistant first thinks about the reasoning process in the mind and then provides
+        the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> {reasoning process here} </think><answer>
+        {answer here} </answer>
+    resample_on_failure: false
+
+thinking/llave_onevision_images_sft:
+    _target_: llava.data.LLaVADataset
+    # data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/vila-sft/LLaVA-OneVision-Data-processed/llava_onevision_sft_images_only_non_repeat_train.jsonl
+    data_path: hf-datasets://Efficient-Large-Model/thinking_data/llave_onevision_images_sft/instances.json
+    media_dir: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/vila-sft/LLaVA-OneVision-Data-processed/images
+    comments: thinking data for llave_onevision_images_sft, relabeled by Gemini 2.0 exp thinking
+    system_prompt: A conversation between User and Assistant. The user asks a question, and the Assistant solves it. The assistant first thinks about the reasoning process in the mind and then provides
+        the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> {reasoning process here} </think><answer>
+        {answer here} </answer>
+    resample_on_failure: false
+
+thinking/chartqa_train_18k:
+    _target_: llava.data.LLaVADataset
+    media_dir: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/vila-sft/internvl_chat/playground/data/chartqa
+    # data_path: /home/ligengz/workspace/VILA-main/thinking_data/chartqa_train_18k/instances.json
+    data_path: hf-datasets://Efficient-Large-Model/thinking_data/chartqa_train_18k/instances.json
+    comments: thinking data for chartqa_train_18k, relabeled by Gemini 2.0 exp thinking
+    system_prompt: A conversation between User and Assistant. The user asks a question, and the Assistant solves it. The assistant first thinks about the reasoning process in the mind and then provides
+        the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> {reasoning process here} </think><answer>
+        {answer here} </answer>
+    resample_on_failure: false
+
+thinking/tabmwp:
+    _target_: llava.data.LLaVADataset
+    media_dir: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/vila-sft/PromptPG/data/tabmwp
+    # data_path: /home/ligengz/workspace/VILA-main/thinking_data/tabmwp/instances.json
+    data_path: hf-datasets://Efficient-Large-Model/thinking_data/tabmwp/instances.json
+    comments: thinking data for tabmwp, relabeled by Gemini 2.0 exp thinking
+    system_prompt: A conversation between User and Assistant. The user asks a question, and the Assistant solves it. The assistant first thinks about the reasoning process in the mind and then provides
+        the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> {reasoning process here} </think><answer>
+        {answer here} </answer>
+    resample_on_failure: false
+
+llave_onevision_images_sft_cot:
+    _target_: llava.data.LLaVACOTDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/vila-sft/LLaVA-OneVision-Data-processed/llava_onevision_sft_images_only_non_repeat_train@@fix_relpath.jsonl
+    media_dir: /home/ligengz/nvr_elm_llm/dataset/vila-sft/LLaVA-OneVision-Data-processed/images
+    name: llave_onevision_images_sft
+    cot_relabel_path: /home/ligengz/workspace/VILA-dev/data_curation_dev/recaptioned_cot_llava.json
+
+sharegpt4v_sft_cot:
+    _target_: llava.data.LLaVACOTDataset
+    data_path: /home/jasonlu/vlm_datasets/ShareGPT4V/jason-filter-sharegpt4v_mix665k_cap23k_coco-ap9k_lcs3k_sam9k_div2k.json
+    media_dir: /home/jasonlu/vlm_datasets/ShareGPT4V/data
+    name: sharegpt4v_sft
+    cot_relabel_path: /home/ligengz/workspace/VILA-dev/data_curation_dev/recaptioned_cot_llava.json
+
+geoqa_cot:
+    _target_: llava.data.LLaVACOTDataset
+    data_path: /home/jasonlu/workspace/InternVL/internvl_chat/playground/geoqa+.jsonl
+    media_dir: /home/jasonlu/workspace/InternVL/internvl_chat/playground/data/geoqa+
+    name: geoqa
+    cot_relabel_path: /home/ligengz/workspace/VILA-dev/data_curation_dev/recaptioned_cot_llava.json
+
+chartqa_train_18k_cot:
+    _target_: llava.data.LLaVACOTDataset
+    data_path: /home/jasonlu/workspace/InternVL/internvl_chat/playground/chartqa_train_18k.jsonl
+    media_dir: /home/jasonlu/workspace/InternVL/internvl_chat/playground/data/chartqa
+    name: chartqa_train_18k
+    cot_relabel_path: /home/ligengz/workspace/VILA-dev/data_curation_dev/recaptioned_cot_llava.json
+
+tabmwp_cot:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/vila-sft/PromptPG/data/tabmwp/problems_train_vila_cot.json
+    media_dir: /home/ligengz/nvr_elm_llm/dataset/vila-sft/PromptPG/data/tabmwp
+
+tabmwp:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/vila-sft/PromptPG/data/tabmwp/problems_train_vila.json
+    media_dir: /home/ligengz/nvr_elm_llm/dataset/vila-sft/PromptPG/data/tabmwp
+
+mmc_instruction:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/vila-sft/MMC-Instruction/processed/mmc_instruction_410k.json
+    media_dir: /home/ligengz/nvr_elm_llm/dataset/vila-sft/MMC-Instruction

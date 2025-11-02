@@ -1,0 +1,94 @@
+{#-
+  In addition to the normal inputs of `messages` and `tools`, this template also accepts the
+  following kwargs:
+  - "builtin_tools": A list, can contain "browser" and/or "python".
+  - "model_identity": A string that optionally describes the model identity.
+  - "reasoning_effort": A string that describes the reasoning effort, defaults to "medium".
+ #}
+{#- System Message Construction ============================================ #}
+{%- macro build_system_message() -%}
+    {%- if model_identity is not defined %}
+        {{- "You are ChatGPT, a large language model trained by OpenAI.
+" -}}
+    {%- else %}
+        {{- model_identity }}
+    {%- endif %}
+    {{- "Knowledge cutoff: 2024-06
+" }}
+    {{- "Current date: " + strftime_now("%Y-%m-%d") + "
+" }}
+    {%- if reasoning_effort is not defined %}
+        {%- set reasoning_effort = "medium" %}
+    {%- endif %}
+    {{- "reasoning: " + reasoning_effort + "
+" }}
+    {{- "# Valid channels: analysis, commentary, final. Channel must be included for every message.
+" }}
+{%- endmacro -%}
+{#- CoT Dropping Logic ================================================== #}
+{%- set cot_final_indices = [] -%}
+{%- for idx in range(messages|length) -%}
+    {%- set m = messages[idx] -%}
+    {%- if m.role == 'assistant' and m.get('channel', '') == 'final' -%}
+        {%- if cot_final_indices.append(idx) -%}{%- endif -%}
+    {%- endif -%}
+{%- endfor -%}
+{%- set cot_last_final_idx = cot_final_indices[-1] if cot_final_indices else none -%}
+{%- set cot_last_user_idx = none -%}
+{%- if cot_last_final_idx is not none -%}
+    {%- for idx in range(cot_last_final_idx - 1, -1, -1) -%}
+        {%- if messages[idx].role == 'user' and cot_last_user_idx is none -%}
+            {%- set cot_last_user_idx = idx -%}
+        {%- endif -%}
+    {%- endfor -%}
+{%- endif -%}
+{#- Main Template Logic ================================================= #}
+{#- Set defaults #}
+{%- set auto_drop = auto_drop_analysis if auto_drop_analysis is defined else true -%}
+{#- Render system message #}
+{{- "<|start|>system<|message|>" }}
+{{- build_system_message() }}
+{{- "<|end|>" }}
+{#- Extract developer message #}
+{%- if messages[0].role == "developer" or messages[0].role == "system" %}
+    {%- set developer_message = messages[0].content %}
+    {%- set loop_messages = messages[1:] %}
+{%- else %}
+    {%- set developer_message = "" %}
+    {%- set loop_messages = messages %}
+{%- endif %}
+{#- Render developer message #}
+{%- if developer_message %}
+    {{- "<|start|>developer<|message|>" }}
+    {{- "# Instructions
+" }}
+    {{- developer_message }}
+    {{- "<|end|>" }}
+{%- endif %}
+{#- Render messages #}
+{%- for message in loop_messages -%}
+    {%- set skip = false -%}
+    
+    {# Apply CoT dropping logic #}
+    {%- if auto_drop and cot_last_final_idx is not none and loop.index0 < cot_last_final_idx -%}
+        {%- if message.role == 'assistant' and message.get('channel', '') != 'final' -%}
+            {%- if cot_last_user_idx is none or loop.index0 > cot_last_user_idx -%}
+                {%- set skip = true -%}
+            {%- endif -%}
+        {%- elif message.role == 'user' and message.get('channel', '') == 'analysis' -%}
+            {%- set skip = true -%}
+        {%- endif -%}
+    {%- endif -%}
+    
+    {%- if not skip -%}
+        {%- if message.role == 'assistant' -%}
+            {{- "<|start|>assistant<|message|>" + message.content + "<|end|>" }}
+        {%- else -%}
+            {{- "<|start|>user<|message|>" + message.content + "<|end|>" }}
+        {%- endif -%}
+    {%- endif -%}
+{%- endfor -%}
+{#- Generation prompt #}
+{%- if add_generation_prompt -%}
+<|start|>assistant
+{%- endif -%}

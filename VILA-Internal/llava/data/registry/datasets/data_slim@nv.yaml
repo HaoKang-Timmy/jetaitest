@@ -1,0 +1,101 @@
+---
+llava-video/youtube-oe_sub0:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/youtube-oe.json
+    media_dir: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/videos
+    start_idx: 0/10
+    end_idx: 1/10
+
+llava-video/youtube-oe_sub1:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/youtube-oe.json
+    media_dir: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/videos
+    start_idx: 1/10
+    end_idx: 2/10
+
+llava-video/youtube-oe_sub2:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/youtube-oe.json
+    media_dir: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/videos
+    start_idx: 2/10
+    end_idx: 3/10
+
+llava-video/youtube-oe_sub3:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/youtube-oe.json
+    media_dir: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/videos
+    start_idx: 3/10
+    end_idx: 4/10
+
+llava-video/youtube-oe_sub4:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/youtube-oe.json
+    media_dir: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/videos
+    start_idx: 4/10
+    end_idx: 5/10
+
+llava-video/youtube-oe_sub5:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/youtube-oe.json
+    media_dir: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/videos
+    start_idx: 5/10
+    end_idx: 6/10
+
+llava-video/youtube-oe_sub6:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/youtube-oe.json
+    media_dir: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/videos
+    start_idx: 6/10
+    end_idx: 7/10
+
+llava-video/youtube-oe_sub7:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/youtube-oe.json
+    media_dir: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/videos
+    start_idx: 7/10
+    end_idx: 8/10
+
+llava-video/youtube-oe_sub8:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/youtube-oe.json
+    media_dir: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/videos
+    start_idx: 8/10
+    end_idx: 9/10
+
+llava-video/youtube-oe_sub9:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/youtube-oe.json
+    media_dir: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/datasets/llava-video/videos
+    start_idx: 9/10
+    end_idx: 10/10
+
+train:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/ligengz/workspace/dataset-curation/slim/meta_data/sharegpt4v_sft+vflan/train.jsonl
+    media_dir: ''
+
+infer:
+    _target_: llava.data.DataScorerInferDataset
+    data_path: /home/ligengz/workspace/dataset-curation/slim/meta_data/sharegpt4v_sft+vflan/train.jsonl
+    media_dir: ''
+
+train_small:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/ligengz/workspace/dataset-curation/slim/meta_data/sharegpt4v_sft+vflan/train_small.jsonl
+    media_dir: ''
+
+target:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/ligengz/workspace/dataset-curation/slim/meta_data/target.jsonl
+    media_dir: /home/ligengz/workspace/dataset-curation/slim/media
+
+proxy:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/ligengz/workspace/dataset-curation/slim/meta_data/sharegpt4v_sft+vflan/proxy.jsonl
+    media_dir: ''
+
+proxy_with_scores:
+    _target_: llava.data.DataScorerDataset
+    data_path: /home/ligengz/workspace/dataset-curation/slim/meta_data/sharegpt4v_sft+vflan/proxy.jsonl
+    media_dir: ''
+    score_dir: runs/dummy

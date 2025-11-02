@@ -1,0 +1,640 @@
+---
+dummy:
+    _target_: llava.data.DummyDataset
+    num_instances: 10000
+    comments: dummy dataset for testing
+
+######### added by ligeng Nov 5 #########
+# not ready yet
+wit_subset:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/WIT/wit_1_8m/wit_processed_538k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/WIT_subset/wit_1_8m/images
+
+estvqa:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/estvqa/ESTVQA_processed.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/estvqa/train
+
+math:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/math/data.json
+
+sherlock:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/sherlock/processed/sherlock_317k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/sherlock/images
+
+doc_reason:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/docreason25k_processed2.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/DocReason25K
+
+kvqa:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/kvqa/raw/kvqa_processed.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/kvqa/raw
+
+art:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/art_shangy/art500k_processed.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/art_shangy
+
+chembl:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/chembl/chembl_converted.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/chembl/images
+
+poie:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/poie/POIE_processed.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/poie/nfv5/nfv5_3125
+
+mminstruct:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/MMInstruct/jsons_all/qa_en.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/MMInstruct/images
+
+############################################
+
+llave_onevision_images_sft_cot:
+    _target_: llava.data.LLaVACOTDataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/LLaVA-OneVision-Data-processed/llava_onevision_sft_images_only_non_repeat_train@fix_relpath.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/LLaVA-OneVision-Data-processed/images
+    name: llave_onevision_images_sft
+    cot_relabel_path: /home/ligengz/workspace/VILA-dev/data_curation_dev/recaptioned_cot_llava.json
+
+sharegpt4v_sft_cot:
+    _target_: llava.data.LLaVACOTDataset
+    data_path: /home/jasonlu/vlm_datasets/ShareGPT4V/jason-filter-sharegpt4v_mix665k_cap23k_coco-ap9k_lcs3k_sam9k_div2k.json
+    media_dir: /home/jasonlu/vlm_datasets/ShareGPT4V/data
+    name: sharegpt4v_sft
+    cot_relabel_path: /home/ligengz/workspace/VILA-dev/data_curation_dev/recaptioned_cot_llava.json
+
+geoqa_cot:
+    _target_: llava.data.LLaVACOTDataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground/geoqa+.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground/data/geoqa+
+    name: geoqa
+    cot_relabel_path: /home/ligengz/workspace/VILA-dev/data_curation_dev/recaptioned_cot_llava.json
+
+chartqa_train_18k_cot:
+    _target_: llava.data.LLaVACOTDataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground/chartqa_train_18k.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground/data/chartqa
+    name: chartqa_train_18k
+    cot_relabel_path: /home/ligengz/workspace/VILA-dev/data_curation_dev/recaptioned_cot_llava.json
+
+tabmwp_cot:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/PromptPG/data/tabmwp/problems_train_vila_cot.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/PromptPG/data/tabmwp
+
+tabmwp:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/PromptPG/data/tabmwp/problems_train_vila.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/PromptPG/data/tabmwp
+
+mmc_instruction:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/MMC-Instruction/processed/mmc_instruction_410k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/MMC-Instruction
+
+nextqa_mc:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/train-processed-filtered-mc.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/VideoGPT-plus_Training_Dataset/instruction_tuning/NExTQA/test
+    is_video: true
+
+mmbench_val:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/MMBench/data/mmbench_4k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/MMBench/images
+
+vcg_human:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/VideoGPT-plus_Training_Dataset/annotations/vcg_human_annotated.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/VideoGPT-plus_Training_Dataset/instruction_tuning/Activity_Videos
+    is_video: true
+
+unimm_chat:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/UniMM-Chat/UniMM-Chat_117k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/coco
+
+textocr_qa:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/textocr-gpt4v/processed/textocr_25k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/TextOCR/train_images
+
+svit:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/SVIT/SVIT_108k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/svit
+
+stem_qa:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/STEM/processed/stem_sft_644k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/STEM/processed/images/train
+
+ssv2:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/VideoGPT-plus_Training_Dataset/annotations/classification_ssv2_converted.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/VideoGPT-plus_Training_Dataset/instruction_tuning/ssv2
+    is_video: true
+
+shikra:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/shikra/shikra.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/flickr30k-images
+
+# coco_clip and coco?
+refcoco_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /home/yunhaof/workspace/datasets/grounding/annotations/processed/refcoco_train.json
+    media_dir: /home/yunhaof/workspace/datasets
+
+reason_clevrerqa:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/VideoGPT-plus_Training_Dataset/annotations/reasoning_clevrer_qa_converted.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/VideoGPT-plus_Training_Dataset/instruction_tuning/clevrer
+    is_video: true
+
+reason_clevrermc:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/VideoGPT-plus_Training_Dataset/annotations/reasoning_clevrer_mc_converted.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/VideoGPT-plus_Training_Dataset/instruction_tuning/clevrer
+    is_video: true
+
+nv_mm_sft:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/nv_mm_sft/nv_mm_sft.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/nv_mm_sft/images
+
+k710:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/VideoGPT-plus_Training_Dataset/annotations/classification_k710_converted.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/VideoGPT-plus_Training_Dataset/instruction_tuning/k710
+    is_video: true
+
+
+llave_onevision_images_sft:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/LLaVA-OneVision-Data-processed/llava_onevision_sft_images_only_non_repeat_train@fix_relpath.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/LLaVA-OneVision-Data-processed/images
+
+llave_onevision_sft:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/LLaVA-OneVision-Data-processed/llava_onevision_sft_non_repeat_train.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/LLaVA-OneVision-Data-processed/images
+
+idefics2_sft:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/idefics2-sft/processed/idefics2_sft_w_table.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/idefics2-sft
+
+cambrian_1375k:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/cambrian/cambrian_1375k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/Cambrian/data
+
+cvbench:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/CV-Bench/test_2k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/CV-Bench
+
+ai2d_train_12k:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground//ai2d_train_12k.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground//data/ai2d
+
+shot2story_shotonly:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/shot2story/train-shortclip-processed-bin.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/shot2story/Shot2Story/data/videos_extracted
+
+
+orand-b:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/ORAND-CAR-B_train.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/yuxian_data/images/ORAND-CAR-B
+
+wordart:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/WordArt_train_label_out_processed.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/WordArt
+
+unichart:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/unichart-qa-data/unichart-qa_processed.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/unichart-qa-data/images
+
+ureaderkg:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/ureader_kg/ureader_kg_processed.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/ureader_kg
+
+# 154,608
+olmo_pointing:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo/llava/pointing.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo
+# 27,856
+olmo_pointing_qa:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo/llava/pointing_qa.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo
+# 65,934
+olmo_pointing_high_freq:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo/llava/pointing_high_frequency.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo
+# 46,518
+olmo_doc_table:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/documents_tables.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo
+# 71,282
+olmo_doc_doc:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo/llava/documents_documents.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo
+# 16,551
+olmo_doc_diagrams:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo/llava/documents_diagrams.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo
+# 116,814
+olmo_doc_charts:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo/llava/documents_charts.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo
+# 203,559
+olmo_clock200k:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo/llava/clocks_processed_200k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo
+# 30,000
+olmo_clock30k:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/clocks_processed_30k.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo
+# 71,172
+olmo_askanything:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/ask_model_anything.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo
+# 162,855
+olmo_capqa:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo/llava/capqa.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pixmo
+
+sharegpt4v_gpt4_100k:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/ShareGPT4V/jason-filter-sharegpt4v_instruct_gpt4-vision_cap100k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/ShareGPT4V/data
+
+synthdog_en:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground//synthdog_en.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground//data/synthdog-en
+
+llava_instruct:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground//llava_instruct_150k_zh.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground//data/coco
+
+geoqa:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground//geoqa+.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground//data/geoqa+
+
+text_flan_1m:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/text_flan_1m/data.json
+    no_system_prompt: true
+
+scienceqa:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/evaluation/scienceqa/scienceqa_train_12k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/evaluation/scienceqa/images
+
+sharegpt4v_sft:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/ShareGPT4V/jason-filter-sharegpt4v_mix665k_cap23k_coco-ap9k_lcs3k_sam9k_div2k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/ShareGPT4V/data
+
+########################### vflan ###########################
+captioning_image-paragraph-captioning_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/captioning_image-paragraph-captioning_train/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vflan/captioning_image-paragraph-captioning_train/images
+    no_system_prompt: true
+
+captioning_msrvtt_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/captioning_msrvtt_train/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vflan/captioning_msrvtt_train/images
+    no_system_prompt: true
+    is_video: true
+
+captioning_textcap_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/captioning_textcap_train/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vflan/captioning_textcap_train/images
+    no_system_prompt: true
+
+chartqa_train_18k:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground/chartqa_train_18k.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground/data/chartqa
+
+docvqa_train_10k:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground/docvqa_train_10k.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground/data/docvqa
+
+dvqa_train_200k:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground/dvqa_train_200k.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground/data/dvqa
+
+generation_visual-dialog_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/generation_visual-dialog_train/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vflan/generation_visual-dialog_train/images
+    no_system_prompt: true
+
+llava-video/academic-cap:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/datasets/llava-video/academic-cap.json
+    media_dir: /lustre/fsw/nvr_elm_llm/datasets/llava-video/videos
+    is_video: true
+
+llava-video/academic-mc:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/datasets/llava-video/academic-mc.json
+    media_dir: /lustre/fsw/nvr_elm_llm/datasets/llava-video/videos
+    is_video: true
+
+llava-video/academic-oe:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/datasets/llava-video/academic-oe.json
+    media_dir: /lustre/fsw/nvr_elm_llm/datasets/llava-video/videos
+    is_video: true
+
+llava-video/activitynetqa-oe:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/datasets/llava-video/activitynetqa-oe.json
+    media_dir: /lustre/fsw/nvr_elm_llm/datasets/llava-video/videos
+    is_video: true
+
+llava-video/nextqa-mc:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/datasets/llava-video/nextqa-mc.json
+    media_dir: /lustre/fsw/nvr_elm_llm/datasets/llava-video/videos
+    is_video: true
+
+llava-video/nextqa-oe:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/datasets/llava-video/nextqa-oe.json
+    media_dir: /lustre/fsw/nvr_elm_llm/datasets/llava-video/videos
+    is_video: true
+
+llava-video/perceptiontest-mc:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/datasets/llava-video/perceptiontest-mc.json
+    media_dir: /lustre/fsw/nvr_elm_llm/datasets/llava-video/videos
+    is_video: true
+
+llava-video/sharegptvideo-cap:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/datasets/llava-video/sharegptvideo-cap.json
+    media_dir: /lustre/fsw/nvr_elm_llm/datasets/sharegpt-video/videos
+    is_video: true
+
+llava-video/sharegptvideo-oe:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/datasets/llava-video/sharegptvideo-oe.json
+    media_dir: /lustre/fsw/nvr_elm_llm/datasets/sharegpt-video/videos
+    is_video: true
+
+llava-video/youtube-cap:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/datasets/llava-video/youtube-cap.json
+    media_dir: /lustre/fsw/nvr_elm_llm/datasets/llava-video/videos
+    is_video: true
+
+llava-video/youtube-mc:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/datasets/llava-video/youtube-mc.json
+    media_dir: /lustre/fsw/nvr_elm_llm/datasets/llava-video/videos
+    is_video: true
+
+llava-video/youtube-oe:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/datasets/llava-video/youtube-oe.json
+    media_dir: /lustre/fsw/nvr_elm_llm/datasets/llava-video/videos
+    is_video: true
+
+reasoning_clevr_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/reasoning_clevr_train/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vflan/reasoning_clevr_train/images
+    no_system_prompt: true
+
+reasoning_nlvr_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/reasoning_nlvr_train/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vflan/reasoning_nlvr_train/images
+    no_system_prompt: true
+
+reasoning_visual-mrc_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/reasoning_visual-mrc_train/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vflan/reasoning_visual-mrc_train/images
+    no_system_prompt: true
+
+vqa_activitynet-qa_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_activitynet-qa_train/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_activitynet-qa_train/images
+    no_system_prompt: true
+    is_video: true
+
+vqa_docvqa_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_docvqa_train/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_docvqa_train/images
+    no_system_prompt: true
+
+vqa_gqa_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_gqa_train/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_gqa_train/images
+    no_system_prompt: true
+
+vqa_ivqa_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_ivqa_train/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_ivqa_train/images
+    no_system_prompt: true
+    is_video: true
+
+vqa_msrvtt-qa_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_msrvtt-qa_train/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_msrvtt-qa_train/images
+    no_system_prompt: true
+    is_video: true
+
+vqa_msvd-qa_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_msvd-qa_train/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_msvd-qa_train/images
+    no_system_prompt: true
+    is_video: true
+
+vqa_ocr-vqa_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_ocr-vqa_train/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_ocr-vqa_train/images
+    no_system_prompt: true
+
+vqa_st-vqa_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_st-vqa_train/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_st-vqa_train/images
+    no_system_prompt: true
+
+vqa_viquae_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_viquae_train/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_viquae_train/images
+    no_system_prompt: true
+
+vqa_vqa-v2_train:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_vqa-v2_train/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vflan/vqa_vqa-v2_train/images
+    no_system_prompt: true
+
+llava_1_5_mm_align:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-pretrain/LLaVA-CC3M-Pretrain-595K/chat.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-pretrain/LLaVA-CC3M-Pretrain-595K/images
+
+allava_caption_vflan:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-pretrain/ALLaVA-4V/ALLaVA-Caption-VFLAN-4V.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-pretrain/ALLaVA-4V/
+
+docmatix_750k:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-pretrain/Docmatix/conversations_750k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-pretrain/Docmatix
+
+docmatix_2:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-pretrain/Docmatix/conversations_750000-1000000.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-pretrain/Docmatix
+
+docmatix_3:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-pretrain/Docmatix/conversations_1000000-1250000.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-pretrain/Docmatix
+
+pdfa-1m:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-pretrain/pdfa/vanilla_qa/pdfa_1m.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-pretrain/pdfa/vanilla_qa
+
+unichart-pretrain-1m:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/unichart-pretrain-data/unichart-pretrain_processed_1m.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/UniChart-pretrain-images/content/images
+
+mtwi:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/mtwi_train/mtwi_processed.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/mtwi_train/image_train
+
+art1:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/ART/ART_processed1.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/ART/train_images
+
+art2:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/ART/ART_processed2.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/ART/train_task2_images
+
+lsvt:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/LSVT/LSVT_processed.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/LSVT/train_full_images
+
+sharegpt4v_pretrain:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/ShareGPT4V/jason-filter-share-captioner_coco_lcs_sam_1246k_1107.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/ShareGPT4V/data
+
+pathvqa:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pathvqa/pvqa/train_32k.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pathvqa/pvqa/images
+
+pmcvqa:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pmc-vqa/train_176k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/pmc-vqa/images
+
+medvqa:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/medvqa/train_data_17k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/medvqa/data/
+
+slake:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/slake/slake_train_val_instruct_high_freq_4.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/slake/imgs
+
+mimicvqa:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/MIMIC_VQA/all_images_json/llava_med_instruct_mimicvqa_train.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/MIMIC_VQA/images_small
+
+grandstaff_qa:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/grandstaff/grandstaff_converted.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/grandstaff/images
+
+sroie:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/sroie/SROIE_processed.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/sroie/train
+
+real-cqa:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/real-cqa/data.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/real-cqa/images
+
+lrv_instruction:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/LRV-Instruction/processed/lrv_instruction_321k.json
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/ShareGPT4V/data/vg
+
+chartqa_train_18k_cot2:
+    _target_: llava.data.LLaVACOTDataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground/chartqa_train_18k.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/InternVL/internvl_chat/playground/data/chartqa
+    name: chartqa_train_18k
+    cot_relabel_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/cot_llava_1021fixed_processed.json
+
+llave_onevision_images_sft_cot2:
+    _target_: llava.data.LLaVACOTDataset
+    data_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/LLaVA-OneVision-Data-processed/llava_onevision_sft_images_only_non_repeat_train@fix_relpath.jsonl
+    media_dir: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/LLaVA-OneVision-Data-processed/images
+    name: llave_onevision_images_sft
+    cot_relabel_path: /lustre/fsw/nvr_elm_llm/dataset/vila-sft/cot_llava_1021fixed_processed.json

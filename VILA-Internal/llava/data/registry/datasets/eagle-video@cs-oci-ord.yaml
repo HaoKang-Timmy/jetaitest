@@ -1,0 +1,186 @@
+---
+eagle/video-cap-ego4d-video-recap:
+    _target_: llava.data.EagleVideoWDSDataset
+    is_video: true
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-cap-ego4d-video-recap
+
+eagle/video-cap-egoexolearn-ego-untrimmed:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-cap-egoexolearn-ego-untrimmed
+    is_video: true
+
+eagle/video-cap-funqa-train-claude-20241022:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-cap-funqa-train-claude-20241022
+    is_video: true
+
+# eagle/video-cap-smit:
+#   _target_: llava.data.EagleVideoWDSDataset
+#   data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-cap-smit
+#   is_video: true
+
+eagle/video-cls-k400-full-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-cls-k400-full-train
+    is_video: true
+
+eagle/video-cls-sthv2-full-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-cls-sthv2-full-train
+    is_video: true
+
+# eagle/video-cls-videochat2-k710:
+#     _target_: llava.data.EagleVideoWDSDataset
+#     data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-cls-videochat2-k710
+#     is_video: true
+
+eagle/video-cls-videochat2-sthv2:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-cls-videochat2-sthv2
+    is_video: true
+
+eagle/video-conversation-vcg-human-single-turn:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-conversation-vcg-human-single-turn
+    is_video: true
+
+eagle/video-vqa-cinepile-mcq-multi-turn:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vqa-cinepile-mcq-multi-turn
+    is_video: true
+
+eagle/video-vqa-clevrerqa:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vqa-clevrerqa
+    is_video: true
+
+eagle/video-vqa-egotaskqa-oe-direct-singleturn:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vqa-egotaskqa-oe-direct-singleturn
+    is_video: true
+
+eagle/video-vqa-egotaskqa-oe-indirect-singleturn:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vqa-egotaskqa-oe-indirect-singleturn
+    is_video: true
+
+eagle/video-vqa-finevideo-oe-multiturn:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vqa-finevideo-oe-multiturn
+    is_video: true
+
+eagle/video-vqa-llava-hound:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vqa-llava-hound
+    is_video: true
+
+eagle/video-vqa-nextqa:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vqa-nextqa
+    is_video: true
+
+eagle/video-vqa-sportsqa-mcq-multiturn:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vqa-sportsqa-mcq-multiturn
+    is_video: true
+
+eagle/video-vqa-sportsqa-oe-multiturn:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vqa-sportsqa-oe-multiturn
+    is_video: true
+
+eagle/video-vqa-star:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vqa-star
+    is_video: true
+
+eagle/video-vqa-tvqa-long-mcq-multiturn-shuffle-repeat-2:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vqa-tvqa-long-mcq-multiturn-shuffle-repeat-2
+    is_video: true
+
+# empty tar
+# eagle/video-vqa-videochat2-egoqa:
+#   _target_: llava.data.EagleVideoWDSDataset
+#   data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vqa-videochat2-egoqa
+#   is_video: true
+
+eagle/video-vtg-anet-caption-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vtg-anet-caption-train
+    is_video: true
+
+eagle/video-vtg-anet-tal-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vtg-anet-tal-train
+    is_video: true
+
+eagle/video-vtg-charades-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vtg-charades-train
+    is_video: true
+
+eagle/video-vtg-coin-action-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vtg-coin-action-train
+    is_video: true
+
+eagle/video-vtg-coin-class-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vtg-coin-class-train
+    is_video: true
+
+eagle/video-vtg-didemo-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vtg-didemo-train
+    is_video: true
+
+eagle/video-vtg-ego4d-mq-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vtg-ego4d-mq-train
+    is_video: true
+
+eagle/video-vtg-ego4d-nlq-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vtg-ego4d-nlq-train
+    is_video: true
+
+eagle/video-vtg-hacs-tal-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vtg-hacs-tal-train
+    is_video: true
+
+eagle/video-vtg-hirest-class-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vtg-hirest-class-train
+    is_video: true
+
+eagle/video-vtg-hirest-step-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vtg-hirest-step-train
+    is_video: true
+
+eagle/video-vtg-medvidqa-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vtg-medvidqa-train
+    is_video: true
+
+eagle/video-vtg-perceptiontest-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vtg-perceptiontest-train
+    is_video: true
+
+eagle/video-vtg-qvhighlight-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vtg-qvhighlight-train
+    is_video: true
+
+eagle/video-vtg-tacos-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vtg-tacos-train
+    is_video: true
+
+eagle/video-vtg-youcook2-train:
+    _target_: llava.data.EagleVideoWDSDataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/eagle-video/wds/video-vtg-youcook2-train
+    is_video: true

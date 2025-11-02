@@ -1,0 +1,10 @@
+---
+dummy:
+    _target_: llava.data.DummyDataset
+    num_instances: 10000
+    comments: dummy dataset for testing
+
+sharegpt4v_sft:
+    _target_: llava.data.LLaVADataset
+    data_path: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/vila-sft/ShareGPT4V/jason-filter-sharegpt4v_mix665k_cap23k_coco-ap9k_lcs3k_sam9k_div2k.json
+    media_dir: /lustre/fsw/portfolios/nvr/projects/nvr_elm_llm/dataset/vila-sft/ShareGPT4V/data

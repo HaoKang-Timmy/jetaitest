@@ -1,0 +1,885 @@
+---
+eagle15_full:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate
+
+eagle/GroundUI:
+    # check groundui dataset on draco
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/GroundUI
+
+eagle/HME100K:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/HME100K
+
+eagle/IAM_words_text_recognition:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/IAM_words_text_recognition
+
+eagle/IMGUR5K:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/IMGUR5K
+
+eagle/Infinity-Instruct:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/Infinity-Instruct
+
+eagle/MMDU:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/MMDU
+
+eagle/MMInstruct_cn:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/MMInstruct_cn
+
+eagle/MMInstruct_qa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/MMInstruct_qa
+
+eagle/MTVQA:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/MTVQA
+
+eagle/NuminaMath-CoT:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/NuminaMath-CoT
+
+eagle/ORAND_CAR:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/ORAND_CAR
+
+eagle/OpenMathInstruct:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/OpenMathInstruct
+
+eagle/PDF_VQA:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/PDF_VQA
+
+eagle/RLAIF-V:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/RLAIF-V
+
+eagle/SPARK:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/SPARK
+
+eagle/SQuAD_VQA:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/SQuAD_VQA
+
+eagle/SlideVQA:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/SlideVQA
+
+eagle/StepDPO:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/StepDPO
+
+eagle/TAL_HW_MATH:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/TAL_HW_MATH
+
+eagle/TAL_OCR_ENG:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/TAL_OCR_ENG
+
+eagle/TAT_DQA:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/TAT_DQA
+
+eagle/UltraInteract_sft:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/UltraInteract_sft
+
+eagle/UniGeo:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/UniGeo
+
+eagle/VQA_CD:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/VQA_CD
+
+eagle/VQAonBD:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/VQAonBD
+
+eagle/VisualWebInstruct:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/VisualWebInstruct
+
+eagle/ai2d:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/ai2d
+
+eagle/ai2d_gpt:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/ai2d_gpt
+
+eagle/alfworldgpt:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/alfworldgpt
+
+eagle/allava_laion:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/allava_laion
+
+eagle/allava_vflan:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/allava_vflan
+
+eagle/animals:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/animals
+
+eagle/art_ocr:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/art_ocr
+
+eagle/arxivqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/arxivqa
+
+eagle/benthamQA:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/benthamQA
+
+eagle/block_digram:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/block_digram
+
+eagle/captcha:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/captcha
+
+eagle/cauldron_ai2d:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_ai2d
+
+eagle/cauldron_aokvqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_aokvqa
+
+eagle/cauldron_cocoqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_cocoqa
+
+eagle/cauldron_diagram_image_to_text:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_diagram_image_to_text
+
+eagle/cauldron_geomverse:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_geomverse
+
+eagle/cauldron_hateful_memes:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_hateful_memes
+
+eagle/cauldron_iam:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_iam
+
+eagle/cauldron_iconqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_iconqa
+
+eagle/cauldron_intergps:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_intergps
+
+eagle/cauldron_intergps_gpt:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_intergps_gpt
+
+eagle/cauldron_mapqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_mapqa
+
+eagle/cauldron_mimic_cgd:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_mimic_cgd
+
+eagle/cauldron_multihiertt:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_multihiertt
+
+eagle/cauldron_nlvr2:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_nlvr2
+
+eagle/cauldron_ocrvqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_ocrvqa
+
+eagle/cauldron_raven:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_raven
+
+eagle/cauldron_raven_2:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_raven_2
+
+eagle/cauldron_rendered_text:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_rendered_text
+
+eagle/cauldron_robut_sqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_robut_sqa
+
+eagle/cauldron_robut_wikisql:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_robut_wikisql
+
+eagle/cauldron_robut_wtq:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_robut_wtq
+
+eagle/cauldron_spot_the_diff:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_spot_the_diff
+
+eagle/cauldron_st_vqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_st_vqa
+
+eagle/cauldron_vistext:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_vistext
+
+eagle/cauldron_visual7w:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_visual7w
+
+eagle/cauldron_visualmrc:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_visualmrc
+
+eagle/cauldron_vqarad:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_vqarad
+
+eagle/cauldron_websight:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cauldron_websight
+
+eagle/cc3m_recap:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/cc3m_recap
+
+eagle/chart2text:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/chart2text
+
+eagle/chartqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/chartqa
+
+eagle/chartqa_aug:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/chartqa_aug
+
+eagle/chartqa_aug_yn:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/chartqa_aug_yn
+
+eagle/chartqa_qwen_max_cot:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/chartqa_qwen_max_cot
+
+eagle/chinese_meme:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/chinese_meme
+
+eagle/chrome_writting:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/chrome_writting
+
+eagle/clevr:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/clevr
+
+eagle/clevr_math:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/clevr_math
+
+eagle/clevr_math_qwenvl_cot:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/clevr_math_qwenvl_cot
+
+eagle/code_feedback:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/code_feedback
+
+eagle/colors:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/colors
+
+eagle/colpali:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/colpali
+
+eagle/ctw:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/ctw
+
+eagle/datikz:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/datikz
+
+eagle/deepfusion:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/deepfusion
+
+eagle/design2code:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/design2code
+
+eagle/digit_handwritten_latex:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/digit_handwritten_latex
+
+eagle/docmatrix:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/docmatrix
+
+eagle/docmatrix_2pages:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/docmatrix_2pages
+
+eagle/docreason:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/docreason
+
+eagle/docvqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/docvqa
+
+eagle/docvqa_cot:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/docvqa_cot
+
+eagle/docvqa_text:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/docvqa_text
+
+eagle/dvqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/dvqa
+
+eagle/est_vqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/est_vqa
+
+eagle/face_emotion:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/face_emotion
+
+eagle/figureqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/figureqa
+
+eagle/financeqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/financeqa
+
+eagle/geo:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/geo
+
+eagle/geos:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/geos
+
+eagle/geos_gpt:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/geos_gpt
+
+eagle/gpt_cauldron_raven:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_cauldron_raven
+
+eagle/gpt_chartqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_chartqa
+
+eagle/gpt_cocotext:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_cocotext
+
+eagle/gpt_ctw:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_ctw
+
+eagle/gpt_funsd:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_funsd
+
+eagle/gpt_hiertext:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_hiertext
+
+eagle/gpt_infovqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_infovqa
+
+eagle/gpt_landmark:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_landmark
+
+eagle/gpt_lvst:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_lvst
+
+eagle/gpt_maptext:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_maptext
+
+eagle/gpt_mtwi:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_mtwi
+
+eagle/gpt_nfv5:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_nfv5
+
+eagle/gpt_rects:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_rects
+
+eagle/gpt_roadtext:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_roadtext
+
+eagle/gpt_sroie:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_sroie
+
+eagle/gpt_tqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_tqa
+
+eagle/gpt_ureader:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_ureader
+
+eagle/gpt_wikiart:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gpt_wikiart
+
+eagle/gqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/gqa
+
+eagle/handwriting_forms:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/handwriting_forms
+
+eagle/handwriting_latex:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/handwriting_latex
+
+eagle/i2s-musicsheet:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/i2s-musicsheet
+
+eagle/idk:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/idk
+
+eagle/iiit5k:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/iiit5k
+
+eagle/iiit5k_aug:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/iiit5k_aug
+
+eagle/image_textualization:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/image_textualization
+
+eagle/indoor_qa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/indoor_qa
+
+eagle/infinitymath:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/infinitymath
+
+eagle/infos_v1:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/infos_v1
+
+eagle/infos_v2:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/infos_v2
+
+eagle/infovqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/infovqa
+
+eagle/invoice:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/invoice
+
+eagle/k12_ext:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/k12_ext
+
+eagle/k12_printing:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/k12_printing
+
+eagle/koniq:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/koniq
+
+eagle/koniq2:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/koniq2
+
+eagle/kvqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/kvqa
+
+eagle/latex_formula:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/latex_formula
+
+eagle/liaion_gpt4v:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/liaion_gpt4v
+
+eagle/llava-critic-113k:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/llava-critic-113k
+
+eagle/llava_instruct_150k:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/llava_instruct_150k
+
+eagle/llava_instruct_150k_zh:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/llava_instruct_150k_zh
+
+eagle/llavar:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/llavar
+
+eagle/lnqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/lnqa
+
+eagle/lrv_chart:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/lrv_chart
+
+eagle/lvis_instruct4v:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/lvis_instruct4v
+
+eagle/mathinstruct:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/mathinstruct
+
+eagle/mathvision:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/mathvision
+
+eagle/mathvision_cot:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/mathvision_cot
+
+eagle/mavis_math_metagen:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/mavis_math_metagen
+
+eagle/mavis_math_metagen_cot:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/mavis_math_metagen_cot
+
+eagle/mavis_math_rule_geo:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/mavis_math_rule_geo
+
+eagle/md_arxiv:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/md_arxiv
+
+eagle/memes:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/memes
+
+eagle/memotion:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/memotion
+
+eagle/meta_mathqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/meta_mathqa
+
+eagle/mmc_inst:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/mmc_inst
+
+eagle/mmra:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/mmra
+
+eagle/movie_posters:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/movie_posters
+
+eagle/music:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/music
+
+eagle/object365_coordinate_train_coord_detect_all:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/object365_coordinate_train_coord_detect_all
+
+eagle/object365_exists_train_exist:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/object365_exists_train_exist
+
+eagle/object365_exists_train_exist_logic:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/object365_exists_train_exist_logic
+
+eagle/ocra:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/ocra
+
+eagle/oodvqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/oodvqa
+
+eagle/openhermes:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/openhermes
+
+eagle/orca_math:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/orca_math
+
+eagle/pathvqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/pathvqa
+
+eagle/place365:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/place365
+
+eagle/plotqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/plotqa
+
+eagle/pmc_vqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/pmc_vqa
+
+eagle/python_code_25k:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/python_code_25k
+
+eagle/python_code_instructions_18k_alpaca:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/python_code_instructions_18k_alpaca
+
+eagle/recipe:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/recipe
+
+eagle/rects:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/rects
+
+eagle/ref3coco:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/ref3coco
+
+eagle/refcocog:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/refcocog
+
+eagle/runs:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/runs
+
+eagle/ruozhiba:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/ruozhiba
+
+eagle/sam_77k:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/sam_77k
+
+eagle/scale_nv:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/scale_nv
+
+eagle/scienceqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/scienceqa
+
+eagle/scienceqa_onevision:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/scienceqa_onevision
+
+eagle/sciqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/sciqa
+
+eagle/screenqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/screenqa
+
+eagle/sft_zh:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/sft_zh
+
+eagle/sharegpt4o:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/sharegpt4o
+
+eagle/sharegpt4v100k:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/sharegpt4v100k
+
+eagle/sharegpt4v665k:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/sharegpt4v665k
+
+eagle/sketchyvqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/sketchyvqa
+
+eagle/sketchyvqa_8k_qwenvl_cot:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/sketchyvqa_8k_qwenvl_cot
+
+eagle/spatialsense:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/spatialsense
+
+eagle/sroie:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/sroie
+
+eagle/super_clevr:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/super_clevr
+
+eagle/svrd:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/svrd
+
+eagle/synthdog:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/synthdog
+
+eagle/tab_mwp:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/tab_mwp
+
+eagle/tablellm:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/tablellm
+
+eagle/tallyqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/tallyqa
+
+eagle/textbooks_nv:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/textbooks_nv
+
+eagle/textcaps:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/textcaps
+
+eagle/textocr_gpt4v:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/textocr_gpt4v
+
+eagle/textvqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/textvqa
+
+eagle/textvqa_text:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/textvqa_text
+
+eagle/theoremqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/theoremqa
+
+eagle/theoremqa_gpt:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/theoremqa_gpt
+
+eagle/tmdb-celeb-10k:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/tmdb-celeb-10k
+
+eagle/tqa:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/tqa
+
+eagle/unichart:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/unichart
+
+eagle/ureader:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/ureader
+
+eagle/video_order:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/video_order
+
+eagle/viquae:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/viquae
+
+eagle/vqav2:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/vqav2
+
+eagle/vqav2_ext:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/vqav2_ext
+
+eagle/vsr:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/vsr
+
+eagle/wds_second_iteration_v3:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/wds_second_iteration_v3
+
+eagle/weather:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/weather
+
+eagle/wikiart_type:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/wikiart_type
+
+eagle/wildvision:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/wildvision
+
+eagle/wizardlm:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/wizardlm
+
+eagle/wordart:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/wordart
+
+eagle/wordart_grid:
+    _target_: llava.data.EagleWDSDataset
+    data_path: /home/ligengz/nvr_elm_llm/dataset/eagle/webdataset/stage1.5_separate/wordart_grid
